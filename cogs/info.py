@@ -10,7 +10,11 @@ import logging
 import datetime
 import platform
 import time
-import psutil
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 import os
 from utils.embeds import comprehensive_embed, info_embed, error_embed
 
@@ -377,9 +381,12 @@ class Info(commands.GroupCog, name="info"):
         latency     = round(self.bot.latency * 1000)
 
         try:
-            proc   = psutil.Process(os.getpid())
-            mem_mb = proc.memory_info().rss / 1024 / 1024
-            cpu    = proc.cpu_percent(interval=0.1)
+            if HAS_PSUTIL:
+                proc   = psutil.Process(os.getpid())
+                mem_mb = proc.memory_info().rss / 1024 / 1024
+                cpu    = proc.cpu_percent(interval=0.1)
+            else:
+                mem_mb, cpu = 0.0, 0.0
         except Exception:
             mem_mb, cpu = 0.0, 0.0
 
