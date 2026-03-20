@@ -1,5 +1,6 @@
 """XERO Bot — Server Management & Logging (14 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -33,6 +34,7 @@ class Server(commands.GroupCog, name="server"):
 
     @app_commands.command(name="bans", description="List the most recent bans in this server.")
     @app_commands.checks.has_permissions(ban_members=True)
+    @command_guard
     async def bans(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         bans = [entry async for entry in interaction.guild.bans(limit=20)]
@@ -130,6 +132,7 @@ class Server(commands.GroupCog, name="server"):
 
     @app_commands.command(name="audit-log", description="View the last 10 audit log entries for this server.")
     @app_commands.checks.has_permissions(view_audit_log=True)
+    @command_guard
     async def audit_log(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         entries = []

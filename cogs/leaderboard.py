@@ -1,5 +1,6 @@
 """XERO Bot — Leaderboards (3 commands) — XP, Economy, Activity"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -15,6 +16,7 @@ class Leaderboard(commands.GroupCog, name="leaderboard"):
         self.bot = bot
 
     @app_commands.command(name="xp", description="Server XP leaderboard — levels, total XP, and multipliers for the top 15.")
+    @command_guard
     async def xp(self, interaction: discord.Interaction):
         await interaction.response.defer()
         lb = await self.bot.db.get_level_leaderboard(interaction.guild.id, 15)
@@ -70,6 +72,7 @@ class Leaderboard(commands.GroupCog, name="leaderboard"):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="economy", description="Server wealth leaderboard — wallet, bank, net worth for the top 15 richest members.")
+    @command_guard
     async def economy(self, interaction: discord.Interaction):
         await interaction.response.defer()
         lb = await self.bot.db.get_economy_leaderboard(interaction.guild.id, 15)
@@ -125,6 +128,7 @@ class Leaderboard(commands.GroupCog, name="leaderboard"):
         await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="commands", description="Most active members leaderboard — commands used and messages sent.")
+    @command_guard
     async def commands_lb(self, interaction: discord.Interaction):
         await interaction.response.defer()
         lb = await self.bot.db.get_stats_leaderboard(interaction.guild.id, 15)

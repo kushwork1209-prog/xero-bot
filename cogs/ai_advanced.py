@@ -1,5 +1,6 @@
 """XERO Bot — Advanced AI Features (8 commands) — AI Debate, RPG, Advisor, Coach"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -19,6 +20,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
     # ── AI Debate ─────────────────────────────────────────────────────────
     @app_commands.command(name="debate", description="Watch two AI personas argue both sides of any topic live in chat.")
     @app_commands.describe(topic="Topic to debate", rounds="Number of debate rounds (1-4)")
+    @command_guard
     async def debate(self, interaction: discord.Interaction, topic: str, rounds: int = 2):
         await interaction.response.defer()
         rounds = max(1, min(4, rounds))
@@ -102,6 +104,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         app_commands.Choice(name="🗡️ Rogue", value="Rogue"),
         app_commands.Choice(name="🛡️ Paladin", value="Paladin"),
     ])
+    @command_guard
     async def rpg_start(self, interaction: discord.Interaction, character_name: str, character_class: str = "Warrior", setting: str = "a dark fantasy realm"):
         await interaction.response.defer()
         uid = interaction.user.id
@@ -139,6 +142,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
 
     @app_commands.command(name="rpg-action", description="Make a choice in your RPG adventure.")
     @app_commands.describe(action="What you do (type a number 1-3 or describe your action)")
+    @command_guard
     async def rpg_action(self, interaction: discord.Interaction, action: str):
         await interaction.response.defer()
         uid = interaction.user.id
@@ -186,6 +190,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
     @app_commands.command(name="mod-advice", description="Get AI-powered moderation advice for a user's case history.")
     @app_commands.describe(user="User to analyze")
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def mod_advice(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True)
         cases = await self.bot.db.get_mod_cases(interaction.guild.id, user.id, limit=10)
@@ -223,6 +228,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
     # ── AI Communication Coach ────────────────────────────────────────────
     @app_commands.command(name="coach", description="Get AI feedback on your writing — tone, clarity, impact, and improvement tips.")
     @app_commands.describe(text="The text you want analyzed and improved")
+    @command_guard
     async def coach(self, interaction: discord.Interaction, text: str):
         await interaction.response.defer()
         prompt = (
@@ -255,6 +261,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         app_commands.Choice(name="Detailed", value="detailed"),
         app_commands.Choice(name="Expert / Technical", value="expert"),
     ])
+    @command_guard
     async def explain(self, interaction: discord.Interaction, concept: str, level: str = "simple"):
         await interaction.response.defer()
         level_prompts = {

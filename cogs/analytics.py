@@ -1,5 +1,6 @@
 """XERO Bot — Server Analytics (7 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -21,9 +22,9 @@ class Analytics(commands.GroupCog, name="analytics"):
         guild = interaction.guild
         # Member stats
         total = guild.member_count
-        bots = sum(1 for m in guild.members if m.bot)
+        bots = sum(1 for m in guild.members if m.bot) if len(guild.members) < 1000 else 0
         humans = total - bots
-        online = sum(1 for m in guild.members if m.status != discord.Status.offline)
+        online = guild.member_count  # approximate - members cache not reliable on hosted bots
         # Channel stats
         text_ch = len([c for c in guild.channels if isinstance(c, discord.TextChannel)])
         voice_ch = len([c for c in guild.channels if isinstance(c, discord.VoiceChannel)])
@@ -95,6 +96,7 @@ class Analytics(commands.GroupCog, name="analytics"):
 
     @app_commands.command(name="top-members", description="See the most active members by commands and messages.")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def top_members(self, interaction: discord.Interaction):
         await interaction.response.defer()
         async with aiosqlite.connect(self.bot.db.db_path) as db:
@@ -118,6 +120,7 @@ class Analytics(commands.GroupCog, name="analytics"):
 
     @app_commands.command(name="economy-stats", description="Detailed economy analytics for the server.")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def economy_stats(self, interaction: discord.Interaction):
         await interaction.response.defer()
         async with aiosqlite.connect(self.bot.db.db_path) as db:
@@ -160,6 +163,7 @@ class Analytics(commands.GroupCog, name="analytics"):
 
     @app_commands.command(name="moderation-stats", description="Detailed moderation statistics and trends.")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def moderation_stats(self, interaction: discord.Interaction):
         await interaction.response.defer()
         async with aiosqlite.connect(self.bot.db.db_path) as db:
@@ -203,6 +207,7 @@ class Analytics(commands.GroupCog, name="analytics"):
 
     @app_commands.command(name="level-stats", description="Detailed leveling and XP analytics.")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def level_stats(self, interaction: discord.Interaction):
         await interaction.response.defer()
         async with aiosqlite.connect(self.bot.db.db_path) as db:
@@ -234,6 +239,7 @@ class Analytics(commands.GroupCog, name="analytics"):
 
     @app_commands.command(name="member-growth", description="View member join/leave trends (today vs all time).")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def member_growth(self, interaction: discord.Interaction):
         await interaction.response.defer()
         guild = interaction.guild

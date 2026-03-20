@@ -20,6 +20,7 @@ Channels (all separately configurable or one unified):
   #log-voice     →  every voice state + session durations
 """
 import discord
+from utils.guard import command_guard
 from discord.ext import commands, tasks
 from discord import app_commands
 import logging, datetime, aiosqlite
@@ -977,6 +978,7 @@ class LoggingConfig(commands.GroupCog, name="logs"):
     @app_commands.command(name="user", description="Pull every XERO log for a user — mod cases, warnings, tickets, economy, cross-server history.")
     @app_commands.describe(user="The user to pull logs for")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def user_logs(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True)
         pages = await _collect_user_logs(self.bot, interaction.guild, user)

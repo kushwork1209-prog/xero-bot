@@ -1,5 +1,6 @@
 """XERO Bot — Moderation (16 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -183,6 +184,7 @@ class Moderation(commands.GroupCog, name="mod"):
     @app_commands.command(name="purge", description="Delete multiple messages at once (up to 100).")
     @app_commands.describe(amount="Number of messages to delete", user="Only delete messages from this user (optional)")
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def purge(self, interaction: discord.Interaction, amount: int, user: discord.Member = None):
         amount = max(1, min(100, amount))
         await interaction.response.defer(ephemeral=True)

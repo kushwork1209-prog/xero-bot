@@ -5,6 +5,7 @@ announces milestones, and makes the server feel alive.
 This is what makes people actually LIKE the bot vs just using it.
 """
 import discord
+from utils.guard import command_guard
 from discord.ext import commands, tasks
 from discord import app_commands
 import logging
@@ -181,6 +182,7 @@ class Personality(commands.Cog):
         app_commands.Choice(name="🌙 Be Philosophical", value="philosophical"),
         app_commands.Choice(name="🎲 Random", value="random"),
     ])
+    @command_guard
     async def xero_quote(self, interaction: discord.Interaction, mood: str = "random"):
         await interaction.response.defer()
         mood_prompts = {
@@ -215,6 +217,7 @@ class Personality(commands.Cog):
     # ── /vibe-check ────────────────────────────────────────────────────────
     @app_commands.command(name="vibe-check", description="XERO reads the last 30 messages in this channel and gives its honest take.")
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def vibe_check(self, interaction: discord.Interaction):
         await interaction.response.defer()
         messages = []
@@ -247,6 +250,7 @@ class Personality(commands.Cog):
     # ── /roast-server ──────────────────────────────────────────────────────
     @app_commands.command(name="roast-server", description="XERO gives this server a playful roast based on its stats and setup.")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def roast_server(self, interaction: discord.Interaction):
         await interaction.response.defer()
         guild = interaction.guild

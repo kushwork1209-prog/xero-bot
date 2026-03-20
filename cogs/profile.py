@@ -1,5 +1,6 @@
 """XERO Bot — Advanced Info & Profile Commands (12 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -147,6 +148,7 @@ class ImageGen(commands.GroupCog, name="imagine"):
         app_commands.Choice(name="Flux 3D", value="flux-3d"),
         app_commands.Choice(name="Turbo (Fastest)", value="turbo"),
     ])
+    @command_guard
     async def generate(self, interaction: discord.Interaction, prompt: str, model: str = "flux", width: int = 1024, height: int = 1024):
         await interaction.response.defer()
         import random
@@ -171,6 +173,7 @@ class ImageGen(commands.GroupCog, name="imagine"):
 
     @app_commands.command(name="variations", description="Generate 3 variations of an image with the same prompt.")
     @app_commands.describe(prompt="Image description")
+    @command_guard
     async def variations(self, interaction: discord.Interaction, prompt: str):
         await interaction.response.defer()
         import random
@@ -193,6 +196,7 @@ class ImageGen(commands.GroupCog, name="imagine"):
         app_commands.Choice(name="Cyberpunk", value="cyberpunk neon portrait"),
         app_commands.Choice(name="Sketch", value="pencil sketch portrait"),
     ])
+    @command_guard
     async def avatar_style(self, interaction: discord.Interaction, user: discord.Member = None, style: str = "anime portrait"):
         await interaction.response.defer()
         import random

@@ -4,6 +4,7 @@ All information commands in one clean, consistent, hyper-detailed group.
 Replaces: userinfo, serverinfo, roleinfo, channelinfo, botinfo (scattered across utility/server/profile)
 """
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -30,6 +31,7 @@ class Info(commands.GroupCog, name="info"):
     # ── /info user ────────────────────────────────────────────────────────
     @app_commands.command(name="user", description="Get the most detailed breakdown of any user — account, server stats, level, economy, mod history.")
     @app_commands.describe(user="User to inspect (defaults to yourself)")
+    @command_guard
     async def user(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
         await interaction.response.defer()
@@ -147,6 +149,7 @@ class Info(commands.GroupCog, name="info"):
 
     # ── /info server ──────────────────────────────────────────────────────
     @app_commands.command(name="server", description="Complete server breakdown — members, channels, boosts, security, activity stats.")
+    @command_guard
     async def server(self, interaction: discord.Interaction):
         await interaction.response.defer()
         g = interaction.guild

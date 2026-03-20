@@ -1,5 +1,6 @@
 """XERO Bot — Admin Dashboard (interactive panel)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -208,6 +209,7 @@ class Admin(commands.Cog):
     @app_commands.command(name="purge-bots", description="[Admin] Delete all messages sent by bots in this channel.")
     @app_commands.describe(limit="How many messages back to scan (max 200)")
     @app_commands.checks.has_permissions(administrator=True)
+    @command_guard
     async def purge_bots(self, interaction: discord.Interaction, limit: int = 100):
         limit = max(1, min(200, limit))
         await interaction.response.defer(ephemeral=True)

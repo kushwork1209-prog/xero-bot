@@ -579,6 +579,7 @@ class _ToolsPanel(_Panel):
     async def reload_cog(self, i, _b): await i.response.send_modal(_ReloadCogModal(self.bot))
 
     @discord.ui.button(label="↑ Sync Commands",   style=discord.ButtonStyle.primary,   row=0)
+    @command_guard
     async def sync(self, i: discord.Interaction, _b):
         await i.response.defer(ephemeral=True)
         synced  = await self.bot.tree.sync()
@@ -1286,6 +1287,7 @@ class ManagementDashboard(discord.ui.View):
         await i.response.edit_message(embed=await p.make_embed(i.guild), view=p)
 
     @discord.ui.button(label="🏥 Health",    style=discord.ButtonStyle.secondary, row=1)
+    @command_guard
     async def btn_health(self, i: discord.Interaction, _b):
         await i.response.defer()
         p = _HealthPanel(self.bot)
@@ -1305,6 +1307,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
 
     @app_commands.command(name="dashboard", description="Open the XERO Management Dashboard — 8-panel black/white/blue control centre.")
     @is_management()
+    @command_guard
     async def dashboard(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await _ensure_mgmt_tables(self.bot.db.db_path)

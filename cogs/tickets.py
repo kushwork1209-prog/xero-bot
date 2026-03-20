@@ -582,6 +582,7 @@ class Tickets(commands.GroupCog, name="ticket"):
     @app_commands.command(name="history", description="Browse closed tickets latest to earliest. ◀ ▶ to navigate. Filter by user optionally.")
     @app_commands.describe(user="Filter to a specific user's tickets (optional)")
     @app_commands.checks.has_permissions(manage_channels=True)
+    @command_guard
     async def history(self, interaction: discord.Interaction, user: discord.Member=None):
         await interaction.response.defer(ephemeral=True)
         q = "SELECT * FROM tickets WHERE guild_id=? AND status='closed'"
@@ -623,6 +624,7 @@ class Tickets(commands.GroupCog, name="ticket"):
 
     @app_commands.command(name="transcript", description="Export a text transcript of this ticket.")
     @app_commands.checks.has_permissions(manage_channels=True)
+    @command_guard
     async def transcript(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         lines = []

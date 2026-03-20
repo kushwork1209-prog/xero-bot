@@ -1,5 +1,6 @@
 """XERO Bot — Levels & XP System (8 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -15,6 +16,7 @@ class Levels(commands.GroupCog, name="levels"):
 
     @app_commands.command(name="rank", description="View your level, XP progress bar, server rank, multiplier, and next reward.")
     @app_commands.describe(user="User to check (default: yourself)")
+    @command_guard
     async def rank(self, interaction: discord.Interaction, user: discord.Member = None):
         await interaction.response.defer()
         target   = user or interaction.user

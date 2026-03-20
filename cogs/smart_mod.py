@@ -4,6 +4,7 @@ Raid detection, auto-escalation, mass-join protection, server health AI analysis
 This is what makes staff teams actually rely on XERO over every other bot.
 """
 import discord
+from utils.guard import command_guard
 from discord.ext import commands, tasks
 from discord import app_commands
 import logging
@@ -149,6 +150,7 @@ class SmartMod(commands.GroupCog, name="smart"):
     # ── /smart health ──────────────────────────────────────────────────────
     @app_commands.command(name="health", description="Get an AI-powered server health score — mod activity, member retention, bot usage.")
     @app_commands.checks.has_permissions(manage_guild=True)
+    @command_guard
     async def health(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
@@ -365,6 +367,7 @@ class SmartMod(commands.GroupCog, name="smart"):
     # ── /smart warn-stats ──────────────────────────────────────────────────
     @app_commands.command(name="warn-stats", description="View warning statistics — top offenders, trends, most common reasons.")
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def warn_stats(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         async with aiosqlite.connect(self.bot.db.db_path) as db:

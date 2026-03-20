@@ -1,5 +1,6 @@
 """XERO Bot — Backup System (5 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -18,6 +19,7 @@ class Backup(commands.GroupCog, name="backup"):
     @app_commands.command(name="create", description="Create a backup of all server bot settings.")
     @app_commands.describe(name="Optional label for this backup")
     @app_commands.checks.has_permissions(administrator=True)
+    @command_guard
     async def create(self, interaction: discord.Interaction, name: str = None):
         await interaction.response.defer(ephemeral=True)
         settings = await self.bot.db.get_guild_settings(interaction.guild.id)
@@ -57,6 +59,7 @@ class Backup(commands.GroupCog, name="backup"):
     @app_commands.command(name="restore", description="Restore server settings from a backup by ID.")
     @app_commands.describe(backup_id="Backup ID from /backup list")
     @app_commands.checks.has_permissions(administrator=True)
+    @command_guard
     async def restore(self, interaction: discord.Interaction, backup_id: int):
         await interaction.response.defer(ephemeral=True)
         async with aiosqlite.connect(self.bot.db.db_path) as db:
@@ -87,6 +90,7 @@ class Backup(commands.GroupCog, name="backup"):
     @app_commands.command(name="export", description="Export a backup as a downloadable JSON file.")
     @app_commands.describe(backup_id="Backup ID to export")
     @app_commands.checks.has_permissions(administrator=True)
+    @command_guard
     async def export(self, interaction: discord.Interaction, backup_id: int):
         await interaction.response.defer(ephemeral=True)
         async with aiosqlite.connect(self.bot.db.db_path) as db:

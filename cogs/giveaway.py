@@ -1,5 +1,6 @@
 """XERO Bot — Giveaway System (8 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands, tasks
 from discord import app_commands
 import logging
@@ -115,6 +116,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @app_commands.command(name="end", description="Immediately end a giveaway and pick winners.")
     @app_commands.describe(giveaway_id="ID of the giveaway to end")
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def end(self, interaction: discord.Interaction, giveaway_id: int):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             db.row_factory = aiosqlite.Row

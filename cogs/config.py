@@ -1403,6 +1403,7 @@ class Config(commands.GroupCog, name="config"):
         description="View the full current welcome setup with a live preview of the card."
     )
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def welcome_view(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         s = await _s(self.bot, interaction.guild.id)
@@ -1523,6 +1524,7 @@ class Config(commands.GroupCog, name="config"):
         description="Preview exactly what the welcome DM looks like, with image."
     )
     @app_commands.checks.has_permissions(manage_messages=True)
+    @command_guard
     async def welcome_dm_view(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         s = await _s(self.bot, interaction.guild.id)

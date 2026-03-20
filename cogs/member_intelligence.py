@@ -502,6 +502,7 @@ class Intelligence(commands.GroupCog, name="intel"):
 
     @app_commands.command(name="who-knows", description="Find members in this server who know a specific skill.")
     @app_commands.describe(skill="Skill to search for (e.g. React, Python, music production, Photoshop)")
+    @command_guard
     async def who_knows(self, interaction: discord.Interaction, skill: str):
         await interaction.response.defer()
         experts = await get_guild_skill_experts(self.bot.db.db_path, interaction.guild.id, skill)

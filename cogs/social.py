@@ -1,5 +1,6 @@
 """XERO Bot — Social with real GIFs + 12 actions"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging, random, aiohttp
@@ -44,6 +45,7 @@ async def fetch_gif(action: str):
 class Social(commands.GroupCog, name="social"):
     def __init__(self, bot): self.bot = bot
 
+    @command_guard
     async def _act(self, interaction, action, user):
         if user==interaction.user: return await interaction.response.send_message(f"You can't {action} yourself!",ephemeral=True)
         await interaction.response.defer()

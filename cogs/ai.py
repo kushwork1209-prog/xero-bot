@@ -1,5 +1,6 @@
 """XERO Bot — AI Commands (15 commands) — Powered by NVIDIA Llama 4 Maverick"""
 import discord
+from utils.guard import command_guard
 import asyncio
 from discord.ext import commands
 from discord import app_commands
@@ -30,6 +31,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Ask ───────────────────────────────────────────────────────────────
     @app_commands.command(name="ask", description="Ask the AI any question and get a detailed, intelligent answer.")
     @app_commands.describe(question="Your question for the AI", image_url="Optional image URL for image analysis")
+    @command_guard
     async def ask(self, interaction: discord.Interaction, question: str, image_url: str = None):
         await interaction.response.defer()
         if image_url:
@@ -42,6 +44,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Chat ──────────────────────────────────────────────────────────────
     @app_commands.command(name="chat", description="Have a context-aware conversation with the AI (remembers history).")
     @app_commands.describe(message="Your message to the AI")
+    @command_guard
     async def chat(self, interaction: discord.Interaction, message: str):
         await interaction.response.defer()
         gid = interaction.guild.id
@@ -59,6 +62,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Summarize ─────────────────────────────────────────────────────────
     @app_commands.command(name="summarize", description="Summarize any text or recent chat messages.")
     @app_commands.describe(text="Text to summarize (leave empty to summarize last 50 messages)", limit="Number of chat messages to summarize")
+    @command_guard
     async def summarize(self, interaction: discord.Interaction, text: str = None, limit: int = 50):
         await interaction.response.defer()
         content = text
@@ -76,6 +80,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Translate ─────────────────────────────────────────────────────────
     @app_commands.command(name="translate", description="Translate text to any language with high accuracy.")
     @app_commands.describe(text="Text to translate", language="Target language (e.g. Spanish, French, Japanese)")
+    @command_guard
     async def translate(self, interaction: discord.Interaction, text: str, language: str = "Spanish"):
         await interaction.response.defer()
         response = await self.bot.nvidia.translate(text, language)
@@ -86,6 +91,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Brainstorm ────────────────────────────────────────────────────────
     @app_commands.command(name="brainstorm", description="Generate creative ideas on any topic.")
     @app_commands.describe(topic="Topic to brainstorm about", count="Number of ideas to generate (max 15)")
+    @command_guard
     async def brainstorm(self, interaction: discord.Interaction, topic: str, count: int = 10):
         await interaction.response.defer()
         count = max(3, min(15, count))
@@ -95,6 +101,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Code Explain ──────────────────────────────────────────────────────
     @app_commands.command(name="code-explain", description="Get a detailed explanation of any code snippet.")
     @app_commands.describe(code="Code to explain")
+    @command_guard
     async def code_explain(self, interaction: discord.Interaction, code: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.explain_code(code)
@@ -103,6 +110,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Code Debug ────────────────────────────────────────────────────────
     @app_commands.command(name="code-debug", description="Debug code and get a fixed version with explanations.")
     @app_commands.describe(code="Code to debug", error="Error message you're seeing (optional)")
+    @command_guard
     async def code_debug(self, interaction: discord.Interaction, code: str, error: str = ""):
         await interaction.response.defer()
         response = await self.bot.nvidia.debug_code(code, error)
@@ -111,6 +119,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Sentiment ─────────────────────────────────────────────────────────
     @app_commands.command(name="sentiment", description="Deep sentiment and emotional analysis of any text.")
     @app_commands.describe(text="Text to analyze")
+    @command_guard
     async def sentiment(self, interaction: discord.Interaction, text: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.analyze_sentiment(text)
@@ -129,6 +138,7 @@ class AI(commands.GroupCog, name="ai"):
         app_commands.Choice(name="Persuasive", value="persuasive and compelling"),
         app_commands.Choice(name="Poetic", value="poetic and creative"),
     ])
+    @command_guard
     async def rewrite(self, interaction: discord.Interaction, text: str, style: str = "professional"):
         await interaction.response.defer()
         response = await self.bot.nvidia.rewrite(text, style)
@@ -139,6 +149,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Grammar Check ─────────────────────────────────────────────────────
     @app_commands.command(name="grammar", description="Check grammar, spelling, and style with detailed corrections.")
     @app_commands.describe(text="Text to grammar-check")
+    @command_guard
     async def grammar(self, interaction: discord.Interaction, text: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.check_grammar(text)
@@ -147,6 +158,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Generate ──────────────────────────────────────────────────────────
     @app_commands.command(name="generate", description="Generate any type of content: stories, emails, scripts, posts, etc.")
     @app_commands.describe(prompt="Describe what you want generated in detail")
+    @command_guard
     async def generate(self, interaction: discord.Interaction, prompt: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.generate(prompt, max_tokens=1500)
@@ -155,6 +167,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Fact Check ────────────────────────────────────────────────────────
     @app_commands.command(name="fact-check", description="AI fact-check any claim with detailed analysis and verdict.")
     @app_commands.describe(claim="The claim or statement to fact-check")
+    @command_guard
     async def fact_check(self, interaction: discord.Interaction, claim: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.fact_check(claim)
@@ -165,6 +178,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Roast ─────────────────────────────────────────────────────────────
     @app_commands.command(name="roast", description="Generate a funny, playful roast of anything (keep it lighthearted!).")
     @app_commands.describe(target="What or who to roast")
+    @command_guard
     async def roast(self, interaction: discord.Interaction, target: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.roast(target)
@@ -173,6 +187,7 @@ class AI(commands.GroupCog, name="ai"):
     # ── Image Analyze ─────────────────────────────────────────────────────
     @app_commands.command(name="analyze-image", description="Analyze any image URL using NVIDIA Vision AI.")
     @app_commands.describe(image_url="Direct URL of the image to analyze", question="What do you want to know about the image?")
+    @command_guard
     async def analyze_image(self, interaction: discord.Interaction, image_url: str, question: str = "Describe this image in comprehensive detail."):
         await interaction.response.defer()
         response = await self.bot.nvidia.analyze_image_url(image_url, question)
