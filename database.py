@@ -1076,6 +1076,7 @@ class Database:
                 "welcome_card_text_pos TEXT DEFAULT 'bottom_left'",
                 "welcome_card_overlay TEXT DEFAULT 'gradient'",
                 "welcome_card_font_size INTEGER DEFAULT 52",
+                "welcome_card_image_data TEXT",
             ]
             for col in new_v4_cols:
                 try: await db.execute(f"ALTER TABLE guild_settings ADD COLUMN {col}")

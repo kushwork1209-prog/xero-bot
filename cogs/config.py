@@ -1328,8 +1328,8 @@ class Config(commands.GroupCog, name="config"):
                 async with _aio.ClientSession() as sess:
                     async with sess.get(image.url, timeout=_aio.ClientTimeout(total=15)) as r:
                         img_bytes = await r.read()
-                from utils.welcome_card import save_base_image
-                save_base_image(interaction.guild.id, img_bytes)
+                from utils.welcome_card import save_base_image_async
+                await save_base_image_async(interaction.guild.id, img_bytes)
                 # Clear URL-based fallbacks since file is now primary
                 await _set(self.bot, interaction.guild.id, "welcome_image_url",   None)
                 await _set(self.bot, interaction.guild.id, "welcome_use_banner",  0)
@@ -1341,13 +1341,14 @@ class Config(commands.GroupCog, name="config"):
                 )
 
         # Generate live preview
-        from utils.welcome_card import generate_welcome_card, fetch_avatar, _get_base_image
+        from utils.welcome_card import generate_welcome_card, fetch_avatar, get_base_image_async
         import io as _io
-
-        if _get_base_image(interaction.guild.id):
+        _base_img = await get_base_image_async(interaction.guild.id)
+        if _base_img:
             av = await fetch_avatar(str(interaction.user.display_avatar.url))
             card = generate_welcome_card(
                 guild_id=interaction.guild.id,
+                base_bytes=_base_img,
                 member_name=interaction.user.display_name,
                 member_avatar_bytes=av,
                 text_color=text_color, text_position=text_position,

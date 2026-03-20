@@ -295,12 +295,14 @@ class Events(commands.Cog):
 
                     # Welcome card — personalized image with name overlay
                     # Priority: uploaded file (with name) → server banner → AI URL → nothing
-                    from utils.welcome_card import generate_welcome_card, fetch_avatar, _get_base_image
-                    if _get_base_image(member.guild.id):
+                    from utils.welcome_card import generate_welcome_card, fetch_avatar, get_base_image_async
+                    _base_img = await get_base_image_async(member.guild.id)
+                    if _base_img:
                         # Admin uploaded an image — generate personalized card
                         avatar_bytes = await fetch_avatar(str(member.display_avatar.url)) if settings.get("welcome_card_show_avatar", 1) else None
                         card_bytes   = generate_welcome_card(
                             guild_id          = member.guild.id,
+                            base_bytes        = _base_img,
                             member_name       = member.display_name if settings.get("welcome_card_show_name", 1) else "",
                             member_avatar_bytes = avatar_bytes,
                             text_color        = settings.get("welcome_card_text_color", "#FFFFFF"),
