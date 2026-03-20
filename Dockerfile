@@ -6,18 +6,22 @@ RUN apt-get update && apt-get install -y \
     libopus0 \
     libffi-dev \
     libnacl-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install dependencies first (better layer caching)
+# Install Python deps first (better layer caching)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all bot files
 COPY . .
 
-# Create data directories
+# Create persistent data directories
 RUN mkdir -p data/welcome_images logs
+
+# Koyeb requires a PORT env var even for non-HTTP apps
+ENV PORT=8080
 
 CMD ["python", "main.py"]
