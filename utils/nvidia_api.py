@@ -22,7 +22,7 @@ from typing import Optional, List, Dict
 logger = logging.getLogger("XERO.AI")
 
 BASE_URL       = "https://integrate.api.nvidia.com/v1/chat/completions"
-MODEL_PRIMARY  = "nvidia/nemotron-3-super-120b-a12b"
+MODEL_PRIMARY  = "meta/llama-3.1-8b-instruct"
 MODEL_VISION   = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
 
 SYSTEM_BASE = (
@@ -78,7 +78,7 @@ class NvidiaAPI:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     BASE_URL, headers=headers, json=payload,
-                    timeout=aiohttp.ClientTimeout(total=20)
+                    timeout=aiohttp.ClientTimeout(total=25)
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
