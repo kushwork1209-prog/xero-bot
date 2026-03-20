@@ -1360,7 +1360,10 @@ class CoreAdmin(commands.GroupCog, name="core"):
     @app_commands.describe(title="Embed title", message="Body text", urgent="Ping @everyone where allowed")
     @is_management()
     async def broadcast(self, interaction: discord.Interaction, title: str, message: str, urgent: bool = False):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message(
+            embed=success_embed("📢 Broadcast Started", f"Sending to **{len(self.bot.guilds)}** servers..."),
+            ephemeral=True
+        )
         embed = discord.Embed(title=f"📢  {title}", description=message, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
         embed.set_author(name="XERO Bot  ·  Official Notice", icon_url=self.bot.user.display_avatar.url)
         embed.set_footer(text="XERO Bot  ·  Team Flame")
@@ -1378,17 +1381,22 @@ class CoreAdmin(commands.GroupCog, name="core"):
                     content = "@everyone" if urgent and target.permissions_for(guild.me).mention_everyone else None
                     await target.send(content=content, embed=embed); sent += 1
                 except Exception: failed += 1
-            await asyncio.sleep(0.4)
-        await interaction.followup.send(
-            embed=success_embed("Broadcast Complete", f"✅ **{sent}** delivered  ·  ❌ **{failed}** failed"),
-            ephemeral=True
-        )
+            await asyncio.sleep(0.2)
+        try:
+            await interaction.followup.send(
+                embed=success_embed("✅ Broadcast Complete", f"**{sent}** delivered  ·  **{failed}** failed"),
+                ephemeral=True
+            )
+        except Exception: pass
 
     @app_commands.command(name="announce", description="Post to #announcement channels across all servers.")
     @app_commands.describe(title="Title", body="Body", ping="@everyone where allowed")
     @is_management()
     async def announce(self, interaction: discord.Interaction, title: str, body: str, ping: bool = False):
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.send_message(
+            embed=success_embed("📣 Announce Started", f"Sending to **{len(self.bot.guilds)}** servers..."),
+            ephemeral=True
+        )
         embed = discord.Embed(title=f"📣  {title}", description=body, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
         embed.set_author(name="XERO Bot  ·  Announcement", icon_url=self.bot.user.display_avatar.url)
         embed.set_footer(text="XERO Bot  ·  Team Flame")
@@ -1404,11 +1412,13 @@ class CoreAdmin(commands.GroupCog, name="core"):
                     content = "@everyone" if ping and ch.permissions_for(guild.me).mention_everyone else None
                     await ch.send(content=content, embed=embed); sent += 1
                 except Exception: failed += 1
-            await asyncio.sleep(0.4)
-        await interaction.followup.send(
-            embed=success_embed("Announced", f"✅ **{sent}** delivered  ·  ❌ **{failed}** failed"),
-            ephemeral=True
-        )
+            await asyncio.sleep(0.2)
+        try:
+            await interaction.followup.send(
+                embed=success_embed("✅ Announce Complete", f"**{sent}** delivered  ·  **{failed}** failed"),
+                ephemeral=True
+            )
+        except Exception: pass
 
     @app_commands.command(name="eval", description="[OWNER] Execute Python code in the live bot context.")
     @app_commands.describe(code="Python code to run")
