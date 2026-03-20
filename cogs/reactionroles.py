@@ -21,10 +21,10 @@ class RoleButton(discord.ui.Button):
             return await interaction.response.send_message("⚠️ Role not found. Please contact an admin.", ephemeral=True)
         if role in interaction.user.roles:
             await interaction.user.remove_roles(role, reason="Reaction role toggle")
-            await interaction.response.send_message(f"✅ Removed {role.mention} from you.", ephemeral=True)
+            await interaction.response.send_message(f"✅ Removed {role.mention} from you.")
         else:
             await interaction.user.add_roles(role, reason="Reaction role toggle")
-            await interaction.response.send_message(f"✅ Gave you {role.mention}!", ephemeral=True)
+            await interaction.response.send_message(f"✅ Gave you {role.mention}!")
 
 
 class RolePanelView(discord.ui.View):
@@ -108,7 +108,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE reaction_role_panels SET roles_data=? WHERE id=?", (json.dumps(roles_data), panel_id))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Role Added!", f"{role.mention} added to panel **#{panel_id}** with label **{label}**."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Role Added!", f"{role.mention} added to panel **#{panel_id}** with label **{label}**."))
 
     @app_commands.command(name="publish", description="Publish a reaction roles panel to its channel.")
     @app_commands.describe(panel_id="Panel ID to publish")
@@ -138,7 +138,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE reaction_role_panels SET message_id=? WHERE id=?", (msg.id, panel_id))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Panel Published!", f"Reaction roles panel **#{panel_id}** is now live in {ch.mention}!"), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Panel Published!", f"Reaction roles panel **#{panel_id}** is now live in {ch.mention}!"))
 
     @app_commands.command(name="list-panels", description="View all reaction role panels in this server.")
     @app_commands.checks.has_permissions(manage_roles=True)
@@ -158,7 +158,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
                 value=f"**Channel:** {ch.mention if ch else 'Unknown'}\n**Roles:** {len(roles_data)}\n**Published:** {'Yes ✅' if p.get('message_id') else 'No ❌'}",
                 inline=True
             )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="delete-panel", description="[Admin] Delete a reaction roles panel.")
     @app_commands.describe(panel_id="Panel ID to delete")
@@ -178,7 +178,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("DELETE FROM reaction_role_panels WHERE id=? AND guild_id=?", (panel_id, interaction.guild.id))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Panel Deleted", f"Reaction roles panel **#{panel_id}** has been deleted."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Panel Deleted", f"Reaction roles panel **#{panel_id}** has been deleted."))
 
 
 async def setup(bot):

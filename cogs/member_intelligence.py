@@ -498,7 +498,7 @@ class Intelligence(commands.GroupCog, name="intel"):
         e.set_footer(
             text=f"Learned passively from their messages  •  {'Only you can see this' if is_self else 'Staff only'}"
         )
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        await interaction.response.send_message(embed=e)
 
     @app_commands.command(name="who-knows", description="Find members in this server who know a specific skill.")
     @app_commands.describe(skill="Skill to search for (e.g. React, Python, music production, Photoshop)")

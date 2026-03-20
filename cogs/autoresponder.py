@@ -329,7 +329,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
             embed = success_embed(f"✅ {len(matches)} Match(es) Found", "\n".join(f"• `{t['trigger']}` → {t['response'][:60]}" for t in matches))
         else:
             embed = info_embed("No Matches", f"No auto-responders would fire for: `{message}`")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 class StickyMessages(commands.GroupCog, name="sticky"):
@@ -376,7 +376,7 @@ class StickyMessages(commands.GroupCog, name="sticky"):
             await db.execute("UPDATE sticky_messages SET last_message_id=? WHERE channel_id=?", (msg.id, ch.id))
             await db.commit()
 
-        await interaction.response.send_message(embed=success_embed("Sticky Set!", f"Sticky message set in {ch.mention}.\nIt will re-post after every new message."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Sticky Set!", f"Sticky message set in {ch.mention}.\nIt will re-post after every new message."))
 
     @app_commands.command(name="remove", description="Remove the sticky message from a channel.")
     @app_commands.describe(channel="Channel to remove sticky from (default: current)")
@@ -410,7 +410,7 @@ class StickyMessages(commands.GroupCog, name="sticky"):
             ch = interaction.guild.get_channel(cid)
             embed.add_field(name=f"{'✅' if enabled else '❌'} {ch.name if ch else f'#{cid}'}",
                            value=content[:80], inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 class Highlights(commands.GroupCog, name="highlight"):
@@ -445,7 +445,7 @@ class Highlights(commands.GroupCog, name="highlight"):
                 await db.commit()
             except aiosqlite.IntegrityError:
                 return await interaction.response.send_message(embed=error_embed("Already Added", f"You're already watching `{keyword}`."), ephemeral=True)
-        await interaction.response.send_message(embed=success_embed("Highlight Added", f"You'll be DM'd when `{keyword}` is mentioned in this server."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Highlight Added", f"You'll be DM'd when `{keyword}` is mentioned in this server."))
 
     @app_commands.command(name="remove", description="Stop watching a keyword.")
     @app_commands.describe(keyword="Keyword to remove")
@@ -454,7 +454,7 @@ class Highlights(commands.GroupCog, name="highlight"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("DELETE FROM highlights WHERE user_id=? AND guild_id=? AND LOWER(keyword)=LOWER(?)", (interaction.user.id,interaction.guild.id,keyword))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Highlight Removed", f"No longer watching `{keyword}`."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Highlight Removed", f"No longer watching `{keyword}`."))
 
     @app_commands.command(name="list", description="See all your highlight keywords in this server.")
     async def list(self, interaction: discord.Interaction):
@@ -463,10 +463,10 @@ class Highlights(commands.GroupCog, name="highlight"):
             async with db.execute("SELECT keyword FROM highlights WHERE user_id=? AND guild_id=? ORDER BY keyword", (interaction.user.id,interaction.guild.id)) as c:
                 rows = [r[0] for r in await c.fetchall()]
         if not rows:
-            return await interaction.response.send_message(embed=info_embed("No Highlights", "You're not watching any keywords. Use `/highlight add` to add one."), ephemeral=True)
+            return await interaction.response.send_message(embed=info_embed("No Highlights", "You're not watching any keywords. Use `/highlight add` to add one."))
         embed = discord.Embed(title="🔔  Your Highlights", description="\n".join(f"• `{kw}`" for kw in rows), color=XERO.PRIMARY)
         embed.set_footer(text=f"{len(rows)}/10 keywords  •  XERO Highlights")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="clear", description="Remove all your highlights in this server.")
     async def clear(self, interaction: discord.Interaction):
@@ -474,7 +474,7 @@ class Highlights(commands.GroupCog, name="highlight"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("DELETE FROM highlights WHERE user_id=? AND guild_id=?", (interaction.user.id,interaction.guild.id))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Highlights Cleared", "All your highlights for this server removed."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Highlights Cleared", "All your highlights for this server removed."))
 
 
 class Tags(commands.GroupCog, name="tag"):

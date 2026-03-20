@@ -78,7 +78,7 @@ class NvidiaAPI:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     BASE_URL, headers=headers, json=payload,
-                    timeout=aiohttp.ClientTimeout(total=50)
+                    timeout=aiohttp.ClientTimeout(total=20)
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -95,7 +95,7 @@ class NvidiaAPI:
                         return f"API error ({resp.status}). Try again."
         except asyncio.TimeoutError:
             logger.warning("NVIDIA API: timeout")
-            return "⌛ Request timed out. Try again."
+            return "⌛ AI is taking too long. Try again in a moment."
         except Exception as e:
             logger.error(f"NVIDIA API exception: {e}")
             return "❌ Connection error. Try again."

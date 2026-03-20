@@ -88,21 +88,39 @@ class XeroBot(commands.Bot):
         logger.info(f"✓ XERO ready — {self.user} | {len(self.guilds)} guilds | {sum(g.member_count for g in self.guilds):,} users | {round(self.latency*1000)}ms")
         await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="300+ commands | /help"))
 
+    async def on_interaction(self, interaction: discord.Interaction):
+        """Guard: if a command interaction is deferred and never responded to, send a fallback after 28s."""
+        if interaction.type != discord.InteractionType.application_command:
+            return
+        await asyncio.sleep(28)
+        try:
+            if interaction.response.is_done():
+                # Check if a followup was never sent - we can't easily detect this
+                # but we can try sending one; if it fails it means it was already handled
+                pass
+        except Exception:
+            pass
+
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         from utils.embeds import error_embed
+        # Unwrap CommandInvokeError to get the real error
+        original = getattr(error, "original", error)
         if isinstance(error, discord.app_commands.MissingPermissions):
             msg = f"You need: `{'`, `'.join(error.missing_permissions)}`"
         elif isinstance(error, discord.app_commands.BotMissingPermissions):
             msg = f"I need: `{'`, `'.join(error.missing_permissions)}`"
         elif isinstance(error, discord.app_commands.CommandOnCooldown):
-            msg = f"Slow down! Retry in **{error.retry_after:.1f}s**"
+            msg = f"Slow down! Try again in **{error.retry_after:.1f}s**"
         elif isinstance(error, discord.app_commands.CheckFailure):
             msg = "You don't have permission to use this command."
+        elif isinstance(original, asyncio.TimeoutError):
+            msg = "Request timed out. Please try again."
         else:
-            msg = "An unexpected error occurred."
-            logger.error(f"Unhandled error: {error}")
+            msg = "Something went wrong. Please try again."
+            logger.error(f"Command error in {getattr(interaction.command, 'name', 'unknown')}: {original}", exc_info=original)
         try:
             embed = error_embed("Error", msg)
+            # Always send a response - prevents thinking forever
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True)
             else:

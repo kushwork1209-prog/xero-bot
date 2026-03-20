@@ -259,7 +259,7 @@ class Security(commands.GroupCog, name="security"):
             + (f"✅ {', '.join(restored)}" if restored else "None restored") +
             (f"\n⚠️ Failed: {', '.join(failed)}" if failed else "")
         )
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     # ── /security view ────────────────────────────────────────────────────
     @app_commands.command(name="view", description="View all active security settings for this server.")
@@ -293,7 +293,7 @@ class Security(commands.GroupCog, name="security"):
         if domains:
             embed.add_field(name="✅ Allowed Domains", value="\n".join(f"`{d}`" for d in domains[:10]), inline=False)
         embed.set_footer(text="XERO Security  •  /security setup to change settings")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):

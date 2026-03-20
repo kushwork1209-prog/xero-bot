@@ -157,7 +157,7 @@ class Confessions(commands.GroupCog, name="confess"):
         embed = info_embed(f"Confession #{confession_id} — Author",
                            f"**Author:** {user_display}\n**Message:** {confession['message'][:1000]}")
         embed.set_footer(text="Confidential — moderation use only.")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="delete", description="[Admin] Delete a confession by ID.")
     @app_commands.describe(confession_id="Confession ID to delete")
@@ -167,7 +167,7 @@ class Confessions(commands.GroupCog, name="confess"):
             await db.execute("DELETE FROM confessions WHERE id=? AND guild_id=?", (confession_id, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(
-            embed=success_embed("Deleted", f"Confession #{confession_id} removed."), ephemeral=True)
+            embed=success_embed("Deleted", f"Confession #{confession_id} removed."))
 
 
 async def setup(bot):

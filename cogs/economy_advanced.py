@@ -135,7 +135,7 @@ class EconomyAdvanced(commands.Cog):
                 f"🔥 **Current Streak:** {s} days\n"
                 f"⚡ **Multiplier:** {mult}×\n"
                 f"💎 **Best Streak:** {streak.get('best_streak',0)} days"
-            ), ephemeral=True)
+            ))
 
         # Update streak
         yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
@@ -216,7 +216,7 @@ class EconomyAdvanced(commands.Cog):
                 "Heist Already Active",
                 f"There's already a heist in progress in {interaction.guild.get_channel(existing['channel_id']).mention}!\n"
                 f"Join it or wait for it to finish."
-            ), ephemeral=True)
+            ))
 
         # Check leader has enough money to risk
         data = await self.bot.db.get_economy(interaction.user.id, interaction.guild.id)
@@ -224,7 +224,7 @@ class EconomyAdvanced(commands.Cog):
             return await interaction.response.send_message(embed=error_embed(
                 "Not Enough Cash",
                 "You need at least **$500** in your wallet to plan a heist. Get that bread first."
-            ), ephemeral=True)
+            ))
 
         bank        = target or random.choice(BANKS)
         potential   = random.randint(15_000, 75_000)
@@ -313,7 +313,7 @@ class EconomyAdvanced(commands.Cog):
             return await interaction.response.send_message(embed=error_embed(
                 "Insufficient Funds",
                 f"**{shares}× {symbol}** costs **${total_cost:,}** but you only have **${data['wallet']:,}** in your wallet."
-            ), ephemeral=True)
+            ))
 
         await self.bot.db.update_economy(interaction.user.id, interaction.guild.id, wallet_delta=-total_cost, spent_delta=total_cost)
         await self.bot.db.buy_stock(interaction.user.id, interaction.guild.id, symbol, shares, price)
@@ -342,7 +342,7 @@ class EconomyAdvanced(commands.Cog):
             return await interaction.response.send_message(embed=error_embed(
                 "Not Enough Shares",
                 f"You only own **{holding['shares']}** share(s) of **{symbol}**."
-            ), ephemeral=True)
+            ))
 
         price    = holding["price"]
         proceeds = price * shares
@@ -441,7 +441,7 @@ class EconomyAdvanced(commands.Cog):
                 "No Recipe Found",
                 f"No crafting recipe found for **{item1}** + **{item2}**.\n"
                 f"Admins can add recipes with `/craft-add`."
-            ), ephemeral=True)
+            ))
 
         recipe = dict(recipe)
         # Check user owns both items
@@ -456,7 +456,7 @@ class EconomyAdvanced(commands.Cog):
                     return await interaction.response.send_message(embed=error_embed(
                         "Missing Item",
                         f"You don't have **{item_name}** in your inventory.\nCheck `/inventory`."
-                    ), ephemeral=True)
+                    ))
 
             # Consume ingredients
             for item_name in [item1, item2]:
@@ -503,7 +503,7 @@ class EconomyAdvanced(commands.Cog):
             return await interaction.response.send_message(embed=error_embed(
                 "No Active Drop",
                 "There's no Community Drop event active right now.\nEvents cycle automatically — check back soon!"
-            ), ephemeral=True)
+            ))
         # Give the reward
         reward = 2500
         await self.bot.db.update_economy(interaction.user.id, interaction.guild.id, wallet_delta=reward, earned_delta=reward)
@@ -526,13 +526,13 @@ class HeistJoinView(discord.ui.View):
     @discord.ui.button(label="🔫  Join Heist", style=discord.ButtonStyle.danger)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.guild_id not in ACTIVE_HEISTS:
-            return await interaction.response.send_message("This heist is no longer active.", ephemeral=True)
+            return await interaction.response.send_message("This heist is no longer active.")
         state = ACTIVE_HEISTS[self.guild_id]
         if interaction.user in state["participants"]:
             return await interaction.response.send_message("You're already in the crew!", ephemeral=True)
         data = await self.bot.db.get_economy(interaction.user.id, interaction.guild.id)
         if data["wallet"] < 200:
-            return await interaction.response.send_message("You need **$200** in your wallet to join a heist.", ephemeral=True)
+            return await interaction.response.send_message("You need **$200** in your wallet to join a heist.")
         state["participants"].append(interaction.user)
         new_pct = min(30 + (len(state["participants"]) - 1) * 8, 80)
         await interaction.response.send_message(
@@ -543,10 +543,10 @@ class HeistJoinView(discord.ui.View):
     @discord.ui.button(label="❌  Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.guild_id not in ACTIVE_HEISTS:
-            return await interaction.response.send_message("No active heist.", ephemeral=True)
+            return await interaction.response.send_message("No active heist.")
         state = ACTIVE_HEISTS[self.guild_id]
         if interaction.user.id != state["leader_id"]:
-            return await interaction.response.send_message("Only the heist leader can cancel.", ephemeral=True)
+            return await interaction.response.send_message("Only the heist leader can cancel.")
         ACTIVE_HEISTS.pop(self.guild_id, None)
         await interaction.response.send_message(embed=info_embed("Heist Cancelled", "The heist has been called off."))
 

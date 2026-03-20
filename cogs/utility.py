@@ -107,7 +107,7 @@ class Utility(commands.Cog):
             ) as c:
                 rows = [dict(r) for r in await c.fetchall()]
         if not rows:
-            return await interaction.response.send_message(embed=info_embed("No Reminders","You have no active reminders. Use `/remind` to create one."), ephemeral=True)
+            return await interaction.response.send_message(embed=info_embed("No Reminders","You have no active reminders. Use `/remind` to create one."))
         embed = discord.Embed(title=f"⏰  Your Reminders ({len(rows)})", color=0x00D4FF)
         for r in rows:
             try:
@@ -122,7 +122,7 @@ class Utility(commands.Cog):
                 )
             except Exception: pass
         embed.set_footer(text="Use /cancel-reminder <id> to cancel one")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="cancel-reminder", description="Cancel an active reminder by its ID.")
     @app_commands.describe(reminder_id="Reminder ID (from /reminders)")
@@ -137,14 +137,14 @@ class Utility(commands.Cog):
                 return await interaction.response.send_message(embed=error_embed("Not Yours", "You can only cancel your own reminders."), ephemeral=True)
             await db.execute("UPDATE reminders SET sent=1 WHERE id=?", (reminder_id,))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Reminder Cancelled", f"Reminder #{reminder_id} has been cancelled."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Reminder Cancelled", f"Reminder #{reminder_id} has been cancelled."))
 
     @app_commands.command(name="snipe", description="See the last deleted message in this channel.")
     async def snipe(self, interaction: discord.Interaction):
         snipes = getattr(self.bot, '_snipe_cache', {})
         msg = snipes.get(interaction.channel.id)
         if not msg:
-            return await interaction.response.send_message(embed=info_embed("Nothing to Snipe","No recently deleted messages cached."), ephemeral=True)
+            return await interaction.response.send_message(embed=info_embed("Nothing to Snipe","No recently deleted messages cached."))
         embed = discord.Embed(description=msg['content'] or "*no text*", color=0xFF3B5C, timestamp=msg['deleted_at'])
         embed.set_author(name=msg['author'], icon_url=msg['avatar'])
         embed.set_footer(text=f"Sniped from #{interaction.channel.name}  •  XERO Snipe")

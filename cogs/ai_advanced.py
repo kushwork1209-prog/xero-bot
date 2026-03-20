@@ -191,7 +191,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         cases = await self.bot.db.get_mod_cases(interaction.guild.id, user.id, limit=10)
         warns = await self.bot.db.get_warnings(interaction.guild.id, user.id)
         if not cases and not warns:
-            return await interaction.followup.send(embed=info_embed("Clean Record", f"{user.mention} has no moderation history. No action needed."), ephemeral=True)
+            return await interaction.followup.send(embed=info_embed("Clean Record", f"{user.mention} has no moderation history. No action needed."))
 
         case_summary = "\n".join([f"- {c['action'].upper()}: {c['reason']} ({c['timestamp'][:10]})" for c in cases[:8]])
         warn_count = len(warns)
@@ -218,7 +218,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         embed.add_field(name="Warnings", value=str(warn_count), inline=True)
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_footer(text="AI advice is a suggestion — always use your own judgment.")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     # ── AI Communication Coach ────────────────────────────────────────────
     @app_commands.command(name="coach", description="Get AI feedback on your writing — tone, clarity, impact, and improvement tips.")

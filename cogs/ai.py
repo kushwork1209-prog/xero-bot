@@ -1,5 +1,6 @@
 """XERO Bot — AI Commands (15 commands) — Powered by NVIDIA Llama 4 Maverick"""
 import discord
+import asyncio
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -185,7 +186,7 @@ class AI(commands.GroupCog, name="ai"):
     async def clear_memory(self, interaction: discord.Interaction):
         gid = interaction.guild.id
         MEMORY.pop(gid, None)
-        await interaction.response.send_message(embed=success_embed("Memory Cleared", "The AI's conversation history for this server has been reset."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Memory Cleared", "The AI's conversation history for this server has been reset."))
 
 
 async def setup(bot):

@@ -331,7 +331,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
                     "Already Claimed!",
                     f"Next weekly: <t:{next_ts}:R>\n"
                     f"*(Once per week — Sundays are a great day to claim!)*"
-                ), ephemeral=True)
+                ))
 
         # Calculate reward
         streak = await self.bot.db.get_streak(interaction.user.id, interaction.guild.id)

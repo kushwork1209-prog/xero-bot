@@ -62,7 +62,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
             return await interaction.response.send_message(
                 embed=error_embed("Not Your Channel", "You can only rename your own temp channel."), ephemeral=True)
         await vc.edit(name=name[:100])
-        await interaction.response.send_message(embed=success_embed("Channel Renamed", f"Your channel is now **{name}**."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Channel Renamed", f"Your channel is now **{name}**."))
 
     # ── Limit ─────────────────────────────────────────────────────────────
     @app_commands.command(name="limit", description="Set the user limit for your temporary voice channel.")
@@ -83,7 +83,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
         await interaction.response.send_message(embed=success_embed(
             "Limit Updated",
             f"Your channel now allows **{'unlimited' if limit == 0 else limit}** users."
-        ), ephemeral=True)
+        ))
 
     # ── Lock / Unlock ─────────────────────────────────────────────────────
     @app_commands.command(name="lock", description="Lock your temp voice channel so only you can invite people.")
@@ -99,7 +99,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
         overwrite = vc.overwrites_for(interaction.guild.default_role)
         overwrite.connect = False
         await vc.set_permissions(interaction.guild.default_role, overwrite=overwrite)
-        await interaction.response.send_message(embed=success_embed("Channel Locked 🔒", "Your temp channel is now locked. Only invited users can join."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Channel Locked 🔒", "Your temp channel is now locked. Only invited users can join."))
 
     @app_commands.command(name="unlock", description="Unlock your temp voice channel for everyone to join.")
     async def unlock(self, interaction: discord.Interaction):
@@ -109,7 +109,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
         overwrite = vc.overwrites_for(interaction.guild.default_role)
         overwrite.connect = None
         await vc.set_permissions(interaction.guild.default_role, overwrite=overwrite)
-        await interaction.response.send_message(embed=success_embed("Channel Unlocked 🔓", "Your temp channel is now open for everyone."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Channel Unlocked 🔓", "Your temp channel is now open for everyone."))
 
     # ── Active ────────────────────────────────────────────────────────────
     @app_commands.command(name="active", description="View all active temp voice channels in the server.")

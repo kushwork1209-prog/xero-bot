@@ -501,7 +501,7 @@ class Info(commands.GroupCog, name="info"):
             f"**Max Uses:** {inv.max_uses or 'Unlimited'}\n"
             f"**Expires:** {'Never' if not inv.max_age else f'<t:{int((inv.created_at.timestamp() + inv.max_age))}:R>' if inv.created_at else 'Unknown'}"
         ), inline=False)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     # ── /info permissions ─────────────────────────────────────────────────
     @app_commands.command(name="permissions", description="See a complete permission breakdown for any user in any channel.")
@@ -547,7 +547,7 @@ class Info(commands.GroupCog, name="info"):
             embed.add_field(name=f"✅ Granted ({len(granted)})", value="\n".join(granted[:mid]) or "None", inline=True)
             embed.add_field(name="\u200b", value="\n".join(granted[mid:]) or "\u200b", inline=True)
             embed.add_field(name=f"❌ Denied ({len(denied)})", value="\n".join(denied[:10]) or "None", inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):

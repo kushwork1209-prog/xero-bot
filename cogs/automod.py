@@ -93,7 +93,7 @@ class AutoMod(commands.GroupCog, name="automod"):
             await db.execute("INSERT INTO automod_filters (guild_id, filter_type, value) VALUES (?,?,?)",
                              (interaction.guild.id, "word", word.lower()))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Filter Added", f"Added `{word}` to the word filter."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Filter Added", f"Added `{word}` to the word filter."))
 
     @app_commands.command(name="remove-filter", description="Remove a word from the AutoMod filter.")
     @app_commands.describe(word="Word to remove from filters")
@@ -102,7 +102,7 @@ class AutoMod(commands.GroupCog, name="automod"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("DELETE FROM automod_filters WHERE guild_id=? AND value=?", (interaction.guild.id, word.lower()))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Filter Removed", f"Removed `{word}` from the word filter."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Filter Removed", f"Removed `{word}` from the word filter."))
 
     @app_commands.command(name="list-filters", description="View all active AutoMod filters for this server.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -127,7 +127,7 @@ class AutoMod(commands.GroupCog, name="automod"):
             embed.add_field(name=f"🚫 Filtered Words ({len(filters)})", value=", ".join(words), inline=False)
         else:
             embed.add_field(name="🚫 Filtered Words", value="None added yet. Use `/automod add-filter` to add.", inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):

@@ -393,7 +393,7 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
                 "Voice Receive Unavailable",
                 "Install `discord-ext-voice-recv` to enable voice AI.\n"
                 "`pip install discord-ext-voice-recv`"
-            ), ephemeral=True)
+            ))
 
         api_key = os.getenv("NVIDIA_AUDIO_KEY") or os.getenv("NVIDIA_MAIN_KEY", "")
         if not api_key:
@@ -402,19 +402,19 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
                 "Add `NVIDIA_AUDIO_KEY` to your `.env` file.\n"
                 "Get it from: https://build.nvidia.com\n"
                 "*(You can reuse `NVIDIA_MAIN_KEY` if it's the same account)*"
-            ), ephemeral=True)
+            ))
 
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.response.send_message(embed=error_embed(
                 "Join a Voice Channel",
                 "You need to be in a voice channel first."
-            ), ephemeral=True)
+            ))
 
         if interaction.guild.id in SESSIONS:
             return await interaction.response.send_message(embed=error_embed(
                 "Already Active",
                 f"Voice AI is already running. Use `/ai-voice leave` to stop it."
-            ), ephemeral=True)
+            ))
 
         await interaction.response.defer()
         vc_channel = interaction.user.voice.channel
@@ -462,7 +462,7 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
         if not session:
             return await interaction.response.send_message(embed=error_embed(
                 "Not Active", "No voice AI session is running in this server."
-            ), ephemeral=True)
+            ))
 
         try:
             if session.voice_client and session.voice_client.is_connected():
@@ -487,7 +487,7 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
             return await interaction.response.send_message(embed=info_embed(
                 "No Active Session",
                 "Use `/ai-voice join` to start a voice AI session."
-            ), ephemeral=True)
+            ))
 
         vc = session.voice_client
         ch_name = vc.channel.name if vc and vc.channel else "?"
@@ -507,11 +507,11 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
         if not session:
             return await interaction.response.send_message(embed=error_embed(
                 "No Session", "No active voice session."
-            ), ephemeral=True)
+            ))
         session.conversation.clear()
         await interaction.response.send_message(embed=success_embed(
             "Memory Cleared", "Conversation history reset. XERO starts fresh."
-        ), ephemeral=True)
+        ))
 
 
 async def setup(bot):

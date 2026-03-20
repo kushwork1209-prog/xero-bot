@@ -37,11 +37,11 @@ class Server(commands.GroupCog, name="server"):
         await interaction.response.defer(ephemeral=True)
         bans = [entry async for entry in interaction.guild.bans(limit=20)]
         if not bans:
-            return await interaction.followup.send(embed=info_embed("No Bans", "No users are currently banned."), ephemeral=True)
+            return await interaction.followup.send(embed=info_embed("No Bans", "No users are currently banned."))
         embed = comprehensive_embed(title=f"🚫 Banned Users ({len(bans)} shown)", color=discord.Color.red())
         for b in bans[:15]:
             embed.add_field(name=str(b.user), value=f"ID: `{b.user.id}`\nReason: {b.reason or 'No reason'}", inline=True)
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="invites", description="List all active invites for this server.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -57,7 +57,7 @@ class Server(commands.GroupCog, name="server"):
                 value=f"**Uses:** {inv.uses} | **Creator:** {inv.inviter.mention if inv.inviter else 'Unknown'}\n**Channel:** {inv.channel.mention}\n**Expires:** {'Never' if not inv.max_age else f'<t:{int((inv.created_at + datetime.timedelta(seconds=inv.max_age)).timestamp())}:R>'}",
                 inline=False
             )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="create-invite", description="Create a custom server invite link.")
     @app_commands.describe(channel="Channel for the invite", max_uses="Max uses (0=unlimited)", expires_hours="Expires in hours (0=never)")
@@ -136,7 +136,7 @@ class Server(commands.GroupCog, name="server"):
         async for entry in interaction.guild.audit_logs(limit=10):
             entries.append(entry)
         if not entries:
-            return await interaction.followup.send(embed=info_embed("Empty", "No audit log entries found."), ephemeral=True)
+            return await interaction.followup.send(embed=info_embed("Empty", "No audit log entries found."))
         embed = comprehensive_embed(title="📋 Recent Audit Log", color=discord.Color.orange())
         for e in entries:
             action_name = str(e.action).replace("AuditLogAction.", "").replace("_", " ").title()
@@ -147,7 +147,7 @@ class Server(commands.GroupCog, name="server"):
                 value=f"**By:** {user_name}\n**Target:** {target_name}\n**When:** <t:{int(e.created_at.timestamp())}:R>",
                 inline=True
             )
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="slowmode-all", description="Set slowmode on all text channels at once.")
     @app_commands.describe(seconds="Slowmode delay in seconds (0 to remove)")
@@ -208,7 +208,7 @@ class Server(commands.GroupCog, name="server"):
         embed = success_embed("💥 Channel Nuked", "This channel has been wiped clean. All messages deleted.")
         await new_ch.send(embed=embed)
         if ch.id != interaction.channel.id:
-            await interaction.response.send_message(embed=success_embed("Nuked", f"#{ch.name} has been nuked."), ephemeral=True)
+            await interaction.response.send_message(embed=success_embed("Nuked", f"#{ch.name} has been nuked."))
 
 
 async def setup(bot):

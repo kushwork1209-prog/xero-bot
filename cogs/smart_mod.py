@@ -314,7 +314,7 @@ class SmartMod(commands.GroupCog, name="smart"):
                 inline=True
             )
         embed.set_footer(text="XERO Smart Moderation  •  Auto-Raid Protection")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     # ── /smart lockdown ────────────────────────────────────────────────────
     @app_commands.command(name="lockdown", description="Emergency manual server lockdown — locks all channels instantly.")
@@ -398,7 +398,7 @@ class SmartMod(commands.GroupCog, name="smart"):
         trend = "📈 Increasing" if totals["week"] > (totals["month"] - totals["week"]) / 3 else "📉 Decreasing"
         embed.add_field(name="📉  Trend", value=trend, inline=True)
         embed.set_footer(text="XERO Smart Moderation")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot):

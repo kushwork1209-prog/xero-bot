@@ -64,7 +64,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
             f"**Embed:** {'Yes — ' + embed_title if embed_title else 'No (plain text)'}\n"
             f"**Role Action:** {role.mention if role else 'None'}"
         ))
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     # ── Use ───────────────────────────────────────────────────────────────
     @app_commands.command(name="use", description="Use a custom command created for this server.")
@@ -136,7 +136,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
                     embed=error_embed("Not Found", f"No command named `{name}`."), ephemeral=True)
             await db.commit()
         await interaction.response.send_message(
-            embed=success_embed("Command Updated", f"Custom command `{name}` has been updated."), ephemeral=True)
+            embed=success_embed("Command Updated", f"Custom command `{name}` has been updated."))
 
     # ── Delete ────────────────────────────────────────────────────────────
     @app_commands.command(name="delete", description="[Admin] Delete a custom command.")
@@ -148,7 +148,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
                              (interaction.guild.id, name.lower()))
             await db.commit()
         await interaction.response.send_message(
-            embed=success_embed("Deleted", f"Custom command `{name}` has been removed."), ephemeral=True)
+            embed=success_embed("Deleted", f"Custom command `{name}` has been removed."))
 
     # ── List ──────────────────────────────────────────────────────────────
     @app_commands.command(name="list", description="View all custom commands for this server.")
@@ -206,7 +206,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
         embed.add_field(name="Uses", value=f"{cmd['uses']:,}", inline=True)
         embed.add_field(name="Role Action", value=role.mention if role else "None", inline=True)
         embed.add_field(name="Created By", value=creator.mention if creator else "Unknown", inline=True)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):

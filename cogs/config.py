@@ -479,7 +479,7 @@ class _TicketButtonView(discord.ui.View):
             )
             embed.set_footer(text="XERO Tickets  •  Use /ticket close to close this ticket")
             await ch.send(embed=embed)
-            await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}", ephemeral=True)
+            await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}")
         except Exception as e:
             await interaction.response.send_message(f"❌ Failed: {e}", ephemeral=True)
 
@@ -528,7 +528,7 @@ class WelcomePanel(SubView):
             "**`/config set-welcome #channel`** — set welcome channel\n"
             "**`/config set-farewell #channel`** — set farewell channel\n\n"
             "*Just type `/config set-welcome` and Discord will show all your channels to pick from.*"
-        ), ephemeral=True)
+        ))
 
     @discord.ui.button(label="✏️ Edit Messages",   style=discord.ButtonStyle.secondary, row=0)
     async def edit_msgs(self, i, b):
@@ -555,7 +555,7 @@ class WelcomePanel(SubView):
             "**Step 3:** Use `/config welcome-preview` to see the live preview\n\n"
             "The bot overlays the joining member's **name + circular avatar** on your image automatically.\n"
             "Every welcome message looks unique — their name is baked in."
-        ), ephemeral=True)
+        ))
 
     @discord.ui.button(label="✏️ Card Settings",  style=discord.ButtonStyle.secondary, row=1)
     async def card_settings(self, i, b):
@@ -567,7 +567,7 @@ class WelcomePanel(SubView):
             "• **Overlay style:** Gradient, bar, full, none\n"
             "• **Show/hide:** Name, avatar, member count\n\n"
             "Or just re-upload with new settings — it replaces instantly."
-        ), ephemeral=True)
+        ))
 
     @discord.ui.button(label="🔄 Refresh",         style=discord.ButtonStyle.secondary, row=2)
     async def refresh(self, i, b):
@@ -597,7 +597,7 @@ class LoggingPanel(SubView):
             "Options: `unified` (one channel for everything), or separate channels for\n"
             "`messages`, `members`, `server`, `voice`\n\n"
             "*Just type `/config set-logs` and pick channels from the dropdown.*"
-        ), ephemeral=True)
+        ))
 
     @discord.ui.button(label="🛡️ Webhook Guard", style=discord.ButtonStyle.success,   row=0)
     async def webhook_guard(self, i, b):
@@ -622,7 +622,7 @@ class LoggingPanel(SubView):
                         await ch.send(embed=te); sent.append(ch.id)
                     except Exception: pass
         result = f"Tests sent to {len(sent)} channel(s)." if sent else "No log channels set yet."
-        await i.followup.send(embed=success_embed("Test Complete", result), ephemeral=True)
+        await i.followup.send(embed=success_embed("Test Complete", result))
 
     @discord.ui.button(label="🔄 Refresh",         style=discord.ButtonStyle.secondary, row=1)
     async def refresh(self, i, b):
@@ -882,7 +882,7 @@ class AIPanel(SubView):
             for key, label in self.PERSONAS.items()
         ]
         view = _PersonaSelectView(self.bot, self.guild.id, self)
-        await i.response.send_message("Choose AI persona:", view=view, ephemeral=True)
+        await i.response.send_message("Choose AI persona:", view=view)
 
     @discord.ui.button(label="🔄 Refresh",           style=discord.ButtonStyle.secondary, row=1)
     async def refresh(self, i, b):
@@ -907,7 +907,7 @@ class _PersonaSelectView(discord.ui.View):
         persona = i.data["values"][0]
         await _set(self.bot, self.guild_id, "persona", persona)
         label = self.PERSONAS[persona]
-        await i.response.send_message(embed=success_embed("Persona Set", f"AI persona → **{label}**"), ephemeral=True)
+        await i.response.send_message(embed=success_embed("Persona Set", f"AI persona → **{label}**"))
 
 
 # ── Roles ─────────────────────────────────────────────────────────────────────
@@ -931,7 +931,7 @@ class RolesPanel(SubView):
             "**`/config set-muterole @role`** — role used for manual mutes\n\n"
             "For verify role: use **`/config dashboard`** → ✅ Verification → Setup\n"
             "For ticket support role: use **`/config dashboard`** → 🎫 Tickets → Setup"
-        ), ephemeral=True)
+        ))
 
     @discord.ui.button(label="🔄 Refresh",       style=discord.ButtonStyle.secondary, row=0)
     async def refresh(self, i, b):
@@ -1097,10 +1097,10 @@ class _ConfirmResetView(discord.ui.View):
             await db.commit()
         await self.bot.db.create_guild_settings(self.guild.id)
         await i.response.send_message(embed=success_embed("Reset Complete",
-            "All settings wiped. Use `/config` to start fresh."), ephemeral=True)
+            "All settings wiped. Use `/config` to start fresh."))
     @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
     async def cancel(self, i, b):
-        await i.response.send_message("Cancelled.", ephemeral=True)
+        await i.response.send_message("Cancelled.")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1115,7 +1115,7 @@ class Config(commands.GroupCog, name="config"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def dashboard(self, interaction: discord.Interaction):
         embed, view = await MasterDashboard.build(self.bot, interaction.guild)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="view", description="Quick overview of all current server settings.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -1149,7 +1149,7 @@ class Config(commands.GroupCog, name="config"):
             f"Card: {'✅ Uploaded' if os.path.exists(f'data/welcome_images/{interaction.guild.id}.png') else '❌ None'}"
         ), inline=True)
         e.set_footer(text="Use /config dashboard to change anything")
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        await interaction.response.send_message(embed=e)
 
     @app_commands.command(name="set-farewell", description="Set the farewell channel.")
     @app_commands.describe(channel="Where farewell messages go", message="Custom farewell message (optional)")
@@ -1157,7 +1157,7 @@ class Config(commands.GroupCog, name="config"):
     async def set_farewell(self, interaction: discord.Interaction, channel: discord.TextChannel, message: str = None):
         await _set(self.bot, interaction.guild.id, "farewell_channel_id", channel.id)
         if message: await _set(self.bot, interaction.guild.id, "farewell_message", message)
-        await interaction.response.send_message(embed=success_embed("Farewell Channel Set", f"Farewell messages will go to {channel.mention}."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Farewell Channel Set", f"Farewell messages will go to {channel.mention}."))
 
     @app_commands.command(name="set-logs", description="Set logging channels. Pick directly from Discord's channel selector.")
     @app_commands.describe(unified="One channel for ALL events", messages="Message edit/delete logs", members="Join/leave/ban logs", server="Channel/role changes", voice="Voice logs")
@@ -1177,7 +1177,7 @@ class Config(commands.GroupCog, name="config"):
         if voice:    await _set(self.bot, interaction.guild.id, "voice_log_channel_id",   voice.id);    saved.append(f"Voice → {voice.mention}")
         adv = self.bot.cogs.get("AdvancedLogger")
         if adv: adv._cache.pop(interaction.guild.id, None)
-        await interaction.response.send_message(embed=success_embed("Log Channels Set", "\n".join(saved) or "No changes."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Log Channels Set", "\n".join(saved) or "No changes."))
 
     @app_commands.command(name="set-autorole", description="Set a role to auto-assign to every new member on join.")
     @app_commands.describe(role="Role to give all new members")
@@ -1186,14 +1186,14 @@ class Config(commands.GroupCog, name="config"):
         if role >= interaction.guild.me.top_role:
             return await interaction.response.send_message(embed=error_embed("Role Too High", f"{role.mention} is above my highest role. Move my role above it first."), ephemeral=True)
         await _set(self.bot, interaction.guild.id, "autorole_id", role.id)
-        await interaction.response.send_message(embed=success_embed("Auto-Role Set", f"Every new member will receive {role.mention}."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Auto-Role Set", f"Every new member will receive {role.mention}."))
 
     @app_commands.command(name="set-muterole", description="Set the mute role for manual mutes.")
     @app_commands.describe(role="The mute role")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_muterole(self, interaction: discord.Interaction, role: discord.Role):
         await _set(self.bot, interaction.guild.id, "mute_role_id", role.id)
-        await interaction.response.send_message(embed=success_embed("Mute Role Set", f"Mute role → {role.mention}"), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Mute Role Set", f"Mute role → {role.mention}"))
 
     @app_commands.command(name="set-levelup-channel", description="Set where level-up announcements are posted.")
     @app_commands.describe(channel="Channel for level-up announcements (leave blank = same channel they chatted in)")
@@ -1201,7 +1201,7 @@ class Config(commands.GroupCog, name="config"):
     async def set_levelup_channel(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
         await _set(self.bot, interaction.guild.id, "level_up_channel_id", channel.id if channel else None)
         await interaction.response.send_message(embed=success_embed("Level-Up Channel Set",
-            f"Level-ups → {channel.mention if channel else 'same channel they chat in'}"), ephemeral=True)
+            f"Level-ups → {channel.mention if channel else 'same channel they chat in'}"))
 
     @app_commands.command(name="toggle-leveling", description="Turn XP and leveling on or off.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -1209,7 +1209,7 @@ class Config(commands.GroupCog, name="config"):
         s = await _s(self.bot, interaction.guild.id)
         new = 0 if s.get("leveling_enabled", 1) else 1
         await _set(self.bot, interaction.guild.id, "leveling_enabled", new)
-        await interaction.response.send_message(embed=success_embed("Leveling " + ("Enabled" if new else "Disabled"), f"XP system is now **{'on' if new else 'off'}**."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Leveling " + ("Enabled" if new else "Disabled"), f"XP system is now **{'on' if new else 'off'}**."))
 
     @app_commands.command(name="toggle-economy", description="Turn the economy system on or off.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -1217,7 +1217,7 @@ class Config(commands.GroupCog, name="config"):
         s = await _s(self.bot, interaction.guild.id)
         new = 0 if s.get("economy_enabled", 1) else 1
         await _set(self.bot, interaction.guild.id, "economy_enabled", new)
-        await interaction.response.send_message(embed=success_embed("Economy " + ("Enabled" if new else "Disabled"), f"Economy is now **{'on' if new else 'off'}**."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Economy " + ("Enabled" if new else "Disabled"), f"Economy is now **{'on' if new else 'off'}**."))
 
     @app_commands.command(name="toggle-ai", description="Turn AI responses when the bot is @mentioned on or off.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -1225,7 +1225,7 @@ class Config(commands.GroupCog, name="config"):
         s = await _s(self.bot, interaction.guild.id)
         new = 0 if s.get("ai_enabled", 1) else 1
         await _set(self.bot, interaction.guild.id, "ai_enabled", new)
-        await interaction.response.send_message(embed=success_embed("AI Responses " + ("Enabled" if new else "Disabled"), f"AI @mention responses are now **{'on' if new else 'off'}**."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("AI Responses " + ("Enabled" if new else "Disabled"), f"AI @mention responses are now **{'on' if new else 'off'}**."))
 
     @app_commands.command(name="set-persona", description="Set how XERO's AI responds when mentioned.")
     @app_commands.describe(persona="AI personality style")
@@ -1239,7 +1239,7 @@ class Config(commands.GroupCog, name="config"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_persona(self, interaction: discord.Interaction, persona: str):
         await _set(self.bot, interaction.guild.id, "persona", persona)
-        await interaction.response.send_message(embed=success_embed("Persona Set", f"AI personality → **{persona}**"), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Persona Set", f"AI personality → **{persona}**"))
 
     @app_commands.command(name="reset", description="Reset all XERO settings for this server to defaults.")
     @app_commands.checks.has_permissions(administrator=True)
@@ -1451,10 +1451,10 @@ class Config(commands.GroupCog, name="config"):
                 f = discord.File(_io.BytesIO(card), filename="preview.png")
                 embed.set_image(url="attachment://preview.png")
                 embed.set_footer(text="👆 Live preview with your name — this is what members see")
-                return await interaction.followup.send(embed=embed, file=f, ephemeral=True)
+                return await interaction.followup.send(embed=embed, file=f)
 
         embed.set_footer(text="Use /config welcome to change anything")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(
         name="welcome-dm",
@@ -1516,7 +1516,7 @@ class Config(commands.GroupCog, name="config"):
         embed.add_field(name="📋 Changes", value="\n".join(changed) or "No changes — specify at least one option.", inline=False)
         embed.add_field(name="💬 DM Preview (what members receive)", value=preview[:400], inline=False)
         embed.set_footer(text="Use /config welcome-dm-view to see full DM preview")
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(
         name="welcome-dm-view",
@@ -1532,7 +1532,7 @@ class Config(commands.GroupCog, name="config"):
                 "📨  Welcome DM",
                 "Welcome DMs are currently **disabled**.\n"
                 "Use `/config welcome-dm enabled:True` to turn them on."
-            ), ephemeral=True)
+            ))
 
         dm_msg = s.get("welcome_dm_message") or "Hey {name}! 👋 Welcome to **{server}**! We're glad to have you."
         preview = dm_msg \
@@ -1557,7 +1557,7 @@ class Config(commands.GroupCog, name="config"):
         )
         wrapper.set_footer(text="Use /config welcome-dm to change the message or image")
 
-        await interaction.followup.send(embeds=[wrapper, dm_embed], ephemeral=True)
+        await interaction.followup.send(embeds=[wrapper, dm_embed])
 
     @app_commands.command(
         name="welcome-remove",
@@ -1576,7 +1576,7 @@ class Config(commands.GroupCog, name="config"):
             "Welcome card images removed.\n"
             "Channel and message settings are still active.\n"
             "Re-run `/config welcome` with an image attached to add a new one."
-        ), ephemeral=True)
+        ))
 
 
 async def setup(bot):

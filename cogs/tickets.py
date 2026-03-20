@@ -374,7 +374,7 @@ class TicketOpenView(discord.ui.View):
         except Exception as ex:
             logger.error(f"Staff brief: {ex}")
 
-        await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}")
 
 
 class TicketActionView(discord.ui.View):
@@ -383,10 +383,10 @@ class TicketActionView(discord.ui.View):
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.secondary, custom_id="xero_t_claim_v2", emoji="🙋")
     async def claim(self, interaction, button):
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.response.send_message("Staff only.", ephemeral=True)
+            return await interaction.response.send_message("Staff only.")
         bot    = interaction.client
         ticket = await _get_ticket(bot.db.db_path, interaction.channel.id)
-        if not ticket: return await interaction.response.send_message("Not a ticket.", ephemeral=True)
+        if not ticket: return await interaction.response.send_message("Not a ticket.")
         if ticket.get("claimed_by"):
             m = interaction.guild.get_member(ticket["claimed_by"])
             return await interaction.response.send_message(f"Already claimed by {m.mention if m else 'someone'}.", ephemeral=True)
@@ -399,10 +399,10 @@ class TicketActionView(discord.ui.View):
     @discord.ui.button(label="Unclaim", style=discord.ButtonStyle.secondary, custom_id="xero_t_unclaim_v2", emoji="🔓")
     async def unclaim(self, interaction, button):
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.response.send_message("Staff only.", ephemeral=True)
+            return await interaction.response.send_message("Staff only.")
         bot    = interaction.client
         ticket = await _get_ticket(bot.db.db_path, interaction.channel.id)
-        if not ticket: return await interaction.response.send_message("Not a ticket.", ephemeral=True)
+        if not ticket: return await interaction.response.send_message("Not a ticket.")
         async with aiosqlite.connect(bot.db.db_path) as db:
             await db.execute("UPDATE tickets SET claimed_by=NULL WHERE ticket_id=?", (ticket["ticket_id"],))
             await db.commit()
@@ -412,7 +412,7 @@ class TicketActionView(discord.ui.View):
     @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="xero_t_close_v2", emoji="🔒")
     async def close(self, interaction, button):
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.response.send_message("Staff only.", ephemeral=True)
+            return await interaction.response.send_message("Staff only.")
         await _close_flow(interaction, interaction.client)
 
 
@@ -507,7 +507,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         if support_role: desc += f"\nSupport role: {support_role.mention}"
         if category:     desc += f"\nCategory: {category.mention}"
         if log_channel:  desc += f"\nCase logs → {log_channel.mention}"
-        await interaction.response.send_message(embed=success_embed("Ticket System Ready", desc), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Ticket System Ready", desc))
 
     @app_commands.command(name="close", description="Close this ticket and generate a full case log.")
     @app_commands.describe(reason="Reason for closing")
@@ -566,7 +566,7 @@ class Tickets(commands.GroupCog, name="ticket"):
             async with db.execute("SELECT * FROM tickets WHERE guild_id=? AND status='open' ORDER BY ticket_id DESC", (interaction.guild.id,)) as c:
                 tickets = [dict(r) for r in await c.fetchall()]
         if not tickets:
-            return await interaction.response.send_message(embed=info_embed("No Open Tickets","All quiet."), ephemeral=True)
+            return await interaction.response.send_message(embed=info_embed("No Open Tickets","All quiet."))
         e = discord.Embed(title=f"Open Tickets — {len(tickets)} active", color=TC_OPEN, timestamp=discord.utils.utcnow())
         for t in tickets[:10]:
             ch = interaction.guild.get_channel(t["channel_id"])
@@ -577,7 +577,7 @@ class Tickets(commands.GroupCog, name="ticket"):
             opener_str = opener.mention if opener else f"<@{t['user_id']}>"
             e.add_field(name=f"#{t['ticket_id']} — {t.get('topic','General')}", value=f"**Opener:** {opener_str}\n**Channel:** {ch.mention if ch else '(deleted)'}\n**Claimed:** {claimer.mention if claimer else '—'}\n**Opened:** {ts}", inline=True)
         e.set_footer(text="XERO Tickets")
-        await interaction.response.send_message(embed=e, ephemeral=True)
+        await interaction.response.send_message(embed=e)
 
     @app_commands.command(name="history", description="Browse closed tickets latest to earliest. ◀ ▶ to navigate. Filter by user optionally.")
     @app_commands.describe(user="Filter to a specific user's tickets (optional)")
@@ -594,10 +594,10 @@ class Tickets(commands.GroupCog, name="ticket"):
                 tickets = [dict(r) for r in await c.fetchall()]
         if not tickets:
             msg = f"No closed tickets" + (f" for {user.mention}" if user else "") + "."
-            return await interaction.followup.send(embed=info_embed("No History", msg), ephemeral=True)
+            return await interaction.followup.send(embed=info_embed("No History", msg))
         view  = TicketHistoryView(self.bot, interaction.guild, tickets)
         embed = await view._embed()
-        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view)
 
     @app_commands.command(name="rate", description="Rate your support experience 1-5 stars.")
     @app_commands.describe(stars="Your rating", feedback="Optional feedback")
@@ -631,7 +631,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         if not lines:
             return await interaction.followup.send(embed=error_embed("Empty","No messages."), ephemeral=True)
         f = discord.File(io.StringIO("\n".join(lines)), filename=f"{interaction.channel.name}-transcript.txt")
-        await interaction.followup.send(embed=discord.Embed(description=f"📄 {len(lines)} messages exported.", color=TC_OPEN), file=f, ephemeral=True)
+        await interaction.followup.send(embed=discord.Embed(description=f"📄 {len(lines)} messages exported.", color=TC_OPEN), file=f)
 
 
 async def setup(bot):

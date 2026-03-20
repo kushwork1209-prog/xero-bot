@@ -203,7 +203,7 @@ class Admin(commands.Cog):
     async def admin(self, interaction: discord.Interaction):
         embed = _main_embed(interaction.guild)
         view = AdminDashboardView(self.bot, interaction.guild)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=embed, view=view)
 
     @app_commands.command(name="purge-bots", description="[Admin] Delete all messages sent by bots in this channel.")
     @app_commands.describe(limit="How many messages back to scan (max 200)")
@@ -212,7 +212,7 @@ class Admin(commands.Cog):
         limit = max(1, min(200, limit))
         await interaction.response.defer(ephemeral=True)
         deleted = await interaction.channel.purge(limit=limit, check=lambda m: m.author.bot)
-        await interaction.followup.send(embed=success_embed("Bot Messages Purged", f"Deleted **{len(deleted)}** bot messages from the last {limit} messages."), ephemeral=True)
+        await interaction.followup.send(embed=success_embed("Bot Messages Purged", f"Deleted **{len(deleted)}** bot messages from the last {limit} messages."))
 
     @app_commands.command(name="shop-manage", description="Add or remove items from the server shop.")
     @app_commands.describe(action="add or remove", name="Item name", price="Item price", description="Item description", role="Role to grant on purchase", emoji="Emoji for the item")
@@ -236,7 +236,7 @@ class Admin(commands.Cog):
                 await db.execute("DELETE FROM economy_shop WHERE guild_id=? AND LOWER(name)=LOWER(?)", (interaction.guild.id, name))
                 await db.commit()
             embed = success_embed("Item Removed", f"**{name}** has been removed from the shop.")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):

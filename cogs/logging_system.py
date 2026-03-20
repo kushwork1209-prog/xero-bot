@@ -981,9 +981,9 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         await interaction.response.defer(ephemeral=True)
         pages = await _collect_user_logs(self.bot, interaction.guild, user)
         if not pages:
-            return await interaction.followup.send(embed=discord.Embed(description=f"No XERO records found for {user.mention}.", color=0x2B2D31), ephemeral=True)
+            return await interaction.followup.send(embed=discord.Embed(description=f"No XERO records found for {user.mention}.", color=0x2B2D31))
         view  = UserLogView(pages, user)
-        await interaction.followup.send(embed=pages[0].embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=pages[0].embed, view=view)
 
     @app_commands.command(name="setup", description="Configure logging. Set one unified channel or separate channels per event type.")
     @app_commands.describe(unified="One channel for ALL events",messages="Edits/deletes",members="Joins/leaves/bans",server="Channels/roles/server changes",voice="Voice events")
@@ -1060,7 +1060,7 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         embed.add_field(name="🔊 Voice",     value=ch(s.get("voice_log_channel_id")),     inline=True)
         embed.add_field(name="🛡️ Webhooks", value="✅ Protected" if s.get("webhook_protection_enabled") else "❌ Off", inline=True)
         embed.set_footer(text="XERO Logging  •  /logs setup to configure")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="webhook-protection", description="Auto-delete webhooks created by non-admins. Kills webhook spam attacks.")
     @app_commands.describe(enabled="Enable or disable")

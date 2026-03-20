@@ -77,7 +77,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
                     return await interaction.response.send_message(embed=error_embed(
                         "Already Given Today",
                         f"You can give rep again <t:{next_ts}:R>.\n*One rep per day — make it count.*"
-                    ), ephemeral=True)
+                    ))
 
             # Give rep
             await db.execute(
@@ -255,7 +255,7 @@ class ProposalView(discord.ui.View):
     @discord.ui.button(label="💍 Accept", style=discord.ButtonStyle.success)
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.target.id:
-            return await interaction.response.send_message("Only the person being proposed to can accept!", ephemeral=True)
+            return await interaction.response.send_message("Only the person being proposed to can accept!")
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute(
@@ -274,7 +274,7 @@ class ProposalView(discord.ui.View):
     @discord.ui.button(label="💔 Decline", style=discord.ButtonStyle.danger)
     async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.target.id:
-            return await interaction.response.send_message("Only the person being proposed to can decline!", ephemeral=True)
+            return await interaction.response.send_message("Only the person being proposed to can decline!")
         embed = discord.Embed(
             title="💔  Proposal Declined",
             description=f"{self.target.mention} declined the proposal from {self.proposer.mention}.\n*There are plenty of fish in the sea...*",
@@ -380,7 +380,7 @@ class EconomyExtras(commands.Cog):
             return await interaction.response.send_message(embed=error_embed(
                 "Invalid Timezone",
                 f"`{timezone}` is not a valid timezone.\n\n**Common timezones:**\n" + "\n".join(f"`{tz}`" for tz in common)
-            ), ephemeral=True)
+            ))
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute(
                 "CREATE TABLE IF NOT EXISTS user_timezones (user_id INTEGER PRIMARY KEY, timezone TEXT)"
@@ -397,7 +397,7 @@ class EconomyExtras(commands.Cog):
             f"**Timezone:** `{timezone}`\n"
             f"**Current time for you:** `{now_local.strftime('%H:%M, %A %B %d')}`\n\n"
             f"*Reminders will now fire at your local time.*"
-        ), ephemeral=True)
+        ))
 
 
 async def setup(bot):

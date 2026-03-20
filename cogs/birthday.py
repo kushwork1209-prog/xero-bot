@@ -30,14 +30,14 @@ class Birthday(commands.GroupCog, name="birthday"):
         month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
         age_text = f" ({datetime.date.today().year - year} years old this year)" if year else ""
         embed = success_embed("Birthday Set! 🎂", f"Your birthday is set to **{month_names[month-1]} {day}**{age_text}.\nThe server will celebrate with you on your special day!")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="remove", description="Remove your birthday from the server.")
     async def remove(self, interaction: discord.Interaction):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("DELETE FROM birthdays WHERE user_id=? AND guild_id=?", (interaction.user.id, interaction.guild.id))
             await db.commit()
-        await interaction.response.send_message(embed=success_embed("Birthday Removed", "Your birthday has been removed from this server."), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Birthday Removed", "Your birthday has been removed from this server."))
 
     @app_commands.command(name="view", description="View your or another user's birthday.")
     @app_commands.describe(user="User to check birthday for")
@@ -49,7 +49,7 @@ class Birthday(commands.GroupCog, name="birthday"):
                 bday = await c.fetchone()
         if not bday:
             name = "You have" if target == interaction.user else f"{target.display_name} has"
-            return await interaction.response.send_message(embed=info_embed("No Birthday Set", f"{name} not set a birthday yet."), ephemeral=True)
+            return await interaction.response.send_message(embed=info_embed("No Birthday Set", f"{name} not set a birthday yet."))
         bday = dict(bday)
         month_names = ["January","February","March","April","May","June","July","August","September","October","November","December"]
         # Calculate days until next birthday
@@ -128,7 +128,7 @@ class Birthday(commands.GroupCog, name="birthday"):
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_footer(text="XERO Birthday System")
         await channel.send(content=user.mention, embed=embed)
-        await interaction.response.send_message(embed=success_embed("Birthday Announced!", f"Celebrated {user.mention}'s birthday in {channel.mention}!"), ephemeral=True)
+        await interaction.response.send_message(embed=success_embed("Birthday Announced!", f"Celebrated {user.mention}'s birthday in {channel.mention}!"))
 
     @app_commands.command(name="today", description="See which members have a birthday today!")
     async def today(self, interaction: discord.Interaction):

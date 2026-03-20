@@ -147,7 +147,7 @@ class Setup(commands.GroupCog, name="setup"):
         embed.add_field(name="🤖 AI", value=(
             f"**Persona:** {settings.get('persona', 'neutral').capitalize()}"
         ), inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):
