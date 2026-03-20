@@ -1,5 +1,6 @@
 """XERO Bot — Music Player (11 commands)"""
 import discord
+from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging
@@ -65,6 +66,7 @@ class Music(commands.GroupCog, name="music"):
             return False
         return True
 
+    @command_guard
     @app_commands.command(name="play", description="Play a song from YouTube by title or URL.")
     @app_commands.describe(query="Song title or YouTube URL")
     async def play(self, interaction: discord.Interaction, query: str):
@@ -74,11 +76,16 @@ class Music(commands.GroupCog, name="music"):
             return await interaction.response.send_message(embed=error_embed("Missing Dependency", "yt-dlp is not installed. Run `pip install yt-dlp`."), ephemeral=True)
         await interaction.response.defer()
         try:
-            with yt_dlp.YoutubeDL(YTDL_OPTS) as ydl:
-                info = ydl.extract_info(f"ytsearch:{query}" if not query.startswith("http") else query, download=False)
-                if "entries" in info:
-                    info = info["entries"][0]
-                song = {"url": info["url"], "title": info["title"], "duration": info.get("duration", 0), "thumbnail": info.get("thumbnail"), "webpage_url": info.get("webpage_url", "")}
+            def _search():
+                with yt_dlp.YoutubeDL(YTDL_OPTS) as ydl:
+                    info = ydl.extract_info(f"ytsearch:{query}" if not query.startswith("http") else query, download=False)
+                    if "entries" in info:
+                        info = info["entries"][0]
+                    return {"url": info["url"], "title": info["title"], "duration": info.get("duration", 0), "thumbnail": info.get("thumbnail"), "webpage_url": info.get("webpage_url", "")}
+            loop = asyncio.get_event_loop()
+            song = await asyncio.wait_for(loop.run_in_executor(None, _search), timeout=20)
+        except asyncio.TimeoutError:
+            return await interaction.followup.send(embed=error_embed("Timed Out", "YouTube search took too long. Try again."))
         except Exception as e:
             return await interaction.followup.send(embed=error_embed("Not Found", f"Couldn't find: **{query}**\n`{str(e)[:100]}`"))
 
