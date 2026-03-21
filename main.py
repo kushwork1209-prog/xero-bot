@@ -37,7 +37,7 @@ class XeroBot(commands.Bot):
         self.MANAGEMENT_GUILD_ID = int(os.getenv("MANAGEMENT_GUILD_ID", "1431852658767040535"))
         self._synced = False  # prevent double-sync on reconnect
         self.initial_extensions = [
-            "cogs.events", "cogs.config", "cogs.info", "cogs.admin",
+            "cogs.events", "cogs.config", "cogs.setup", "cogs.info", "cogs.admin",
             "cogs.moderation", "cogs.automod", "cogs.smart_mod",
             "cogs.economy", "cogs.economy_advanced",
             "cogs.levels", "cogs.leaderboard",
