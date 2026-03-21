@@ -13,7 +13,7 @@ os.makedirs(WELCOME_DIR, exist_ok=True)
 
 CARD_W, CARD_H = 1024, 320
 
-DB_PATH = os.getenv("DB_PATH", "xero_bot.db")
+DB_PATH = os.getenv("DB_PATH", "data/xero.db")
 
 FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
