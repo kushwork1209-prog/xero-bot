@@ -22,37 +22,6 @@ from utils.embeds import comprehensive_embed, info_embed, error_embed
 logger = logging.getLogger("XERO.Info")
 
 
-# ── /invite ───────────────────────────────────────────────────────────
-@app_commands.command(name="invite", description="Get the invite link for XERO Bot.")
-@command_guard
-async def invite_command(interaction: discord.Interaction):
-    """Standalone invite command."""
-    invite_url = discord.utils.oauth_url(
-        interaction.client.user.id,
-        permissions=discord.Permissions(8),  # Administrator permission for full functionality
-        scopes=("bot", "applications.commands")
-    )
-    
-    embed = discord.Embed(
-        title="👋  Invite XERO Bot",
-        description=(
-            "Click the button below to add **XERO** to your server!\n\n"
-            "**Why XERO?**\n"
-            "• 300+ Commands\n"
-            "• Advanced AI & Moderation\n"
-            "• Full Economy & Levels\n"
-            "• High-quality Music\n"
-            "• 100% Free & Premium"
-        ),
-        color=discord.Color.blurple()
-    )
-    embed.set_thumbnail(url=interaction.client.user.display_avatar.url)
-    
-    view = discord.ui.View()
-    view.add_item(discord.ui.Button(label="Invite XERO", url=invite_url, style=discord.ButtonStyle.link))
-    
-    await interaction.response.send_message(embed=embed, view=view)
-
 class Info(commands.GroupCog, name="info"):
     """All /info subcommands in one place."""
 
@@ -585,5 +554,4 @@ class Info(commands.GroupCog, name="info"):
 
 
 async def setup(bot: commands.Bot):
-    bot.tree.add_command(invite_command)
     await bot.add_cog(Info(bot))

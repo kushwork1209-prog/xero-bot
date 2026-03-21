@@ -54,6 +54,13 @@ class Utility(commands.Cog):
         await self.bot.db.set_afk(interaction.user.id,interaction.guild.id,reason[:200])
         await interaction.response.send_message(embed=info_embed("💤 AFK Set",f"You're now AFK: **{reason}**\nI'll notify anyone who pings you. Automatically cleared when you send a message."))
 
+    @app_commands.command(name="invite", description="Get the invite link for XERO Bot.")
+    async def invite(self, interaction: discord.Interaction):
+        url = discord.utils.oauth_url(self.bot.user.id, permissions=discord.Permissions(8), scopes=("bot", "applications.commands"))
+        embed = discord.Embed(title="👋 Invite XERO", description="Click below to add XERO to your server!\n• 400+ Commands\n• AI & Music\n• 100% Free", color=XERO.PRIMARY)
+        view = discord.ui.View().add_item(discord.ui.Button(label="Invite XERO", url=url, style=discord.ButtonStyle.link))
+        await interaction.response.send_message(embed=embed, view=view)
+
     @app_commands.command(name="help", description="Browse all 400+ XERO commands organized by category.")
     async def help(self, interaction: discord.Interaction):
         # Dynamically calculate total commands
