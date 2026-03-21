@@ -1,3 +1,4 @@
+from utils.guard import command_guard
 from discord import app_commands
 """
 XERO Bot — Passive Member Intelligence + Always-On AI

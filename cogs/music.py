@@ -28,6 +28,7 @@ YTDL_OPTS = {
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
     "extract_flat": False,
+    "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     "socket_timeout": 15,
     "retries": 3,
     # Prefer opus codec for lower CPU usage in Discord
