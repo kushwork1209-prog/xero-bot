@@ -1,5 +1,5 @@
 """XERO Bot — Music Player (12 commands)
-Optimized for Railway: Uses SoundCloud + JioSaavn as primary search to bypass YouTube bot-blocking.
+Optimized for Railway: Multi-source search (SoundCloud + YouTube + URL) to bypass bot blocks.
 No external API keys required.
 """
 import discord
@@ -18,7 +18,7 @@ try:
     YTDLP_AVAILABLE = True
 except ImportError:
     YTDLP_AVAILABLE = False
-    logger.warning("yt-dlp not installed — music commands will be disabled.")
+    logger.warning("yt-dlp not installed.")
 
 # ── yt-dlp options ────────────────────────────────────────────────────────────
 YTDL_OPTS = {
@@ -26,12 +26,13 @@ YTDL_OPTS = {
     "noplaylist": True,
     "quiet": True,
     "no_warnings": True,
-    "default_search": "scsearch",  # Switch to SoundCloud search by default
+    "default_search": "auto",
     "source_address": "0.0.0.0",
     "extract_flat": False,
     "socket_timeout": 15,
     "retries": 5,
     "nocheckcertificate": True,
+    "ignoreerrors": True,
 }
 
 FFMPEG_OPTS = {
@@ -54,21 +55,22 @@ def _fmt_duration(seconds: int) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 def _search_sync(query: str) -> dict:
-    """Blocking search — tries SoundCloud first, then JioSaavn, then YouTube as last resort."""
-    # If it's a direct URL, just use it
+    """Blocking search — tries SoundCloud first as it's more stable on cloud IPs."""
     is_url = query.startswith(("http://", "https://", "www."))
     
-    # Strategy: 1. SoundCloud (scsearch), 2. JioSaavn (jssearch), 3. YouTube (ytsearch)
-    search_strategies = [query] if is_url else [f"scsearch:{query}", f"ytsearch:{query}"]
+    # Try multiple search prefixes to find a working one
+    prefixes = [""] if is_url else ["scsearch:", "ytsearch:"]
     
-    last_err = None
-    for search_query in search_strategies:
+    for prefix in prefixes:
         try:
             with yt_dlp.YoutubeDL(YTDL_OPTS) as ydl:
-                info = ydl.extract_info(search_query, download=False)
+                info = ydl.extract_info(f"{prefix}{query}", download=False)
+                if not info: continue
                 if "entries" in info:
                     if not info["entries"]: continue
                     info = info["entries"][0]
+                
+                if not info or "url" not in info: continue
                 
                 return {
                     "url": info["url"],
@@ -79,10 +81,10 @@ def _search_sync(query: str) -> dict:
                     "uploader": info.get("uploader", "Unknown"),
                 }
         except Exception as e:
-            last_err = e
+            logger.warning(f"Search failed with prefix '{prefix}': {e}")
             continue
             
-    raise last_err or ValueError("No results found.")
+    raise ValueError(f"Could not find or play: {query}. YouTube may be blocking the server.")
 
 class Music(commands.GroupCog, name="music"):
     def __init__(self, bot: commands.Bot):
@@ -128,7 +130,7 @@ class Music(commands.GroupCog, name="music"):
             return False
         return True
 
-    @app_commands.command(name="play", description="Play music (SoundCloud/YouTube).")
+    @app_commands.command(name="play", description="Play music from SoundCloud or YouTube.")
     @app_commands.describe(query="Song name or URL")
     @command_guard
     async def play(self, interaction: discord.Interaction, query: str):
@@ -141,7 +143,7 @@ class Music(commands.GroupCog, name="music"):
             loop = asyncio.get_event_loop()
             song = await asyncio.wait_for(loop.run_in_executor(None, _search_sync, query), timeout=30.0)
         except Exception as e:
-            return await interaction.followup.send(embed=error_embed("Error", f"Could not find or play: {query}\n`{str(e)[:100]}`"))
+            return await interaction.followup.send(embed=error_embed("Error", f"{str(e)}"))
 
         vc = interaction.guild.voice_client
         if not vc:
