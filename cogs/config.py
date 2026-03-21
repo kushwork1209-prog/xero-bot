@@ -1,3 +1,4 @@
+from utils.guard import command_guard
 """
 XERO Bot — Unified Configuration Dashboard
 One command. One embed. Every setting.

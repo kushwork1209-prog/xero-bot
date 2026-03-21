@@ -1,3 +1,4 @@
+from utils.guard import command_guard
 """
 XERO Bot — Core Admin + Support Tools
 Management guild ONLY. Invisible everywhere else.

@@ -1,3 +1,4 @@
+from discord import app_commands
 """
 XERO Bot — Passive Member Intelligence + Always-On AI
 
@@ -563,7 +564,6 @@ class Intelligence(commands.GroupCog, name="intel"):
         )
 
 
-from discord import app_commands
 
 
 async def setup(bot):

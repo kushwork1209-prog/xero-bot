@@ -1,3 +1,4 @@
+from utils.guard import command_guard
 """
 XERO Bot — Ticket System (Complete Rewrite)
 Every action permanently logged. Full case log on close. AI summary. Paginated history.
