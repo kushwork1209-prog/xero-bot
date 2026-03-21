@@ -1378,7 +1378,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
                 cid = (gs or {}).get("log_channel_id") or (gs or {}).get("welcome_channel_id")
                 target = guild.get_channel(cid) if cid else None
             if not target:
-                target = next((c for c in guild.text_channels if guild.me.permissions_in(c).send_messages), None)
+                target = next((c for c in guild.text_channels if c.permissions_for(guild.me).send_messages), None)
             if target:
                 try:
                     content = "@everyone" if urgent and target.permissions_for(guild.me).mention_everyone else None
@@ -1405,7 +1405,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
         embed.set_footer(text="XERO Bot  ·  Team Flame")
         sent = failed = 0
         for guild in self.bot.guilds:
-            ch = next((c for c in guild.text_channels if "announce" in c.name.lower() and guild.me.permissions_in(c).send_messages), None)
+            ch = next((c for c in guild.text_channels if "announce" in c.name.lower() and c.permissions_for(guild.me).send_messages), None)
             if not ch:
                 gs = await self.bot.db.get_guild_settings(guild.id)
                 cid = (gs or {}).get("log_channel_id")
