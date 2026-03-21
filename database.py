@@ -1248,3 +1248,9 @@ class Database:
                 )
             await db.commit()
             return True
+
+    def _db_context(self):
+        """Returns the appropriate database connection context."""
+        if self._pool:
+            return make_context(self._pool)
+        return aiosqlite.connect(self.db_path)
