@@ -347,27 +347,24 @@ class Database:
             try:
                 async with db.execute("SELECT * FROM guild_settings WHERE guild_id=?", (guild_id,)) as c:
                     row = await c.fetchone()
-                if row:
-                    return dict(row)
+                if row: return dict(row)
             except Exception as e:
                 logger.warning(f"Error fetching guild settings for {guild_id}: {e}")
-            await db.execute("INSERT OR IGNORE INTO guild_settings (guild_id) VALUES (?)", (guild_id,))
+            
+            # If not found, create and return default
+            await db.execute("INSERT INTO guild_settings (guild_id) VALUES (?) ON CONFLICT (guild_id) DO NOTHING", (guild_id,))
             await db.commit()
-            try:
-                async with db.execute("SELECT * FROM guild_settings WHERE guild_id=?", (guild_id,)) as c:
-                    row = await c.fetchone()
-                return dict(row) if row else {}
-            except Exception as e:
-                logger.warning(f"Error retrieving new guild settings for {guild_id}: {e}")
-                return {}
+            async with db.execute("SELECT * FROM guild_settings WHERE guild_id=?", (guild_id,)) as c:
+                row = await c.fetchone()
+            return dict(row) if row else {}
 
     async def update_guild_setting(self, guild_id: int, key: str, value):
         async with self._db_context() as db:
-            await db.execute("INSERT OR IGNORE INTO guild_settings (guild_id) VALUES (?)", (guild_id,))
-            try:
-                await db.execute(f"UPDATE guild_settings SET {key}=? WHERE guild_id=?", (value, guild_id))
-            except Exception as e:
-                logger.warning(f"Failed to update {key} for guild {guild_id}: {e}")
+            # Atomic upsert for PostgreSQL/SQLite
+            await db.execute(f"""
+                INSERT INTO guild_settings (guild_id, {key}) VALUES (?, ?)
+                ON CONFLICT (guild_id) DO UPDATE SET {key} = EXCLUDED.{key}
+            """, (guild_id, value))
             await db.commit()
 
     async def create_guild_settings(self, guild_id: int):
