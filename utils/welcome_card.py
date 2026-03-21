@@ -45,24 +45,30 @@ async def _save_to_db(guild_id: int, image_bytes: bytes):
     """Save image as base64 in DB."""
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE guild_settings SET welcome_card_image_data=? WHERE guild_id=?",
-            (b64, guild_id)
-        )
-        await db.commit()
+        try:
+            await db.execute(
+                "UPDATE guild_settings SET welcome_card_image_data=? WHERE guild_id=?",
+                (b64, guild_id)
+            )
+            await db.commit()
+        except Exception as e:
+            logger.debug(f"Failed to save welcome card to DB for guild {guild_id}: {e}")
 
 
 async def _load_from_db(guild_id: int) -> bytes | None:
     """Load image bytes from DB."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute(
-                "SELECT welcome_card_image_data FROM guild_settings WHERE guild_id=?",
-                (guild_id,)
-            ) as c:
-                row = await c.fetchone()
-                if row and row[0]:
-                    return base64.b64decode(row[0])
+            try:
+                async with db.execute(
+                    "SELECT welcome_card_image_data FROM guild_settings WHERE guild_id=?",
+                    (guild_id,)
+                ) as c:
+                    row = await c.fetchone()
+                    if row and row[0]:
+                        return base64.b64decode(row[0])
+            except Exception:
+                pass
     except Exception as e:
         logger.debug(f"DB image load: {e}")
     return None
