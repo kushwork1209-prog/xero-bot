@@ -368,14 +368,52 @@ class Events(commands.Cog):
                 dm_embed.set_thumbnail(url=member.guild.icon.url if member.guild.icon else member.display_avatar.url)
                 dm_embed.set_footer(text=f"{member.guild.name}  •  Sent by XERO Bot")
                 await member.send(embed=dm_embed)
-                # DM image — also sent as separate embed
-                dm_img_url = settings.get("welcome_dm_image_url") or settings.get("welcome_image_url")
-                if not dm_img_url and settings.get("welcome_use_banner") and member.guild.banner:
-                    dm_img_url = member.guild.banner.url
-                if dm_img_url:
-                    dm_img_embed = discord.Embed(color=XERO.PRIMARY)
-                    dm_img_embed.set_image(url=dm_img_url)
-                    await member.send(embed=dm_img_embed)
+
+                # ── DM Image logic (Matches channel welcome logic) ──
+                from utils.welcome_card import generate_welcome_card, fetch_avatar, get_base_image_async
+                _base_img = await get_base_image_async(member.guild.id)
+                
+                if _base_img:
+                    # Personalized card
+                    avatar_bytes = await fetch_avatar(str(member.display_avatar.url)) if settings.get("welcome_card_show_avatar", 1) else None
+                    card_bytes   = generate_welcome_card(
+                        guild_id            = member.guild.id,
+                        base_bytes          = _base_img,
+                        member_name         = member.display_name if settings.get("welcome_card_show_name", 1) else "",
+                        member_avatar_bytes = avatar_bytes,
+                        text_color          = settings.get("welcome_card_text_color", "#FFFFFF"),
+                        text_position       = settings.get("welcome_card_text_pos", "bottom_left"),
+                        show_name           = bool(settings.get("welcome_card_show_name", 1)),
+                        show_avatar         = bool(settings.get("welcome_card_show_avatar", 1)),
+                        show_member_count   = bool(settings.get("welcome_card_show_count", 1)),
+                        member_count        = member.guild.member_count,
+                        server_name         = member.guild.name,
+                        overlay_style       = settings.get("welcome_card_overlay", "gradient"),
+                        font_size           = settings.get("welcome_card_font_size", 52),
+                    )
+                    if card_bytes:
+                        import io as _io
+                        card_file = discord.File(_io.BytesIO(card_bytes), filename="welcome_dm.png")
+                        card_embed = discord.Embed(color=XERO.PRIMARY)
+                        card_embed.set_image(url="attachment://welcome_dm.png")
+                        await member.send(embed=card_embed, file=card_file)
+                else:
+                    # Fallback to URLs/Banner
+                    dm_img_url = settings.get("welcome_dm_image_url") or settings.get("welcome_image_url")
+                    if not dm_img_url and settings.get("welcome_use_banner") and member.guild.banner:
+                        dm_img_url = member.guild.banner.url
+                    
+                    if dm_img_url:
+                        dm_img_embed = discord.Embed(color=XERO.PRIMARY)
+                        dm_img_embed.set_image(url=dm_img_url)
+                        await member.send(embed=dm_img_embed)
+                    elif settings.get("welcome_image_enabled"):
+                        # AI fallback
+                        prompt  = urllib.parse.quote(f"vibrant welcome banner for Discord member {member.display_name}")
+                        img_url = f"https://image.pollinations.ai/prompt/{prompt}?width=900&height=220&model=flux&nologo=true"
+                        img_embed = discord.Embed(color=XERO.PRIMARY)
+                        img_embed.set_image(url=img_url)
+                        await member.send(embed=img_embed)
             except discord.Forbidden:
                 pass  # User has DMs disabled — silent fail
             except Exception as e:
