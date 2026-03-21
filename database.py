@@ -1,10 +1,13 @@
 """
 XERO Bot — Database Manager
-Complete SQLite database with all required tables and helpers
+Uses PostgreSQL (asyncpg) when DATABASE_URL is set — data survives all Railway redeploys.
+Falls back to SQLite (aiosqlite) for local development.
 """
 
+import os
 import aiosqlite
 import logging
+from utils.db_adapter import DATABASE_URL, create_pg_pool, make_context
 
 logger = logging.getLogger("XERO.Database")
 
@@ -12,9 +15,13 @@ logger = logging.getLogger("XERO.Database")
 class Database:
     def __init__(self, db_path="data/xero.db"):
         self.db_path = db_path
+        self._pool   = None   # asyncpg pool, set in initialize() when DATABASE_URL is set
 
     async def initialize(self):
-        async with aiosqlite.connect(self.db_path) as db:
+        # Prefer PostgreSQL (permanent persistence, no redeploy data loss)
+        if DATABASE_URL:
+            self._pool = await create_pg_pool()
+        async with self._db_context() as db:
             # ── Guild Settings ─────────────────────────────────────────────
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS guild_settings (
@@ -335,7 +342,7 @@ class Database:
     # ── Guild Settings ────────────────────────────────────────────────────
 
     async def get_guild_settings(self, guild_id: int) -> dict:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             try:
                 async with db.execute("SELECT * FROM guild_settings WHERE guild_id=?", (guild_id,)) as c:
@@ -355,7 +362,7 @@ class Database:
                 return {}
 
     async def update_guild_setting(self, guild_id: int, key: str, value):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("INSERT OR IGNORE INTO guild_settings (guild_id) VALUES (?)", (guild_id,))
             try:
                 await db.execute(f"UPDATE guild_settings SET {key}=? WHERE guild_id=?", (value, guild_id))
@@ -364,14 +371,14 @@ class Database:
             await db.commit()
 
     async def create_guild_settings(self, guild_id: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("INSERT OR IGNORE INTO guild_settings (guild_id) VALUES (?)", (guild_id,))
             await db.commit()
 
     # ── Economy ───────────────────────────────────────────────────────────
 
     async def get_economy(self, user_id: int, guild_id: int) -> dict:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM economy WHERE user_id=? AND guild_id=?", (user_id, guild_id)) as c:
                 row = await c.fetchone()
@@ -384,7 +391,7 @@ class Database:
                     "last_daily": None, "last_work": None, "last_weekly": None, "last_rob": None}
 
     async def update_economy(self, user_id: int, guild_id: int, wallet_delta=0, bank_delta=0, earned_delta=0, spent_delta=0):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("INSERT OR IGNORE INTO economy (user_id, guild_id) VALUES (?,?)", (user_id, guild_id))
             if wallet_delta:
                 await db.execute("UPDATE economy SET wallet=MAX(0,wallet+?) WHERE user_id=? AND guild_id=?",
@@ -401,12 +408,12 @@ class Database:
             await db.commit()
 
     async def set_economy_timestamp(self, user_id: int, guild_id: int, field: str, value: str):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute(f"UPDATE economy SET {field}=? WHERE user_id=? AND guild_id=?", (value, user_id, guild_id))
             await db.commit()
 
     async def get_economy_leaderboard(self, guild_id: int, limit=10):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT user_id, wallet, bank, wallet+bank as total FROM economy WHERE guild_id=? ORDER BY total DESC LIMIT ?",
@@ -417,7 +424,7 @@ class Database:
     # ── Levels ────────────────────────────────────────────────────────────
 
     async def get_level(self, user_id: int, guild_id: int) -> dict:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM levels WHERE user_id=? AND guild_id=?", (user_id, guild_id)) as c:
                 row = await c.fetchone()
@@ -456,7 +463,7 @@ class Database:
 
     async def update_xp(self, user_id: int, guild_id: int, xp_gain: int, is_bot_command: bool = False):
         """Returns (leveled_up: bool, new_level: int)"""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             await db.execute("INSERT OR IGNORE INTO levels (user_id, guild_id) VALUES (?,?)", (user_id, guild_id))
             async with db.execute("SELECT xp, level FROM levels WHERE user_id=? AND guild_id=?", (user_id, guild_id)) as c:
@@ -481,7 +488,7 @@ class Database:
             return leveled_up, current_level
 
     async def get_level_leaderboard(self, guild_id: int, limit=10):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT user_id, level, total_xp FROM levels WHERE guild_id=? ORDER BY total_xp DESC LIMIT ?",
@@ -490,7 +497,7 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def set_user_xp(self, user_id: int, guild_id: int, xp: int, level: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO levels (user_id, guild_id, xp, level, total_xp) VALUES (?,?,?,?,?)",
                 (user_id, guild_id, xp, level, xp)
@@ -500,7 +507,7 @@ class Database:
     # ── Moderation ────────────────────────────────────────────────────────
 
     async def add_mod_case(self, guild_id, user_id, mod_id, action, reason, duration=None) -> int:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             async with db.execute(
                 "INSERT INTO mod_cases (guild_id, user_id, mod_id, action, reason, duration) VALUES (?,?,?,?,?,?)",
                 (guild_id, user_id, mod_id, action, reason, duration)
@@ -510,7 +517,7 @@ class Database:
             return case_id
 
     async def get_mod_cases(self, guild_id, user_id=None, limit=10):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             if user_id:
                 async with db.execute(
@@ -525,7 +532,7 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def add_warning(self, guild_id, user_id, mod_id, reason) -> int:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute(
                 "INSERT INTO warnings (guild_id, user_id, mod_id, reason) VALUES (?,?,?,?)",
                 (guild_id, user_id, mod_id, reason)
@@ -538,7 +545,7 @@ class Database:
                 return row[0]
 
     async def get_warnings(self, guild_id, user_id):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM warnings WHERE guild_id=? AND user_id=? ORDER BY timestamp DESC",
@@ -547,14 +554,14 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def clear_warnings(self, guild_id, user_id):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("DELETE FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id))
             await db.commit()
 
     # ── Stats ─────────────────────────────────────────────────────────────
 
     async def increment_stat(self, user_id: int, guild_id: int, stat="commands_used"):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("INSERT OR IGNORE INTO user_stats (user_id, guild_id) VALUES (?,?)", (user_id, guild_id))
             await db.execute(
                 f"UPDATE user_stats SET {stat}={stat}+1 WHERE user_id=? AND guild_id=?",
@@ -563,7 +570,7 @@ class Database:
             await db.commit()
 
     async def get_stats_leaderboard(self, guild_id: int, limit=10):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT user_id, commands_used, messages_sent FROM user_stats WHERE guild_id=? ORDER BY commands_used DESC LIMIT ?",
@@ -572,7 +579,7 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def get_user_stats(self, user_id: int, guild_id: int) -> dict:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM user_stats WHERE user_id=? AND guild_id=?", (user_id, guild_id)
@@ -583,7 +590,7 @@ class Database:
     # ── Level Rewards ─────────────────────────────────────────────────────
 
     async def add_level_reward(self, guild_id: int, level: int, role_id: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO level_rewards (guild_id, level, role_id) VALUES (?,?,?)",
                 (guild_id, level, role_id)
@@ -591,7 +598,7 @@ class Database:
             await db.commit()
 
     async def get_level_rewards(self, guild_id: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM level_rewards WHERE guild_id=? ORDER BY level ASC", (guild_id,)
@@ -599,14 +606,14 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def remove_level_reward(self, guild_id: int, level: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("DELETE FROM level_rewards WHERE guild_id=? AND level=?", (guild_id, level))
             await db.commit()
 
     # ── AFK ───────────────────────────────────────────────────────────────
 
     async def set_afk(self, user_id: int, guild_id: int, reason: str):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO afk_users (user_id, guild_id, reason) VALUES (?,?,?)",
                 (user_id, guild_id, reason)
@@ -614,7 +621,7 @@ class Database:
             await db.commit()
 
     async def get_afk(self, user_id: int, guild_id: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM afk_users WHERE user_id=? AND guild_id=?", (user_id, guild_id)
@@ -623,14 +630,14 @@ class Database:
             return dict(row) if row else None
 
     async def remove_afk(self, user_id: int, guild_id: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("DELETE FROM afk_users WHERE user_id=? AND guild_id=?", (user_id, guild_id))
             await db.commit()
 
     # ── Reminders ─────────────────────────────────────────────────────────
 
     async def add_reminder(self, user_id: int, channel_id: int, message: str, remind_at: str) -> int:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             async with db.execute(
                 "INSERT INTO reminders (user_id, channel_id, message, remind_at) VALUES (?,?,?,?)",
                 (user_id, channel_id, message, remind_at)
@@ -640,7 +647,7 @@ class Database:
             return rid
 
     async def get_due_reminders(self):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM reminders WHERE sent=0 AND remind_at <= datetime('now')"
@@ -648,13 +655,13 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def mark_reminder_sent(self, reminder_id: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("UPDATE reminders SET sent=1 WHERE id=?", (reminder_id,))
             await db.commit()
 
     async def ensure_extra_tables(self):
         """Ensure all new tables exist."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS birthdays (
                     user_id INTEGER NOT NULL, guild_id INTEGER NOT NULL,
@@ -774,7 +781,7 @@ class Database:
 
     async def initialize_advanced(self):
         """Initialize advanced feature tables."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS suggestions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -876,7 +883,7 @@ class Database:
 
     async def initialize_xero_tables(self):
         """New tables for XERO v3 features."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             # Economy streaks
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS economy_streaks (
@@ -1010,7 +1017,7 @@ class Database:
 
     async def initialize_v4_tables(self):
         """XERO v4 — new feature tables."""
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS member_roles (
                     user_id   INTEGER NOT NULL,
@@ -1143,7 +1150,7 @@ class Database:
     # ── Streak helpers ────────────────────────────────────────────────────
 
     async def get_streak(self, user_id: int, guild_id: int) -> dict:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM economy_streaks WHERE user_id=? AND guild_id=?",
@@ -1161,7 +1168,7 @@ class Database:
                     "daily_streak": 0, "best_streak": 0, "last_daily_date": None}
 
     async def update_streak(self, user_id: int, guild_id: int, new_streak: int, date_str: str):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute("""
                 INSERT INTO economy_streaks (user_id, guild_id, daily_streak, best_streak, last_daily_date)
                 VALUES (?,?,?,?,?)
@@ -1176,13 +1183,13 @@ class Database:
     # ── Stock helpers ─────────────────────────────────────────────────────
 
     async def get_stocks(self) -> list:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM stocks ORDER BY symbol") as c:
                 return [dict(r) for r in await c.fetchall()]
 
     async def update_stock_price(self, symbol: str, new_price: int, prev_price: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             await db.execute(
                 "UPDATE stocks SET price=?, prev_price=?, last_updated=datetime('now') WHERE symbol=?",
                 (max(1, new_price), prev_price, symbol)
@@ -1190,7 +1197,7 @@ class Database:
             await db.commit()
 
     async def get_portfolio(self, user_id: int, guild_id: int) -> list:
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT p.*, s.price, s.name FROM stock_portfolio p JOIN stocks s ON p.symbol=s.symbol WHERE p.user_id=? AND p.guild_id=?",
@@ -1199,7 +1206,7 @@ class Database:
                 return [dict(r) for r in await c.fetchall()]
 
     async def buy_stock(self, user_id: int, guild_id: int, symbol: str, shares: int, price: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             async with db.execute(
                 "SELECT shares, avg_buy_price FROM stock_portfolio WHERE user_id=? AND guild_id=? AND symbol=?",
                 (user_id, guild_id, symbol)
@@ -1220,7 +1227,7 @@ class Database:
             await db.commit()
 
     async def sell_stock(self, user_id: int, guild_id: int, symbol: str, shares: int):
-        async with aiosqlite.connect(self.db_path) as db:
+        async with self._db_context() as db:
             async with db.execute(
                 "SELECT shares FROM stock_portfolio WHERE user_id=? AND guild_id=? AND symbol=?",
                 (user_id, guild_id, symbol)
