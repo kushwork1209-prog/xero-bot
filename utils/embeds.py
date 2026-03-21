@@ -61,7 +61,7 @@ def _base(
     if image:
         embed.set_image(url=image)
     if author_name:
-        embed.set_author(name=author_name, icon_url=author_icon or discord.Embed.Empty)
+        embed.set_author(name=author_name, icon_url=author_icon or None)
     if fields:
         for name, value, inline in fields:
             embed.add_field(name=name, value=value, inline=inline)
