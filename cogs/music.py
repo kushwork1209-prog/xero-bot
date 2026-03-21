@@ -1,5 +1,5 @@
 """XERO Bot — Music Player (12 commands)
-Optimized for Railway: Multi-source search (SoundCloud + YouTube + URL) to bypass bot blocks.
+Optimized for Railway: Uses SoundCloud as primary search to bypass YouTube bot-blocking.
 No external API keys required.
 """
 import discord
@@ -21,18 +21,26 @@ except ImportError:
     logger.warning("yt-dlp not installed.")
 
 # ── yt-dlp options ────────────────────────────────────────────────────────────
-YTDL_OPTS = {
+# We use separate options for search and extraction to maximize success
+SEARCH_OPTS = {
     "format": "bestaudio/best",
     "noplaylist": True,
     "quiet": True,
     "no_warnings": True,
-    "default_search": "auto",
-    "source_address": "0.0.0.0",
-    "extract_flat": False,
-    "socket_timeout": 15,
-    "retries": 5,
+    "default_search": "scsearch",  # SoundCloud search is much more stable on cloud IPs
     "nocheckcertificate": True,
     "ignoreerrors": True,
+    "logtostderr": False,
+}
+
+EXTRACT_OPTS = {
+    "format": "bestaudio/best",
+    "noplaylist": True,
+    "quiet": True,
+    "no_warnings": True,
+    "nocheckcertificate": True,
+    "ignoreerrors": True,
+    "source_address": "0.0.0.0",
 }
 
 FFMPEG_OPTS = {
@@ -55,36 +63,40 @@ def _fmt_duration(seconds: int) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 def _search_sync(query: str) -> dict:
-    """Blocking search — tries SoundCloud first as it's more stable on cloud IPs."""
+    """Blocking search — uses SoundCloud search as primary, YouTube only for direct links."""
     is_url = query.startswith(("http://", "https://", "www."))
     
-    # Try multiple search prefixes to find a working one
-    prefixes = [""] if is_url else ["scsearch:", "ytsearch:"]
-    
-    for prefix in prefixes:
-        try:
-            with yt_dlp.YoutubeDL(YTDL_OPTS) as ydl:
-                info = ydl.extract_info(f"{prefix}{query}", download=False)
-                if not info: continue
-                if "entries" in info:
-                    if not info["entries"]: continue
-                    info = info["entries"][0]
-                
-                if not info or "url" not in info: continue
-                
+    # If it's a direct URL, try to extract it directly
+    if is_url:
+        with yt_dlp.YoutubeDL(EXTRACT_OPTS) as ydl:
+            info = ydl.extract_info(query, download=False)
+            if info:
                 return {
                     "url": info["url"],
                     "title": info.get("title", "Unknown"),
                     "duration": info.get("duration", 0),
                     "thumbnail": info.get("thumbnail"),
-                    "webpage_url": info.get("webpage_url", ""),
+                    "webpage_url": info.get("webpage_url", query),
                     "uploader": info.get("uploader", "Unknown"),
                 }
-        except Exception as e:
-            logger.warning(f"Search failed with prefix '{prefix}': {e}")
-            continue
+
+    # Otherwise, search SoundCloud
+    with yt_dlp.YoutubeDL(SEARCH_OPTS) as ydl:
+        # We explicitly use scsearch: prefix to force SoundCloud
+        search_query = f"scsearch:{query}"
+        info = ydl.extract_info(search_query, download=False)
+        if info and "entries" in info and info["entries"]:
+            entry = info["entries"][0]
+            return {
+                "url": entry["url"],
+                "title": entry.get("title", "Unknown"),
+                "duration": entry.get("duration", 0),
+                "thumbnail": entry.get("thumbnail"),
+                "webpage_url": entry.get("webpage_url", ""),
+                "uploader": entry.get("uploader", "Unknown"),
+            }
             
-    raise ValueError(f"Could not find or play: {query}. YouTube may be blocking the server.")
+    raise ValueError(f"Could not find results for: {query}")
 
 class Music(commands.GroupCog, name="music"):
     def __init__(self, bot: commands.Bot):
@@ -130,7 +142,7 @@ class Music(commands.GroupCog, name="music"):
             return False
         return True
 
-    @app_commands.command(name="play", description="Play music from SoundCloud or YouTube.")
+    @app_commands.command(name="play", description="Play music (SoundCloud based).")
     @app_commands.describe(query="Song name or URL")
     @command_guard
     async def play(self, interaction: discord.Interaction, query: str):
@@ -143,7 +155,7 @@ class Music(commands.GroupCog, name="music"):
             loop = asyncio.get_event_loop()
             song = await asyncio.wait_for(loop.run_in_executor(None, _search_sync, query), timeout=30.0)
         except Exception as e:
-            return await interaction.followup.send(embed=error_embed("Error", f"{str(e)}"))
+            return await interaction.followup.send(embed=error_embed("Error", f"Could not find: {query}"))
 
         vc = interaction.guild.voice_client
         if not vc:
