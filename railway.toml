@@ -1,0 +1,9 @@
+[build]
+# Use the Dockerfile for the build
+dockerfile = "Dockerfile"
+
+[deploy]
+# Discord bots don't need HTTP health checks
+healthcheckPath = ""
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

@@ -1,6 +1,11 @@
 FROM python:3.11-slim
 
-# Install system dependencies including libsodium for PyNaCl (voice support)
+# Install system dependencies
+# ffmpeg:       required for audio processing in music commands
+# libopus0:     required for Discord voice (Opus codec)
+# libsodium23:  required for PyNaCl (voice encryption)
+# libffi-dev, libnacl-dev, libsodium-dev: build deps for PyNaCl
+# git:          needed for some pip installs
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libopus0 \
