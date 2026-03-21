@@ -5,9 +5,11 @@ Advanced AI-Powered Discord Bot by Team Flame
 """
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 import os, logging, asyncio, time
 from database import Database
 from utils.nvidia_api import NvidiaAPI
+from utils.db_backup import auto_restore, send_backup, BACKUP_CHANNEL_ID
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -37,7 +39,7 @@ class XeroBot(commands.Bot):
         self.MANAGEMENT_GUILD_ID = int(os.getenv("MANAGEMENT_GUILD_ID", "1431852658767040535"))
         self._synced = False  # prevent double-sync on reconnect
         self.initial_extensions = [
-            "cogs.events", "cogs.config", "cogs.setup", "cogs.info", "cogs.admin",
+            "cogs.events", "cogs.config", "cogs.setup", "cogs.info", "cogs.help", "cogs.admin",
             "cogs.moderation", "cogs.automod", "cogs.smart_mod",
             "cogs.economy", "cogs.economy_advanced",
             "cogs.levels", "cogs.leaderboard",
@@ -95,10 +97,29 @@ class XeroBot(commands.Bot):
             activity=discord.Activity(type=discord.ActivityType.watching, name="300+ commands | /help")
         )
 
-        # Only sync once per process start (on_ready can fire multiple times on reconnect)
+        # Only run startup tasks once per process start
         if self._synced:
             return
         self._synced = True
+
+        # ── Auto-restore DB if wiped (Railway ephemeral filesystem protection) ──
+        if BACKUP_CHANNEL_ID:
+            restored = await auto_restore(self)
+            if restored:
+                logger.info("✓ Server configs restored from backup — servers won't notice the redeploy.")
+            else:
+                logger.info("✓ DB persistence check passed.")
+        else:
+            logger.info(
+                "ℹ️  BACKUP_CHANNEL_ID not set. For data persistence across redeploys:\n"
+                "   1. Create a private Discord channel\n"
+                "   2. Set BACKUP_CHANNEL_ID=<channel_id> in Railway env vars\n"
+                "   OR mount a Railway Volume at /app/data"
+            )
+
+        # ── Start the 30-min auto-backup loop ─────────────────────────────────
+        if not self._backup_loop.is_running():
+            self._backup_loop.start()
 
         # ── Global sync ────────────────────────────────────────────────────────
         try:
@@ -130,6 +151,18 @@ class XeroBot(commands.Bot):
             )
         except Exception as e:
             logger.error(f"✗ Management guild sync failed: {e}")
+
+    @tasks.loop(minutes=30)
+    async def _backup_loop(self):
+        """Automatically backs up the DB every 30 minutes to the backup channel."""
+        try:
+            await send_backup(self, triggered_by="auto-30min")
+        except Exception as e:
+            logger.error(f"Backup loop error: {e}")
+
+    @_backup_loop.before_loop
+    async def _before_backup_loop(self):
+        await self.wait_until_ready()
 
     async def on_interaction(self, interaction: discord.Interaction):
         """Guard: only handle application commands."""

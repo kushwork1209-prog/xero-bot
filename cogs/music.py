@@ -9,6 +9,8 @@ from discord import app_commands
 import logging
 import asyncio
 import random as _random
+import aiohttp
+import urllib.parse
 from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
 from utils.guard import command_guard
 
@@ -432,6 +434,74 @@ class Music(commands.GroupCog, name="music"):
             await interaction.response.send_message(
                 embed=success_embed("Queue Cleared", f"Removed **{count}** song(s) from the queue.")
             )
+
+    # ── 13. Lyrics ────────────────────────────────────────────────────────
+
+    @app_commands.command(name="lyrics", description="Fetch lyrics for the current song or any song you name.")
+    @app_commands.describe(query="Song to look up (leave empty to use the currently playing song)")
+    async def lyrics(self, interaction: discord.Interaction, query: str = None):
+        await interaction.response.defer()
+        search = query
+        if not search:
+            queue = self.get_queue(interaction.guild.id)
+            if queue.now_playing:
+                search = queue.now_playing["title"]
+            else:
+                return await interaction.followup.send(
+                    embed=error_embed("Nothing Playing", "Provide a song name or play something first."),
+                )
+        raw = search
+        for trash in ["(official video)", "(official audio)", "(lyrics)", "(hd)", "(4k)", "(mv)",
+                      "[official video]", "[official audio]", "[lyrics]", "official video",
+                      "official audio", "official", "audio", "video", "lyrics", "hd", "4k"]:
+            raw = raw.lower().replace(trash, "").strip()
+        if " - " in raw:
+            artist, title = raw.split(" - ", 1)
+        elif " by " in raw:
+            title, artist = raw.split(" by ", 1)
+        else:
+            artist = "unknown"
+            title = raw.strip()
+        artist = artist.strip()
+        title = title.strip()
+        lyrics_text = None
+        tried = [(artist, title)]
+        if artist == "unknown":
+            tried = [(title, "")]
+        for art, tit in tried:
+            try:
+                encoded_art = urllib.parse.quote(art)
+                encoded_tit = urllib.parse.quote(tit or title)
+                url = f"https://api.lyrics.ovh/v1/{encoded_art}/{encoded_tit}"
+                async with aiohttp.ClientSession() as s:
+                    async with s.get(url, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                        if r.status == 200:
+                            data = await r.json()
+                            lyrics_text = data.get("lyrics", "").strip()
+                            if lyrics_text:
+                                break
+            except Exception:
+                pass
+        if not lyrics_text:
+            return await interaction.followup.send(
+                embed=error_embed(
+                    "Lyrics Not Found",
+                    f"Couldn't find lyrics for **{search}**.\nTry `/music lyrics query:Artist - Song Title`."
+                )
+            )
+        chunks = [lyrics_text[i:i+3900] for i in range(0, min(len(lyrics_text), 11700), 3900)]
+        embed = discord.Embed(
+            title=f"🎵 {title.title()}",
+            description=chunks[0],
+            color=discord.Color.purple()
+        )
+        if artist and artist != "unknown":
+            embed.set_author(name=artist.title())
+        if len(chunks) > 1:
+            embed.set_footer(text=f"Showing section 1/{len(chunks)}  •  XERO Music Lyrics")
+        else:
+            embed.set_footer(text="XERO Music Lyrics  •  via lyrics.ovh")
+        await interaction.followup.send(embed=embed)
 
 
 async def setup(bot: commands.Bot):
