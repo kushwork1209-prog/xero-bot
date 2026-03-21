@@ -21,16 +21,14 @@ except ImportError:
     logger.warning("yt-dlp not installed.")
 
 # ── yt-dlp options ────────────────────────────────────────────────────────────
-# We use separate options for search and extraction to maximize success
 SEARCH_OPTS = {
     "format": "bestaudio/best",
     "noplaylist": True,
     "quiet": True,
     "no_warnings": True,
-    "default_search": "scsearch",  # SoundCloud search is much more stable on cloud IPs
+    "default_search": "scsearch",
     "nocheckcertificate": True,
     "ignoreerrors": True,
-    "logtostderr": False,
 }
 
 EXTRACT_OPTS = {
@@ -63,10 +61,7 @@ def _fmt_duration(seconds: int) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 def _search_sync(query: str) -> dict:
-    """Blocking search — uses SoundCloud search as primary, YouTube only for direct links."""
     is_url = query.startswith(("http://", "https://", "www."))
-    
-    # If it's a direct URL, try to extract it directly
     if is_url:
         with yt_dlp.YoutubeDL(EXTRACT_OPTS) as ydl:
             info = ydl.extract_info(query, download=False)
@@ -79,12 +74,8 @@ def _search_sync(query: str) -> dict:
                     "webpage_url": info.get("webpage_url", query),
                     "uploader": info.get("uploader", "Unknown"),
                 }
-
-    # Otherwise, search SoundCloud
     with yt_dlp.YoutubeDL(SEARCH_OPTS) as ydl:
-        # We explicitly use scsearch: prefix to force SoundCloud
-        search_query = f"scsearch:{query}"
-        info = ydl.extract_info(search_query, download=False)
+        info = ydl.extract_info(f"scsearch:{query}", download=False)
         if info and "entries" in info and info["entries"]:
             entry = info["entries"][0]
             return {
@@ -95,7 +86,6 @@ def _search_sync(query: str) -> dict:
                 "webpage_url": entry.get("webpage_url", ""),
                 "uploader": entry.get("uploader", "Unknown"),
             }
-            
     raise ValueError(f"Could not find results for: {query}")
 
 class Music(commands.GroupCog, name="music"):
@@ -112,20 +102,17 @@ class Music(commands.GroupCog, name="music"):
         queue = self.get_queue(guild_id)
         guild = self.bot.get_guild(guild_id)
         if not guild or not guild.voice_client: return
-
         vc = guild.voice_client
         if vc.is_playing() or vc.is_paused(): return
-
         if queue.loop and queue.now_playing:
             queue.songs.insert(0, queue.now_playing)
-
         if not queue.songs:
             queue.now_playing = None
             return
-
         song = queue.songs.pop(0)
         queue.now_playing = song
         try:
+            # Use discord.FFmpegPCMAudio explicitly
             source = discord.FFmpegPCMAudio(song["url"], **FFMPEG_OPTS)
             source = discord.PCMVolumeTransformer(source, volume=queue.volume)
             vc.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._after_song(guild_id, e), self.bot.loop))
@@ -149,21 +136,18 @@ class Music(commands.GroupCog, name="music"):
         if not await self._ensure_voice(interaction): return
         if not YTDLP_AVAILABLE:
             return await interaction.response.send_message("yt-dlp missing.", ephemeral=True)
-
         await interaction.response.defer()
         try:
             loop = asyncio.get_event_loop()
             song = await asyncio.wait_for(loop.run_in_executor(None, _search_sync, query), timeout=30.0)
         except Exception as e:
             return await interaction.followup.send(embed=error_embed("Error", f"Could not find: {query}"))
-
         vc = interaction.guild.voice_client
         if not vc:
             try:
                 vc = await interaction.user.voice.channel.connect(timeout=10.0, reconnect=True)
             except Exception as e:
                 return await interaction.followup.send(embed=error_embed("Voice Error", f"Failed to connect: {e}"))
-
         queue = self.get_queue(interaction.guild.id)
         if vc.is_playing() or vc.is_paused():
             queue.songs.append(song)
@@ -173,7 +157,6 @@ class Music(commands.GroupCog, name="music"):
             source = discord.FFmpegPCMAudio(song["url"], **FFMPEG_OPTS)
             source = discord.PCMVolumeTransformer(source, volume=queue.volume)
             vc.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._after_song(interaction.guild.id, e), self.bot.loop))
-            
             embed = comprehensive_embed(title="🎵 Now Playing", description=f"**[{song['title']}]({song['webpage_url']})**", color=discord.Color.purple())
             embed.add_field(name="Duration", value=_fmt_duration(song["duration"]), inline=True)
             embed.add_field(name="Source", value=song["uploader"], inline=True)
