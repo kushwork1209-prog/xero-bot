@@ -45,7 +45,7 @@ EXTRACT_OPTS = {
 
 FFMPEG_OPTS = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -nostdin",
-    "options": "-vn -bufsize 64k",
+    "options": "-vn",
 }
 
 
@@ -68,34 +68,40 @@ def _fmt_duration(seconds: int) -> str:
 
 def _search_sync(query: str) -> dict:
     is_url = query.startswith(("http://", "https://", "www."))
-    if is_url:
-        with yt_dlp.YoutubeDL(EXTRACT_OPTS) as ydl:
-            info = ydl.extract_info(query, download=False)
-            if info:
-                entries = info.get("entries")
-                if entries:
-                    info = entries[0]
-                return {
-                    "url": info["url"],
-                    "title": info.get("title", "Unknown"),
-                    "duration": info.get("duration", 0),
-                    "thumbnail": info.get("thumbnail"),
-                    "webpage_url": info.get("webpage_url", query),
-                    "uploader": info.get("uploader", "Unknown"),
-                }
-    with yt_dlp.YoutubeDL(SEARCH_OPTS) as ydl:
-        info = ydl.extract_info(f"scsearch:{query}", download=False)
-        if info and "entries" in info and info["entries"]:
-            entry = info["entries"][0]
-            return {
-                "url": entry["url"],
-                "title": entry.get("title", "Unknown"),
-                "duration": entry.get("duration", 0),
-                "thumbnail": entry.get("thumbnail"),
-                "webpage_url": entry.get("webpage_url", ""),
-                "uploader": entry.get("uploader", "Unknown"),
-            }
-    raise ValueError(f"Could not find results for: {query}")
+    
+    # Use different options for search vs extraction
+    opts = EXTRACT_OPTS if is_url else SEARCH_OPTS
+    search_query = query if is_url else f"scsearch:{query}"
+    
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        try:
+            info = ydl.extract_info(search_query, download=False)
+        except Exception as e:
+            logger.error(f"yt-dlp error: {e}")
+            raise ValueError(f"Extraction failed: {e}")
+
+        if not info:
+            raise ValueError(f"No results found for: {query}")
+
+        # If it's a playlist/search result, take the first entry
+        if "entries" in info:
+            if not info["entries"]:
+                raise ValueError(f"No entries found for: {query}")
+            info = info["entries"][0]
+
+        # Ensure we have a playable URL
+        url = info.get("url")
+        if not url:
+            raise ValueError("No playable URL found in metadata.")
+
+        return {
+            "url": url,
+            "title": info.get("title", "Unknown"),
+            "duration": info.get("duration", 0),
+            "thumbnail": info.get("thumbnail"),
+            "webpage_url": info.get("webpage_url", query if is_url else ""),
+            "uploader": info.get("uploader", "Unknown"),
+        }
 
 
 class Music(commands.GroupCog, name="music"):

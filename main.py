@@ -57,7 +57,7 @@ class XeroBot(commands.Bot):
             "cogs.autoresponder",
             "cogs.logging_system",
             "cogs.tools", "cogs.music", "cogs.profile", "cogs.analytics",
-            "cogs.utility", "cogs.backup", "cogs.core_admin",
+            "cogs.utility", "cogs.core_admin",
         ]
 
     async def setup_hook(self):

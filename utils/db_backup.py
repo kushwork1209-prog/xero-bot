@@ -63,18 +63,18 @@ BACKUP_TABLES = [
 ]
 
 
-async def export_db(db_path: str = DB_PATH) -> bytes:
+async def export_db(bot: discord.Client) -> bytes:
     """Export all critical tables as gzip-compressed JSON. Typically 50–500KB."""
     data: dict[str, list] = {}
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        for table in BACKUP_TABLES:
-            try:
+    for table in BACKUP_TABLES:
+        try:
+            async with bot.db._db_context() as db:
+                db.row_factory = aiosqlite.Row
                 async with db.execute(f"SELECT * FROM {table}") as c:
                     rows = await c.fetchall()
                     data[table] = [dict(r) for r in rows]
-            except Exception:
-                pass
+        except Exception:
+            pass
     payload = {
         "timestamp": datetime.utcnow().isoformat(),
         "tables":    data,
@@ -88,14 +88,14 @@ async def export_db(db_path: str = DB_PATH) -> bytes:
     return buf.getvalue()
 
 
-async def import_db(backup_bytes: bytes, db_path: str = DB_PATH) -> int:
+async def import_db(bot: discord.Client, backup_bytes: bytes) -> int:
     """Restore all tables from a gzip-compressed JSON backup. Returns row count."""
     buf = io.BytesIO(backup_bytes)
     with gzip.GzipFile(fileobj=buf, mode="rb") as gz:
         payload = json.loads(gz.read().decode("utf-8"))
     tables    = payload.get("tables", {})
     total_rows = 0
-    async with aiosqlite.connect(db_path) as db:
+    async with bot.db._db_context() as db:
         for table, rows in tables.items():
             if not rows:
                 continue
@@ -105,6 +105,7 @@ async def import_db(backup_bytes: bytes, db_path: str = DB_PATH) -> int:
                 col_str      = ", ".join(cols)
                 values       = [row[c] for c in cols]
                 try:
+                    # Using INSERT OR REPLACE for SQLite, or ON CONFLICT for PG (handled by adapter)
                     await db.execute(
                         f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({placeholders})",
                         values,
@@ -117,18 +118,19 @@ async def import_db(backup_bytes: bytes, db_path: str = DB_PATH) -> int:
     return total_rows
 
 
-async def is_db_empty(db_path: str = DB_PATH) -> bool:
+async def is_db_empty(bot: discord.Client) -> bool:
     """True if guild_settings has no rows — fresh or wiped DB."""
     try:
-        async with aiosqlite.connect(db_path) as db:
+        async with bot.db._db_context() as db:
             async with db.execute("SELECT COUNT(*) FROM guild_settings") as c:
-                count = (await c.fetchone())[0]
-            return count == 0
+                row = await c.fetchone()
+                # row[0] for SQLite, row['count'] or similar for PG. Adapter makes it look like tuple.
+                return row[0] == 0
     except Exception:
         return True
 
 
-async def auto_restore(bot: discord.Client, db_path: str = DB_PATH) -> bool:
+async def auto_restore(bot: discord.Client) -> bool:
     """
     Called once on startup. If DB is empty AND BACKUP_CHANNEL_ID is set,
     finds the most recent backup in that channel and restores automatically.
@@ -136,7 +138,7 @@ async def auto_restore(bot: discord.Client, db_path: str = DB_PATH) -> bool:
     if not BACKUP_CHANNEL_ID:
         logger.info("BACKUP_CHANNEL_ID not set — skipping auto-restore check.")
         return False
-    if not await is_db_empty(db_path):
+    if not await is_db_empty(bot):
         logger.info("✓ DB has existing data — no restore needed.")
         return False
 
@@ -173,7 +175,7 @@ async def auto_restore(bot: discord.Client, db_path: str = DB_PATH) -> bool:
         async with aiohttp.ClientSession() as s:
             async with s.get(att.url, timeout=aiohttp.ClientTimeout(total=30)) as r:
                 backup_bytes = await r.read()
-        rows = await import_db(backup_bytes, db_path)
+        rows = await import_db(bot, backup_bytes)
         logger.info(f"✅ DB auto-restored! {rows} rows recovered.")
         return True
     except Exception as e:
@@ -183,7 +185,6 @@ async def auto_restore(bot: discord.Client, db_path: str = DB_PATH) -> bool:
 
 async def send_backup(
     bot: discord.Client,
-    db_path: str = DB_PATH,
     triggered_by: str = "auto",
 ) -> bool:
     """Send a compressed DB backup to the backup channel."""
@@ -198,7 +199,7 @@ async def send_backup(
         return False
 
     try:
-        backup_bytes = await export_db(db_path)
+        backup_bytes = await export_db(bot)
         timestamp    = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         fname        = f"xero_backup_{timestamp}.gz"
         file         = discord.File(io.BytesIO(backup_bytes), filename=fname)
