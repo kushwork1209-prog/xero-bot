@@ -87,7 +87,6 @@ class Utility(commands.Cog):
             ("📋 /cmd","create · use · list · edit · delete · info"),
             ("🔊 /tempvoice","setup · rename · limit · lock · unlock · active"),
             ("🎨 /profile","card · achievements · compare · generate · variations · avatar-style"),
-            ("💾 /backup","create · list · restore · delete · export"),
             ("🔧 /tools","calc · timestamp · weather · define · color · emojis · snipe"),
             ("🎤 XERO Voice","xero · vibe-check · roast-server · milestone-channel · personality-toggle"),
             ("🔑 Core","/ping · /remind · /poll · /afk · /help · /admin · /purge-bots"),
