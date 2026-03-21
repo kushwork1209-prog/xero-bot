@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     libnacl-dev \
     libffi-dev \
     git \
+    fonts-dejavu-core \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
