@@ -76,6 +76,7 @@ class Database:
                     user_id INTEGER NOT NULL,
                     mod_id INTEGER NOT NULL,
                     reason TEXT DEFAULT 'No reason provided',
+                    type TEXT DEFAULT 'formal',
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -546,18 +547,26 @@ class Database:
             ) as c:
                 return [dict(r) for r in await c.fetchall()]
 
-    async def add_warning(self, guild_id, user_id, mod_id, reason) -> int:
+    async def add_warning(self, guild_id, user_id, mod_id, reason, warn_type="formal") -> int:
         async with self._db_context() as db:
             await db.execute(
-                "INSERT INTO warnings (guild_id, user_id, mod_id, reason) VALUES (?,?,?,?)",
-                (guild_id, user_id, mod_id, reason)
+                "INSERT INTO warnings (guild_id, user_id, mod_id, reason, type) VALUES (?,?,?,?,?)",
+                (guild_id, user_id, mod_id, reason, warn_type)
             )
             await db.commit()
             async with db.execute(
-                "SELECT COUNT(*) FROM warnings WHERE guild_id=? AND user_id=?", (guild_id, user_id)
+                "SELECT COUNT(*) FROM warnings WHERE guild_id=? AND user_id=? AND type='formal'", (guild_id, user_id)
             ) as c:
                 row = await c.fetchone()
                 return row[0]
+
+    async def get_soft_warnings_count(self, guild_id, user_id) -> int:
+        async with self._db_context() as db:
+            async with db.execute(
+                "SELECT COUNT(*) FROM warnings WHERE guild_id=? AND user_id=? AND type='soft'", (guild_id, user_id)
+            ) as c:
+                row = await c.fetchone()
+                return row[0] if row else 0
 
     async def get_warnings(self, guild_id, user_id):
         async with self._db_context() as db:

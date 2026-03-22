@@ -111,10 +111,12 @@ class Info(commands.GroupCog, name="info"):
             f"**Net Worth:** ${net_worth:,}"
         ), inline=True)
 
+        soft_warns = await self.bot.db.get_soft_warnings_count(interaction.guild.id, target.id)
         embed.add_field(name="📈 Activity", value=(
             f"**Commands Used:** {stats_data.get('commands_used', 0):,}\n"
             f"**Messages Sent:** {stats_data.get('messages_sent', 0):,}\n"
-            f"**Warnings:** {len(warnings)}\n"
+            f"**Warnings:** {len(warnings)} (Formal)\n"
+            f"**Soft Warns:** {soft_warns} (AutoMod)\n"
             f"**Mod Cases:** {len(cases)}"
         ), inline=True)
 

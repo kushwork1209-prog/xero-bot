@@ -843,6 +843,16 @@ class Events(commands.Cog):
                     if leveled_up:
                         await self._announce_level_up(message.author, new_level, message.channel, settings)
 
+        # ── AutoMod ───────────────────────────────────────────────────────────
+        am_cog = self.bot.cogs.get("AutoMod")
+        if am_cog:
+            try:
+                # If AutoMod deletes the message, it returns True or similar
+                # We should check if the message still exists before continuing
+                if await am_cog.process_message(message):
+                    return
+            except Exception as e: logger.debug(f"AutoMod: {e}")
+
         # ── Auto-responder ────────────────────────────────────────────────────
         # Skip autoresponder if the bot is mentioned (AI mention handler takes over)
         if not self.bot.user.mentioned_in(message):

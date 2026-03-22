@@ -43,13 +43,21 @@ class AutoMod(commands.GroupCog, name="automod"):
         await self.save_config(
             interaction.guild.id,
             enabled=1, anti_spam=1, anti_links=0, anti_caps=1,
-            anti_profanity=0, max_mentions=5, spam_threshold=5, action="delete",
+            anti_profanity=1, max_mentions=5, spam_threshold=5, action="delete",
             log_channel_id=log_channel.id if log_channel else None
         )
+        # Seed default profanity
+        default_words = ["fuck", "niga", "niger", "nigger", "bitch", "asshole", "shit"]
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            for word in default_words:
+                await db.execute("INSERT OR IGNORE INTO automod_filters (guild_id, filter_type, value) VALUES (?,?,?)",
+                                 (interaction.guild.id, "word", word))
+            await db.commit()
+
         embed = success_embed("AutoMod Configured!", "Recommended settings applied:")
-        embed.add_field(name="✅ Enabled", value="Anti-Spam, Anti-Caps", inline=False)
-        embed.add_field(name="❌ Disabled", value="Anti-Links, Anti-Profanity (configure manually)", inline=False)
+        embed.add_field(name="✅ Enabled", value="Anti-Spam, Anti-Caps, Anti-Profanity (AI-Powered)", inline=False)
         embed.add_field(name="📋 Settings", value=f"Max Mentions: 5 | Spam Threshold: 5 messages", inline=False)
+        embed.add_field(name="🛡️ AI Guard", value="AI is now monitoring chat for harsh language and context.", inline=False)
         if log_channel:
             embed.add_field(name="📢 Log Channel", value=log_channel.mention, inline=False)
         await interaction.response.send_message(embed=embed)
@@ -129,6 +137,77 @@ class AutoMod(commands.GroupCog, name="automod"):
             embed.add_field(name="🚫 Filtered Words", value="None added yet. Use `/automod add-filter` to add.", inline=False)
         await interaction.response.send_message(embed=embed)
 
+
+    async def process_message(self, message: discord.Message):
+        if message.author.bot or not message.guild:
+            return
+        
+        config = await self.get_config(message.guild.id)
+        if not config.get("enabled"):
+            return
+        
+        # ── Anti-Profanity & AI Guard ──────────────────────────────────────
+        if config.get("anti_profanity"):
+            content = message.content.lower()
+            triggered_word = None
+            
+            # 1. Check local filters
+            async with aiosqlite.connect(self.bot.db.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute("SELECT value FROM automod_filters WHERE guild_id=? AND filter_type='word'", (message.guild.id,)) as c:
+                    filters = [r["value"] for r in await c.fetchall()]
+            
+            for word in filters:
+                if word in content:
+                    triggered_word = word
+                    break
+            
+            # 2. AI Context Check (if no word triggered, or to confirm)
+            is_harsh = False
+            if not triggered_word:
+                # Only run AI if message is long enough or contains suspicious patterns
+                if len(message.content) > 10:
+                    try:
+                        prompt = f"Analyze if this message is toxic, contains harsh profanity, or racial slurs. Reply only with 'YES' or 'NO'.\nMessage: {message.content}"
+                        response = await self.bot.nvidia.ask(prompt)
+                        if "YES" in response.upper():
+                            is_harsh = True
+                            triggered_word = "AI Detection"
+                    except Exception:
+                        pass
+            else:
+                is_harsh = True
+
+            if is_harsh:
+                try:
+                    await message.delete()
+                    await message.channel.send(f"{message.author.mention}, you cannot say that! Please follow the guidelines.", delete_after=5)
+                    
+                    # Add Soft Warning
+                    reason = f"AutoMod: Harsh language detected ({triggered_word})"
+                    await self.bot.db.add_warning(message.guild.id, message.author.id, self.bot.user.id, reason, warn_type="soft")
+                    
+                    # DM User
+                    try:
+                        dm_embed = discord.Embed(title="⚠️ Software Warning", color=discord.Color.orange())
+                        dm_embed.description = f"Yo, I detected you saying something harsh in **{message.guild.name}**.\n\n**Message:** {message.content}\n**Reason:** {reason}\n\nPlease follow the community guidelines to avoid further action."
+                        await message.author.send(embed=dm_embed)
+                    except Exception: pass
+                    
+                    # Log Action
+                    if config.get("log_channel_id"):
+                        log_ch = message.guild.get_channel(config["log_channel_id"])
+                        if log_ch:
+                            log_embed = discord.Embed(title="🛡️ AutoMod Action", color=discord.Color.red(), timestamp=discord.utils.utcnow())
+                            log_embed.add_field(name="User", value=f"{message.author.mention} ({message.author.id})")
+                            log_embed.add_field(name="Action", value="Message Deleted + Soft Warning")
+                            log_embed.add_field(name="Reason", value=reason)
+                            log_embed.add_field(name="Original Message", value=message.content[:1024], inline=False)
+                            await log_ch.send(embed=log_embed)
+                    return True
+                except Exception as e:
+                    logger.error(f"AutoMod error: {e}")
+        return False
 
 async def setup(bot):
     await bot.add_cog(AutoMod(bot))
