@@ -4,7 +4,7 @@ XERO Bot — Automatic Database Backup & Restore
 Protects against Railway's ephemeral filesystem wiping all server configs.
 
 How it works:
-  • Every 30 minutes: compress all DB tables → send as .gz file to BACKUP_CHANNEL_ID
+  • Every 1 minute: compress all DB tables → send as .gz file to BACKUP_CHANNEL_ID
   • On startup: if DB is empty → download latest backup → restore all rows automatically
   • Users never notice. Configs survive any number of redeploys.
 

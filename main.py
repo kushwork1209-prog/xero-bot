@@ -117,7 +117,7 @@ class XeroBot(commands.Bot):
                 "   OR mount a Railway Volume at /app/data"
             )
 
-        # ── Start the 30-min auto-backup loop ─────────────────────────────────
+        # ── Start the 1-min auto-backup loop ──────────────────────────────────
         if not self._backup_loop.is_running():
             self._backup_loop.start()
 
@@ -152,11 +152,11 @@ class XeroBot(commands.Bot):
         except Exception as e:
             logger.error(f"✗ Management guild sync failed: {e}")
 
-    @tasks.loop(minutes=30)
+    @tasks.loop(minutes=1)
     async def _backup_loop(self):
-        """Automatically backs up the DB every 30 minutes to the backup channel."""
+        """Automatically backs up the DB every 1 minute to the backup channel."""
         try:
-            await send_backup(self, triggered_by="auto-30min")
+            await send_backup(self, triggered_by="auto-1min")
         except Exception as e:
             logger.error(f"Backup loop error: {e}")
 
