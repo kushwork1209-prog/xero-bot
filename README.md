@@ -1,4 +1,4 @@
-# XER Bot
+# XERO Bot
 
 A full-featured Discord bot built by Team Flame.
 
