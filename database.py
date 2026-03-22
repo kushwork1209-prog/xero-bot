@@ -372,12 +372,23 @@ class Database:
         if bot_instance:
             from utils.db_backup import send_backup
             import asyncio
-            asyncio.create_task(send_backup(bot_instance, triggered_by=f"config_change_{key}"))
+            # Use a small delay to debounce multiple rapid changes
+            async def delayed_backup():
+                await asyncio.sleep(5)
+                await send_backup(bot_instance, triggered_by=f"config_change_{key}")
+            asyncio.create_task(delayed_backup())
 
     async def create_guild_settings(self, guild_id: int):
         async with self._db_context() as db:
             await db.execute("INSERT OR IGNORE INTO guild_settings (guild_id) VALUES (?)", (guild_id,))
             await db.commit()
+        
+        # Trigger backup for new guild
+        from main import bot_instance
+        if bot_instance:
+            from utils.db_backup import send_backup
+            import asyncio
+            asyncio.create_task(send_backup(bot_instance, triggered_by=f"new_guild_{guild_id}"))
 
     # ── Economy ───────────────────────────────────────────────────────────
 
