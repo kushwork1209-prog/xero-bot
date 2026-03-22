@@ -80,7 +80,7 @@ class Utility(commands.Cog):
         )
         
         cats=[
-            ("⚙️ Config","dashboard · view · set-welcome · set-farewell · set-logs · set-autorole · toggle-leveling · toggle-economy · toggle-ai · set-persona · reset"),
+            ("⚙️ Config","dashboard · view · setup welcome · setup farewell · setup logs · setup autorole · setup leveling · setup economy · setup ai-responses · setup ai-persona · reset"),
             ("ℹ️ Info","user · server · role · channel · bot · emoji · invite · permissions"),
             ("🛡️ Moderation","warn · warnings · clearwarns · kick · ban · unban · softban · timeout · untimeout · purge · slowmode · lock · unlock · nick · history"),
             ("🤖 AI","ask · chat · summarize · translate · brainstorm · code-explain · code-debug · sentiment · rewrite · grammar · generate · fact-check · roast · analyze-image · clear-memory"),

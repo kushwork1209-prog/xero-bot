@@ -271,7 +271,11 @@ class Events(commands.Cog):
 
         # ── Welcome message ────────────────────────────────────────────────
         if settings.get("welcome_channel_id"):
-            ch = member.guild.get_channel(settings["welcome_channel_id"])
+            ch = self.bot.get_channel(settings["welcome_channel_id"])
+            if not ch:
+                try: ch = await self.bot.fetch_channel(settings["welcome_channel_id"])
+                except Exception: ch = None
+            
             if ch:
                 try:
                     from utils.embeds import XERO

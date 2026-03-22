@@ -176,11 +176,16 @@ class _PGConn:
     @staticmethod
     def _translate_ddl(sql: str) -> str:
         """Translate SQLite DDL → PostgreSQL DDL."""
+        # SQLite INTEGER is 64-bit, PostgreSQL INTEGER is 32-bit.
+        # Discord IDs (Snowflakes) require 64-bit (BIGINT).
         sql = re.sub(
             r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b",
             "BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
             sql, flags=re.I,
         )
+        sql = re.sub(r"\bINTEGER\s+PRIMARY\s+KEY\b", "BIGINT PRIMARY KEY", sql, flags=re.I)
+        sql = re.sub(r"\bINTEGER\b", "BIGINT", sql, flags=re.I)
+        
         sql = re.sub(r"\bAUTOINCREMENT\b", "", sql, flags=re.I)
         sql = re.sub(r"\bDATETIME\b", "TIMESTAMP", sql, flags=re.I)
         sql = re.sub(r"datetime\s*\(\s*'now'\s*\)", "NOW()", sql, flags=re.I)

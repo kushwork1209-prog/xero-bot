@@ -134,7 +134,10 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.describe(channel="Default channel for announcements")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        await self.bot.db.update_guild_setting(interaction.guild.id, "welcome_channel_id", channel.id)
+        # BUG FIX: This was overwriting welcome_channel_id. 
+        # Since there is no dedicated announcement_channel_id in the schema yet, 
+        # we'll use a new key and the DB will auto-add the column.
+        await self.bot.db.update_guild_setting(interaction.guild.id, "announcement_channel_id", channel.id)
         await interaction.response.send_message(embed=success_embed("Default Channel Set", f"Default announcement channel set to {channel.mention}."))
 
 
