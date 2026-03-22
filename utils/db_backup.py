@@ -155,10 +155,13 @@ async def auto_restore(bot: discord.Client) -> bool:
         return False
 
     backup_msg = None
+    # Look through the last 100 messages for a VALID backup
     async for msg in channel.history(limit=100):
         if msg.attachments:
             for att in msg.attachments:
-                if att.filename.startswith("xero_backup_") and att.filename.endswith(".gz"):
+                # CRITICAL: Only restore if the file is larger than 10KB.
+                # This ignores the "empty" 1KB backups that were accidentally created.
+                if att.filename.startswith("xero_backup_") and att.filename.endswith(".gz") and att.size > 10240:
                     backup_msg = msg
                     break
         if backup_msg:
@@ -170,7 +173,7 @@ async def auto_restore(bot: discord.Client) -> bool:
 
     att = next(
         a for a in backup_msg.attachments
-        if a.filename.startswith("xero_backup_") and a.filename.endswith(".gz")
+        if a.filename.startswith("xero_backup_") and a.filename.endswith(".gz") and a.size > 10240
     )
     logger.info(f"Restoring from: {att.filename} ({att.size // 1024}KB) sent {backup_msg.created_at}")
     try:
