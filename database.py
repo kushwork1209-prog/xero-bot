@@ -366,6 +366,13 @@ class Database:
                 ON CONFLICT (guild_id) DO UPDATE SET {key} = EXCLUDED.{key}
             """, (guild_id, value))
             await db.commit()
+        
+        # Trigger immediate backup to ensure persistence across redeploys
+        from main import bot_instance
+        if bot_instance:
+            from utils.db_backup import send_backup
+            import asyncio
+            asyncio.create_task(send_backup(bot_instance, triggered_by=f"config_change_{key}"))
 
     async def create_guild_settings(self, guild_id: int):
         async with self._db_context() as db:

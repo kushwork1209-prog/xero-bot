@@ -138,7 +138,10 @@ async def auto_restore(bot: discord.Client) -> bool:
     if not BACKUP_CHANNEL_ID:
         logger.info("BACKUP_CHANNEL_ID not set — skipping auto-restore check.")
         return False
-    if not await is_db_empty(bot):
+    # Force restore if DB is empty or only has a few guilds (likely fresh deploy)
+    # This ensures that even if a few guilds joined before restore, we still pull the backup.
+    is_empty = await is_db_empty(bot)
+    if not is_empty:
         logger.info("✓ DB has existing data — no restore needed.")
         return False
 

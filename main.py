@@ -198,8 +198,12 @@ class XeroBot(commands.Bot):
             pass
 
 
+bot_instance = None
+
 async def main():
+    global bot_instance
     bot = XeroBot()
+    bot_instance = bot
     token = os.getenv("DISCORD_TOKEN")
     if not token:
         logger.critical("DISCORD_TOKEN not set — cannot start."); return
