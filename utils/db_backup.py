@@ -202,6 +202,14 @@ async def send_backup(
         return False
 
     try:
+        # SAFETY CHECK: Never back up an empty database if it's an auto-trigger.
+        # This prevents overwriting good backups with empty ones during a failed restore.
+        if triggered_by in ("auto-1min", "startup_sync"):
+            from utils.db_backup import is_db_empty
+            if await is_db_empty(bot):
+                logger.warning(f"⚠ Skipping {triggered_by} backup: Database is empty.")
+                return False
+
         backup_bytes = await export_db(bot)
         timestamp    = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         fname        = f"xero_backup_{timestamp}.gz"

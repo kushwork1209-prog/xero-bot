@@ -104,17 +104,21 @@ class XeroBot(commands.Bot):
 
         # ── Auto-restore DB if wiped (Railway ephemeral filesystem protection) ──
         if BACKUP_CHANNEL_ID:
-            # Always try to restore on startup to ensure we have the latest data
-            # The auto_restore function already checks if the DB is empty
+            # CRITICAL: Always try to restore FIRST before doing anything else.
+            # This prevents a "startup_sync" from backing up an empty DB and overwriting good data.
             restored = await auto_restore(self)
             if restored:
                 logger.info("✓ Server configs restored from backup — servers won't notice the redeploy.")
             else:
-                # If not restored, it might be because DB is not empty or no backup found
-                # Let's force a backup now to ensure we have a fresh starting point
-                from utils.db_backup import send_backup
-                await send_backup(self, triggered_by="startup_sync")
-                logger.info("✓ DB persistence check passed & startup sync completed.")
+                # If not restored, it means either the DB already has data OR no backup was found.
+                # Only sync if we are SURE we didn't just start with an empty DB that failed to restore.
+                from utils.db_backup import is_db_empty
+                if not await is_db_empty(self):
+                    from utils.db_backup import send_backup
+                    await send_backup(self, triggered_by="startup_sync")
+                    logger.info("✓ DB persistence check passed & startup sync completed.")
+                else:
+                    logger.warning("⚠ DB is empty and no backup was found to restore. Skipping startup sync to avoid overwriting.")
         else:
             logger.info(
                 "ℹ️  BACKUP_CHANNEL_ID not set. For data persistence across redeploys:\n"
