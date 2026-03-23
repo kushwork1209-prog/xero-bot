@@ -61,11 +61,29 @@ class Verification(commands.GroupCog, name="verify"):
             await db.commit()
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_role_id", role.id)
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_channel_id", channel.id)
-        embed = discord.Embed(title="✅ Verification Required", description=msg, color=discord.Color.green())
+        settings = await self.bot.db.get_guild_settings(interaction.guild.id)
+        color = discord.Color.green()
+        if settings.get("embed_color"):
+            try: color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
+            except: pass
+
+        embed = discord.Embed(title="✅ Verification Required", description=msg, color=color)
         embed.add_field(name="Instructions", value="1. Click **Verify** below\n2. You'll receive access instantly!", inline=False)
         embed.set_footer(text=f"{interaction.guild.name} | XERO Bot")
         if interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
+        
+        # Unified Image Integration
+        if settings.get("unified_image_data"):
+            import io, base64
+            try:
+                img_bytes = base64.b64decode(settings["unified_image_data"])
+                file = discord.File(io.BytesIO(img_bytes), filename="verify.png")
+                embed.set_image(url="attachment://verify.png")
+                await channel.send(embed=embed, file=file, view=VerifyButton())
+                return
+            except Exception: pass
+
         await channel.send(embed=embed, view=VerifyButton())
         await interaction.response.send_message(embed=success_embed("Verification Setup Complete!", f"Verification panel posted in {channel.mention}.\n**Role:** {role.mention}"))
 

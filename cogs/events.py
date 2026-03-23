@@ -297,11 +297,26 @@ class Events(commands.Cog):
                     embed.set_footer(text="XERO Bot  •  Welcome!")
                     await ch.send(embed=embed)
 
+                    # Unified Image Integration (Highest Priority)
+                    if settings.get("unified_image_data"):
+                        import io as _io, base64 as _base64
+                        try:
+                            img_bytes = _base64.b64decode(settings["unified_image_data"])
+                            file = discord.File(_io.BytesIO(img_bytes), filename="welcome.png")
+                            img_embed = discord.Embed(color=XERO.PRIMARY)
+                            img_embed.set_image(url="attachment://welcome.png")
+                            # Apply custom color if set
+                            if settings.get("embed_color"):
+                                try: img_embed.color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
+                                except: pass
+                            await ch.send(embed=img_embed, file=file)
+                        except Exception: pass
+
                     # Welcome card — personalized image with name overlay
                     # Priority: uploaded file (with name) → server banner → AI URL → nothing
                     from utils.welcome_card import generate_welcome_card, fetch_avatar, get_base_image_async
                     _base_img = await get_base_image_async(member.guild.id)
-                    if _base_img:
+                    if _base_img and not settings.get("unified_image_data"):
                         # Admin uploaded an image — generate personalized card
                         avatar_bytes = await fetch_avatar(str(member.display_avatar.url)) if settings.get("welcome_card_show_avatar", 1) else None
                         card_bytes   = generate_welcome_card(
@@ -985,6 +1000,21 @@ class Events(commands.Cog):
             color=color
         )
         embed.set_thumbnail(url=member.display_avatar.url)
+        
+        # Unified Image Integration
+        if settings.get("unified_image_data"):
+            import io, base64
+            try:
+                img_bytes = base64.b64decode(settings["unified_image_data"])
+                file = discord.File(io.BytesIO(img_bytes), filename="levelup.png")
+                embed.set_image(url="attachment://levelup.png")
+                # Apply custom color if set
+                if settings.get("embed_color"):
+                    try: embed.color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
+                    except: pass
+                await ch.send(embed=embed, file=file)
+                return
+            except Exception: pass
 
         # Show next multiplier milestone
         mult = self.bot.db.xp_multiplier(level)

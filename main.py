@@ -56,6 +56,7 @@ class XeroBot(commands.Bot):
             "cogs.member_intelligence",
             "cogs.autoresponder",
             "cogs.logging_system",
+            "cogs.branding",
             "cogs.tools", "cogs.music", "cogs.profile", "cogs.analytics",
             "cogs.utility", "cogs.core_admin",
         ]

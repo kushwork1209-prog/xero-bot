@@ -50,7 +50,10 @@ class Database:
                     ai_enabled INTEGER DEFAULT 1,
                     automod_enabled INTEGER DEFAULT 0,
                     timezone TEXT DEFAULT 'UTC',
-                    level_up_channel_id INTEGER
+                    level_up_channel_id INTEGER,
+                    unified_image_data TEXT,
+                    embed_color TEXT DEFAULT '#5865F2',
+                    bot_nickname TEXT
                 )
             """)
 
