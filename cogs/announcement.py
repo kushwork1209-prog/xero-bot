@@ -31,9 +31,16 @@ class Announcement(commands.GroupCog, name="announcement"):
                 try:
                     ch = self.bot.get_channel(ann["channel_id"])
                     if ch:
+                        from utils.embeds import brand_embed
                         embed = discord.Embed(title=f"📢 {ann['title']}", description=ann["message"], color=discord.Color.blurple())
-                        embed.set_footer(text="Scheduled Announcement | XERO Bot")
-                        await ch.send(embed=embed)
+                        embed.set_footer(text="Scheduled Announcement")
+                        
+                        # Unified Branding
+                        embed, file = await brand_embed(embed, ch.guild, self.bot)
+                        if file:
+                            await ch.send(embed=embed, file=file)
+                        else:
+                            await ch.send(embed=embed)
                     async with aiosqlite.connect(self.bot.db.db_path) as db:
                         await db.execute("UPDATE announcements SET sent=1 WHERE announcement_id=?", (ann["announcement_id"],))
                         await db.commit()
@@ -60,10 +67,17 @@ class Announcement(commands.GroupCog, name="announcement"):
                    ping_everyone: bool = False, color: str = "blue"):
         color_map = {"blue": discord.Color.blue(), "red": discord.Color.red(), "green": discord.Color.green(),
                      "gold": discord.Color.gold(), "purple": discord.Color.purple()}
+        from utils.embeds import brand_embed
         embed = discord.Embed(title=f"📢 {title}", description=message, color=color_map.get(color, discord.Color.blue()))
-        embed.set_footer(text=f"Announced by {interaction.user.display_name} | XERO Bot")
+        embed.set_footer(text=f"Announced by {interaction.user.display_name}")
         content = "@everyone" if ping_everyone else None
-        await channel.send(content=content, embed=embed)
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if file:
+            await channel.send(content=content, embed=embed, file=file)
+        else:
+            await channel.send(content=content, embed=embed)
         await interaction.response.send_message(embed=success_embed("Announcement Sent!", f"**{title}** posted in {channel.mention}."))
 
     @app_commands.command(name="schedule", description="Schedule an announcement for a future time.")

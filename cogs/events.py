@@ -286,6 +286,7 @@ class Events(commands.Cog):
                         .replace("{server}", member.guild.name) \
                         .replace("{count}",  str(member.guild.member_count))
 
+                    from utils.embeds import brand_embed
                     embed = discord.Embed(
                         title=f"👋  Welcome to {member.guild.name}!",
                         description=msg,
@@ -294,23 +295,14 @@ class Events(commands.Cog):
                     embed.set_thumbnail(url=member.display_avatar.url)
                     embed.add_field(name="👥  Member #", value=f"**{member.guild.member_count:,}**",  inline=True)
                     embed.add_field(name="📅  Account",  value=f"<t:{int(member.created_at.timestamp())}:R>", inline=True)
-                    embed.set_footer(text="XERO Bot  •  Welcome!")
-                    await ch.send(embed=embed)
-
-                    # Unified Image Integration (Highest Priority)
-                    if settings.get("unified_image_data"):
-                        import io as _io, base64 as _base64
-                        try:
-                            img_bytes = _base64.b64decode(settings["unified_image_data"])
-                            file = discord.File(_io.BytesIO(img_bytes), filename="welcome.png")
-                            img_embed = discord.Embed(color=XERO.PRIMARY)
-                            img_embed.set_image(url="attachment://welcome.png")
-                            # Apply custom color if set
-                            if settings.get("embed_color"):
-                                try: img_embed.color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
-                                except: pass
-                            await ch.send(embed=img_embed, file=file)
-                        except Exception: pass
+                    embed.set_footer(text="Welcome!")
+                    
+                    # Unified Branding
+                    embed, file = await brand_embed(embed, member.guild, self.bot)
+                    if file:
+                        await ch.send(embed=embed, file=file)
+                    else:
+                        await ch.send(embed=embed)
 
                     # Welcome card — personalized image with name overlay
                     # Priority: uploaded file (with name) → server banner → AI URL → nothing
@@ -468,15 +460,21 @@ class Events(commands.Cog):
         ch = member.guild.get_channel(settings["farewell_channel_id"])
         if not ch: return
         try:
-            from utils.embeds import XERO
+            from utils.embeds import XERO, brand_embed
             msg = (settings.get("farewell_message") or "Goodbye **{name}**, we'll miss you!") \
                 .replace("{user}", member.display_name) \
                 .replace("{name}", member.display_name) \
                 .replace("{server}", member.guild.name)
             embed = discord.Embed(description=msg, color=XERO.ERROR)
             embed.set_author(name=f"{member.display_name} left the server", icon_url=member.display_avatar.url)
-            embed.set_footer(text=f"Members: {member.guild.member_count:,}  •  XERO Bot")
-            await ch.send(embed=embed)
+            embed.set_footer(text=f"Members: {member.guild.member_count:,}")
+            
+            # Unified Branding
+            embed, file = await brand_embed(embed, member.guild, self.bot)
+            if file:
+                await ch.send(embed=embed, file=file)
+            else:
+                await ch.send(embed=embed)
         except Exception as e:
             logger.error(f"Farewell: {e}")
 
@@ -1001,21 +999,6 @@ class Events(commands.Cog):
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         
-        # Unified Image Integration
-        if settings.get("unified_image_data"):
-            import io, base64
-            try:
-                img_bytes = base64.b64decode(settings["unified_image_data"])
-                file = discord.File(io.BytesIO(img_bytes), filename="levelup.png")
-                embed.set_image(url="attachment://levelup.png")
-                # Apply custom color if set
-                if settings.get("embed_color"):
-                    try: embed.color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
-                    except: pass
-                await ch.send(embed=embed, file=file)
-                return
-            except Exception: pass
-
         # Show next multiplier milestone
         mult = self.bot.db.xp_multiplier(level)
         bot_mult = self.bot.db.xp_multiplier(level, is_bot_command=True)
@@ -1024,10 +1007,17 @@ class Events(commands.Cog):
             value=f"💬 Messages: **{mult:.2f}×** | 🤖 Commands: **{bot_mult:.2f}×**",
             inline=False
         )
-        embed.set_footer(text="XERO Levels  •  Keep chatting to level up!")
+        embed.set_footer(text="Keep chatting to level up!")
 
+        # Unified Branding
+        from utils.embeds import brand_embed
+        embed, file = await brand_embed(embed, member.guild, self.bot)
+        
         try:
-            await ch.send(embed=embed)
+            if file:
+                await ch.send(embed=embed, file=file)
+            else:
+                await ch.send(embed=embed)
         except Exception as e:
             logger.error(f"Level-up announce: {e}")
 

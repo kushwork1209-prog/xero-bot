@@ -18,7 +18,7 @@ def sug_embed(sid,title,desc,author,avatar,status,up,down,note=None):
     embed.add_field(name="👍 Up",value=str(up),inline=True); embed.add_field(name="👎 Down",value=str(down),inline=True)
     embed.add_field(name=f"Approval ({pct}%)",value=f"`{bar}`",inline=False)
     if note: embed.add_field(name="📋 Staff Note",value=note,inline=False)
-    embed.set_footer(text="XERO Suggestions • Vote with the buttons!"); return embed
+    embed.set_footer(text="Vote with the buttons!"); return embed
 
 class VoteView(discord.ui.View):
     def __init__(self,bot,sid):
@@ -76,8 +76,16 @@ class Suggestions(commands.GroupCog, name="suggest"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             async with db.execute("INSERT INTO suggestions (guild_id,user_id,channel_id,title,description,author_name,author_avatar) VALUES (?,?,?,?,?,?,?)",(interaction.guild.id,interaction.user.id,channel_id,title[:100],description[:1000],interaction.user.display_name,str(interaction.user.display_avatar.url))) as c: sid=c.lastrowid
             await db.commit()
+        from utils.embeds import brand_embed
         embed=sug_embed(sid,title,description,interaction.user.display_name,str(interaction.user.display_avatar.url),"pending",0,0)
-        view=VoteView(self.bot,sid); msg=await channel.send(embed=embed,view=view)
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        view=VoteView(self.bot,sid)
+        if file:
+            msg=await channel.send(embed=embed,view=view,file=file)
+        else:
+            msg=await channel.send(embed=embed,view=view)
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE suggestions SET message_id=? WHERE id=?",(msg.id,sid)); await db.commit()
         await interaction.response.send_message(embed=success_embed("Submitted!",f"Suggestion **#{sid}** posted in {channel.mention} for voting!"),ephemeral=True)

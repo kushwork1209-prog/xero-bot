@@ -100,13 +100,20 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         req = []
         if required_role: req.append("Must have " + required_role.mention)
         if bonus_role:    req.append(bonus_role.mention + " gets 2x entries")
+        from utils.embeds import brand_embed
         embed = discord.Embed(title="🎉  GIVEAWAY!", description="## " + prize, color=0xFFD700)
         embed.add_field(name="🏆 Winners",  value=str(w_count),                  inline=True)
         embed.add_field(name="⏰ Ends",      value="<t:" + str(end_ts) + ":R>",  inline=True)
         embed.add_field(name="📢 Host",     value=interaction.user.mention,       inline=True)
         if req: embed.add_field(name="📋 Requirements", value="\n".join(req),   inline=False)
-        embed.set_footer(text="ID: " + str(gw_id) + "  •  React 🎉 to enter!")
-        msg = await ch.send(content=ping_role.mention if ping_role else None, embed=embed)
+        embed.set_footer(text=f"ID: {gw_id}  •  React 🎉 to enter!")
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if file:
+            msg = await ch.send(content=ping_role.mention if ping_role else None, embed=embed, file=file)
+        else:
+            msg = await ch.send(content=ping_role.mention if ping_role else None, embed=embed)
         await msg.add_reaction("🎉")
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE giveaways SET message_id=? WHERE giveaway_id=?",(msg.id,gw_id))

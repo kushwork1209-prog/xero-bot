@@ -56,17 +56,23 @@ async def _save_to_db(guild_id: int, image_bytes: bytes):
 
 
 async def _load_from_db(guild_id: int) -> bytes | None:
-    """Load image bytes from DB."""
+    """Load image bytes from DB. Priority: unified_image_data -> welcome_card_image_data."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
             try:
                 async with db.execute(
-                    "SELECT welcome_card_image_data FROM guild_settings WHERE guild_id=?",
+                    "SELECT unified_image_data, welcome_card_image_data FROM guild_settings WHERE guild_id=?",
                     (guild_id,)
                 ) as c:
                     row = await c.fetchone()
-                    if row and row[0]:
-                        return base64.b64decode(row[0])
+                    if row:
+                        # Priority 1: Unified Branding Image
+                        if row["unified_image_data"]:
+                            return base64.b64decode(row["unified_image_data"])
+                        # Priority 2: Legacy Welcome Card Image
+                        if row["welcome_card_image_data"]:
+                            return base64.b64decode(row["welcome_card_image_data"])
             except Exception:
                 pass
     except Exception as e:

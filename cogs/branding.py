@@ -14,7 +14,7 @@ class Branding(commands.GroupCog, name="branding"):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="unified-image", description="Set a single image to be used across Welcome, Level Up, and Verify features.")
+    @app_commands.command(name="unified-image", description="Set a single image to be used across all server modules (Tickets, Verification, Welcome, etc.).")
     @app_commands.describe(image="The image to use (upload a file)")
     @app_commands.checks.has_permissions(administrator=True)
     async def unified_image(self, interaction: discord.Interaction, image: discord.Attachment):
@@ -35,8 +35,15 @@ class Branding(commands.GroupCog, name="branding"):
             
             await self.bot.db.update_guild_setting(interaction.guild.id, "unified_image_data", b64_data)
             
-            embed = success_embed("Unified Image Set!", "This image will now be used for:\n• Welcome Messages\n• Level Up Announcements\n• Verification Panels\n• Member DMs")
+            modules = [
+                "Tickets", "Verification", "Giveaways", "Suggestions", 
+                "Reaction Roles", "Announcements", "Welcome", "Farewell", "Level-Up"
+            ]
+            module_list = "\n".join([f"• {m}" for m in modules])
+            
+            embed = success_embed("Unified Branding Active!", f"This image will now be used across all **{len(modules)}** core modules:\n{module_list}")
             embed.set_image(url=image.url)
+            embed.set_footer(text=f"{interaction.guild.name}  •  Unified Branding")
             await interaction.followup.send(embed=embed)
             
         except Exception as e:
@@ -59,7 +66,8 @@ class Branding(commands.GroupCog, name="branding"):
         await self.bot.db.update_guild_setting(interaction.guild.id, "embed_color", f"#{hex_code}")
         
         color = discord.Color(int(hex_code, 16))
-        embed = discord.Embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color)
+        embed = discord.Embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color, timestamp=discord.utils.utcnow())
+        embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="nickname", description="Set a custom nickname for the bot in this server.")
@@ -93,6 +101,8 @@ class Branding(commands.GroupCog, name="branding"):
                 embed.color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
             except: pass
             
+        embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
+        embed.timestamp = discord.utils.utcnow()
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):

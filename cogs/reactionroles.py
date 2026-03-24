@@ -125,16 +125,23 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         if not roles_data:
             return await interaction.response.send_message(embed=error_embed("No Roles", "Add roles first with `/reactionroles add-role`."), ephemeral=True)
         ch = interaction.guild.get_channel(panel["channel_id"]) or interaction.channel
+        from utils.embeds import brand_embed
         embed = discord.Embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
-        embed.set_footer(text="Click a button to get/remove the role | XERO Reaction Roles")
+        embed.set_footer(text="Click a button to get/remove the role")
         role_list = []
         for r in roles_data:
             role = interaction.guild.get_role(r["role_id"])
             if role:
                 role_list.append(f"{r.get('emoji', '•')} {role.mention} — {r['label']}")
         embed.add_field(name="Available Roles", value="\n".join(role_list) if role_list else "None", inline=False)
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
         view = RolePanelView(roles_data)
-        msg = await ch.send(embed=embed, view=view)
+        if file:
+            msg = await ch.send(embed=embed, view=view, file=file)
+        else:
+            msg = await ch.send(embed=embed, view=view)
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE reaction_role_panels SET message_id=? WHERE id=?", (msg.id, panel_id))
             await db.commit()
