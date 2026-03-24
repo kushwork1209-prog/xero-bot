@@ -103,23 +103,22 @@ class XeroBot(commands.Bot):
             return
         self._synced = True
 
-        # ── Auto-restore DB if wiped (Railway ephemeral filesystem protection) ──
+        # ── Intelligence-First Auto-Restore (Railway Ephemeral Protection) ──
         if BACKUP_CHANNEL_ID:
-            # CRITICAL: Always try to restore FIRST before doing anything else.
-            # This prevents a "startup_sync" from backing up an empty DB and overwriting good data.
+            # Intelligence-First: Always try to restore the LARGEST and LATEST state on startup.
+            # This ensures levels, XP, and settings are consistently recovered across redeploys.
             restored = await auto_restore(self)
             if restored:
-                logger.info("✓ Server configs restored from backup — servers won't notice the redeploy.")
+                logger.info("✓ XERO Intelligence-First: Server configs and levels restored from elite backup.")
             else:
-                # If not restored, it means either the DB already has data OR no backup was found.
-                # Only sync if we are SURE we didn't just start with an empty DB that failed to restore.
+                # Only backup if we have data and didn't just restore.
                 from utils.db_backup import is_db_empty
                 if not await is_db_empty(self):
                     from utils.db_backup import send_backup
                     await send_backup(self, triggered_by="startup_sync")
-                    logger.info("✓ DB persistence check passed & startup sync completed.")
+                    logger.info("✓ DB persistence check passed — current state is stable.")
                 else:
-                    logger.warning("⚠ DB is empty and no backup was found to restore. Skipping startup sync to avoid overwriting.")
+                    logger.warning("⚠ DB is empty and no valid backup found. Starting fresh to avoid overwriting.")
         else:
             logger.info(
                 "ℹ️  BACKUP_CHANNEL_ID not set. For data persistence across redeploys:\n"

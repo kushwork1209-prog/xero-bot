@@ -5,16 +5,8 @@ Protects against Railway's ephemeral filesystem wiping all server configs.
 
 How it works:
   • Every 1 minute: compress all DB tables → send as .gz file to BACKUP_CHANNEL_ID
-  • On startup: if DB is empty → download latest backup → restore all rows automatically
+  • On startup: Intelligence-First Restoration scans for the largest/latest backup
   • Users never notice. Configs survive any number of redeploys.
-
-Setup (one-time):
-  1. Create a private Discord channel visible only to XERO Bot
-  2. Copy the channel ID into Railway env vars as BACKUP_CHANNEL_ID
-  3. Done — backups run automatically
-
-For even better persistence (recommended):
-  • Add a Railway Volume mounted at /app/data — data will never be wiped at all
 """
 
 import discord
@@ -60,6 +52,9 @@ BACKUP_TABLES = [
     "economy_transactions",
     "personality_log",
     "counting_config",
+    "log_ignored_channels",
+    "log_ignored_roles",
+    "user_verifications"
 ]
 
 
@@ -78,12 +73,12 @@ async def export_db(bot: discord.Client) -> bytes:
     payload = {
         "timestamp": datetime.utcnow().isoformat(),
         "tables":    data,
-        "version":   "xero_v4",
+        "version":   "xero_v4_aegis",
         "row_counts": {t: len(v) for t, v in data.items()},
     }
     json_bytes = json.dumps(payload, default=str).encode("utf-8")
     buf = io.BytesIO()
-    with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6) as gz:
+    with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=9) as gz:
         gz.write(json_bytes)
     return buf.getvalue()
 
@@ -96,6 +91,11 @@ async def import_db(bot: discord.Client, backup_bytes: bytes) -> int:
     tables    = payload.get("tables", {})
     total_rows = 0
     async with bot.db._db_context() as db:
+        # Clear tables first to ensure clean state
+        for table in tables.keys():
+            try: await db.execute(f"DELETE FROM {table}")
+            except: pass
+            
         for table, rows in tables.items():
             if not rows:
                 continue
@@ -105,7 +105,6 @@ async def import_db(bot: discord.Client, backup_bytes: bytes) -> int:
                 col_str      = ", ".join(cols)
                 values       = [row[c] for c in cols]
                 try:
-                    # Using INSERT OR REPLACE for SQLite, or ON CONFLICT for PG (handled by adapter)
                     await db.execute(
                         f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({placeholders})",
                         values,
@@ -119,12 +118,11 @@ async def import_db(bot: discord.Client, backup_bytes: bytes) -> int:
 
 
 async def is_db_empty(bot: discord.Client) -> bool:
-    """True if guild_settings has no rows — fresh or wiped DB."""
+    """True if critical tables have no rows."""
     try:
         async with bot.db._db_context() as db:
             async with db.execute("SELECT COUNT(*) FROM guild_settings") as c:
                 row = await c.fetchone()
-                # row[0] for SQLite, row['count'] or similar for PG. Adapter makes it look like tuple.
                 return row[0] == 0
     except Exception:
         return True
@@ -132,20 +130,15 @@ async def is_db_empty(bot: discord.Client) -> bool:
 
 async def auto_restore(bot: discord.Client) -> bool:
     """
-    Called once on startup. If DB is empty AND BACKUP_CHANNEL_ID is set,
-    finds the most recent backup in that channel and restores automatically.
+    Intelligence-First Restoration:
+    Scans the backup channel for the largest and most recent valid backup.
     """
     if not BACKUP_CHANNEL_ID:
-        logger.info("BACKUP_CHANNEL_ID not set — skipping auto-restore check.")
-        return False
-    # Force restore if DB is empty or only has a few guilds (likely fresh deploy)
-    # This ensures that even if a few guilds joined before restore, we still pull the backup.
-    is_empty = await is_db_empty(bot)
-    if not is_empty:
-        logger.info("✓ DB has existing data — no restore needed.")
+        logger.info("BACKUP_CHANNEL_ID not set — skipping auto-restore.")
         return False
 
-    logger.warning("⚠️  DB is empty — searching backup channel for latest backup...")
+    logger.info("🔍 Starting Intelligence-First Database Restoration...")
+    
     try:
         channel = bot.get_channel(BACKUP_CHANNEL_ID)
         if not channel:
@@ -154,77 +147,79 @@ async def auto_restore(bot: discord.Client) -> bool:
         logger.error(f"Cannot access backup channel {BACKUP_CHANNEL_ID}: {e}")
         return False
 
-    backup_msg = None
-    # Look through the last 100 messages for a VALID backup
-    async for msg in channel.history(limit=100):
-        if msg.attachments:
-            for att in msg.attachments:
-                # CRITICAL: Only restore if the file is larger than 10KB.
-                # This ignores the "empty" 1KB backups that were accidentally created.
-                if att.filename.startswith("xero_backup_") and att.filename.endswith(".gz") and att.size > 10240:
-                    backup_msg = msg
-                    break
-        if backup_msg:
-            break
+    candidates = []
+    async for msg in channel.history(limit=200):
+        if not msg.attachments: continue
+        for att in msg.attachments:
+            if att.filename.startswith("xero_backup_") and att.filename.endswith(".gz"):
+                # We store (size, timestamp, attachment_url, filename)
+                candidates.append({
+                    "size": att.size,
+                    "time": msg.created_at,
+                    "url":  att.url,
+                    "name": att.filename
+                })
 
-    if not backup_msg:
-        logger.warning("No backup found in backup channel. Starting fresh.")
+    if not candidates:
+        logger.warning("No valid backups found in channel. Starting fresh.")
         return False
 
-    att = next(
-        a for a in backup_msg.attachments
-        if a.filename.startswith("xero_backup_") and a.filename.endswith(".gz") and a.size > 10240
-    )
-    logger.info(f"Restoring from: {att.filename} ({att.size // 1024}KB) sent {backup_msg.created_at}")
+    # Intelligence logic: Sort by size (desc) and then time (desc)
+    # This ensures we pick the MOST COMPLETE data even if a newer small/empty backup exists.
+    candidates.sort(key=lambda x: (x["size"], x["time"]), reverse=True)
+    
+    best = candidates[0]
+    logger.info(f"💎 Best backup candidate: {best['name']} ({best['size']//1024}KB) from {best['time']}")
+    
+    # Safety: If the best backup is under 2KB, it's likely empty.
+    if best["size"] < 2048:
+        logger.warning("Best candidate is suspiciously small (<2KB). Aborting restore to prevent data wipe.")
+        return False
+
     try:
         import aiohttp
         async with aiohttp.ClientSession() as s:
-            async with s.get(att.url, timeout=aiohttp.ClientTimeout(total=30)) as r:
+            async with s.get(best["url"], timeout=aiohttp.ClientTimeout(total=60)) as r:
                 backup_bytes = await r.read()
+        
         rows = await import_db(bot, backup_bytes)
-        logger.info(f"✅ DB auto-restored! {rows} rows recovered.")
+        logger.info(f"✅ Intelligence-First Restore Success: {rows} rows recovered.")
         return True
     except Exception as e:
-        logger.error(f"Auto-restore failed: {e}")
+        logger.error(f"Restore failed: {e}")
         return False
 
 
-async def send_backup(
-    bot: discord.Client,
-    triggered_by: str = "auto",
-) -> bool:
+async def send_backup(bot: discord.Client, triggered_by: str = "auto") -> bool:
     """Send a compressed DB backup to the backup channel."""
     if not BACKUP_CHANNEL_ID:
         return False
+        
     try:
-        channel = bot.get_channel(BACKUP_CHANNEL_ID)
-        if not channel:
-            channel = await bot.fetch_channel(BACKUP_CHANNEL_ID)
-    except Exception as e:
-        logger.error(f"Backup channel not found: {e}")
-        return False
-
-    try:
-        # SAFETY CHECK: Never back up an empty database if it's an auto-trigger.
-        # This prevents overwriting good backups with empty ones during a failed restore.
+        # Safety: Never back up an empty database automatically
         if triggered_by in ("auto-1min", "startup_sync"):
-            from utils.db_backup import is_db_empty
             if await is_db_empty(bot):
-                logger.warning(f"⚠ Skipping {triggered_by} backup: Database is empty.")
+                logger.warning(f"⚠ Skipping {triggered_by} backup: Database contains no server settings.")
                 return False
 
         backup_bytes = await export_db(bot)
         timestamp    = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         fname        = f"xero_backup_{timestamp}.gz"
-        file         = discord.File(io.BytesIO(backup_bytes), filename=fname)
+        
+        channel = bot.get_channel(BACKUP_CHANNEL_ID) or await bot.fetch_channel(BACKUP_CHANNEL_ID)
+        
+        # Meta analysis for the log message
         buf = io.BytesIO(backup_bytes)
         with gzip.GzipFile(fileobj=buf, mode="rb") as gz:
             meta = json.loads(gz.read())
+        
         guilds = len(meta["tables"].get("guild_settings", []))
         total  = sum(len(v) for v in meta["tables"].values())
+        
+        file = discord.File(io.BytesIO(backup_bytes), filename=fname)
         await channel.send(
             content=(
-                f"📦 **XERO Auto-Backup** | `{timestamp} UTC` | trigger: `{triggered_by}`\n"
+                f"📦 **XERO Elite Backup** | `{timestamp} UTC` | trigger: `{triggered_by}`\n"
                 f"**{guilds}** servers • **{total}** rows • `{len(backup_bytes)//1024}KB`"
             ),
             file=file,
@@ -232,5 +227,5 @@ async def send_backup(
         logger.info(f"✅ Backup: {fname} | {guilds} guilds | {total} rows | {len(backup_bytes)//1024}KB")
         return True
     except Exception as e:
-        logger.error(f"Backup send failed: {e}")
+        logger.error(f"Backup failed: {e}")
         return False
