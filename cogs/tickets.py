@@ -134,7 +134,6 @@ async def _close_flow(interaction, bot, reason="Resolved"):
     if ai_summary:
         fields.append(("AI Intelligence Summary", f"```\n{ai_summary[:500]}\n```", False))
 
-    from utils.embeds import comprehensive_embed, comprehensive_embed
     e = comprehensive_embed(
         title=f"CASE ARCHIVE: #{tid}",
         color=XERO.DARK,
@@ -227,7 +226,6 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
         case_list = "\n".join([f"▹ **{c['action'].upper()}** | {c['timestamp'][:10]}" for c in local_cases[:3]])
         fields.append(("Recent Internal Violations", f"```\n{case_list}\n```", False))
 
-    from utils.embeds import comprehensive_embed, comprehensive_embed
     e = comprehensive_embed(
         title="STAFF INTELLIGENCE BRIEF",
         color=XERO.MOD,
@@ -242,11 +240,8 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
         for b in cross_bans[:4]:
             s_obj  = bot.get_guild(b["guild_id"])
             sname  = s_obj.name if s_obj else f"Server {b['guild_id']}"
-            ban_lines.append(f"• **{sname}** — {b['timestamp'][:10]} — *{(b.get('reason') or 'No reason')[:40]}*")
-        e.add_field(name=f"🚨 BANNED IN {len(cross_bans)} OTHER SERVER(S)", value="\n".join(ban_lines), inline=False)
-
-    if blacklisted:
-        e.add_field(name="🚫 XERO GLOBAL BLACKLIST", value=f"Reason: {blacklisted['reason']}", inline=False)
+            ban_lines.append(f"▹ **BAN** in **{sname}**")
+        e.add_field(name="🚨 Network Risk (XERO Aegis)", value="\n".join(ban_lines), inline=False)
 
     if prev_tickets:
         pt_lines = [f"• **#{pt['ticket_id']}** {pt.get('topic','?')} — {pt.get('ai_summary','')[:60]}..." for pt in prev_tickets if pt.get("ai_summary")]
@@ -453,50 +448,42 @@ class Tickets(commands.GroupCog, name="ticket"):
         bot.add_view(TicketActionView(bot))
 
     @app_commands.command(name="setup", description="Set up the elite-style ticket panel with category dropdown.")
-    @app_commands.describe(channel="Where to post the panel", support_role="Role to ping", category="Category for ticket channels", log_channel="Where case logs are posted on close", message="Custom panel message")
+    @app_commands.describe(
+        channel="Where to post the panel", 
+        support_role="Role to ping", 
+        category="Category for ticket channels", 
+        log_channel="Where case logs are posted on close", 
+        message="Custom panel message",
+        use_brand_image="Whether to use the Unified Brand Image (True) or a custom image (False)",
+        custom_image="Custom image URL to use for this panel (if use_brand_image is False)"
+    )
     @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel,
                     support_role: discord.Role=None, category: discord.CategoryChannel=None,
-                    log_channel: discord.TextChannel=None, message: str=None):
+                    log_channel: discord.TextChannel=None, message: str=None,
+                    use_brand_image: bool=True, custom_image: str=None):
         if support_role: await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_support_role_id", support_role.id)
         if category:     await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_category_id", category.id)
         if log_channel:  await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_log_channel_id", log_channel.id)
-
-        txt = message or "Welcome to the server assistance centre. If you require support, please select the appropriate category from the menu below. Our staff will be with you shortly."
         
-        fields = [
-            ("General Support", "Basic Questions & Inquiries", False),
-            ("Senior Support", "Prize Claims\nPartnership Requests", False),
-            ("Executive Support", "Career Opportunities\nReports & Appeals", False),
-        ]
-
-        from utils.embeds import comprehensive_embed, comprehensive_embed
-        emb = comprehensive_embed(
-            title="SERVER ASSISTANCE CENTRE",
-            description=txt,
+        embed = comprehensive_embed(
+            title="SUPPORT CENTER — CONTACT STAFF",
+            description=message or "Select a category below to open a private support ticket. Our staff will assist you as soon as possible.",
             color=XERO.PRIMARY,
-            fields=fields,
-            thumbnail=interaction.guild.icon.url if interaction.guild.icon else None,
-            author_name=f"{interaction.guild.name.upper()} — ELITE SUPPORT",
+            author_name=f"{interaction.guild.name.upper()} — TICKET SYSTEM",
             author_icon=interaction.guild.icon.url if interaction.guild.icon else None
         )
         
-        # Apply Branding
-        from utils.embeds import brand_embed, comprehensive_embed
-        emb, file = await brand_embed(emb, interaction.guild, self.bot)
-        
-        if file:
-            await channel.send(embed=emb, view=TicketOpenView(), file=file)
-        else:
-            await channel.send(embed=emb, view=TicketOpenView())
+        file = None
+        if use_brand_image:
+            embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        elif custom_image:
+            embed.set_image(url=custom_image)
             
-        desc = f"elite-style ticket panel posted in {channel.mention}."
-        if support_role: desc += f"\nSupport role: {support_role.mention}"
-        if category:     desc += f"\nCategory: {category.mention}"
-        if log_channel:  desc += f"\nCase logs → {log_channel.mention}"
-        await interaction.response.send_message(embed=success_embed("Ticket System Ready", desc))
+        await channel.send(embed=embed, file=file, view=TicketOpenView())
+        await interaction.response.send_message(embed=success_embed("Ticket System Deployed", f"Panel posted in {channel.mention}."), ephemeral=True)
 
-    @app_commands.command(name="close", description="Close this ticket and generate a full case log.")
+    @app_commands.command(name="close", description="Close the current ticket and archive the transcript.")
     @app_commands.describe(reason="Reason for closing")
     @app_commands.checks.has_permissions(manage_channels=True)
     async def close(self, interaction: discord.Interaction, reason: str="Resolved"):
@@ -531,7 +518,7 @@ class Tickets(commands.GroupCog, name="ticket"):
     @app_commands.describe(user="User to add")
     @app_commands.checks.has_permissions(manage_channels=True)
     async def add(self, interaction: discord.Interaction, user: discord.Member):
-        await interaction.channel.set_permissions(user, view_channel=True, send_messages=True, read_message_history=True)
+        await interaction.channel.set_permissions(user, view_channel=True, send_messages=True, attach_files=True, read_message_history=True)
         ticket = await _get_ticket(self.bot.db.db_path, interaction.channel.id)
         if ticket: await _log_event(self.bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "user_added", f"{user.display_name} added by {interaction.user.display_name}")
         await interaction.response.send_message(embed=comprehensive_embed(description=f"➕ {user.mention} added.", color=TC_CLAIMED))

@@ -52,7 +52,8 @@ async def calculate_risk_score(member: discord.Member, bot) -> tuple[int, list]:
     # 4. Cross-Server Ban History (XERO Network)
     async with aiosqlite.connect(bot.db.db_path) as db:
         async with db.execute("SELECT COUNT(*) FROM mod_cases WHERE user_id=? AND action='ban'", (member.id,)) as c:
-            ban_count = (await c.fetchone())[0]
+            row = await c.fetchone()
+            ban_count = row[0] if row else 0
             if ban_count > 0:
                 score += min(ban_count * 20, 40)
                 factors.append(f"NETWORK_BANS_{ban_count}")
@@ -250,8 +251,11 @@ class AegisVerifyView(discord.ui.View):
                 else:
                     # Not quarantined, just verify
                     role = interaction.guild.get_role(role_id)
-                    await interaction.user.add_roles(role, reason="Aegis Tier 4 Manual Success")
-                    await interaction.response.send_message(embed=success_embed("Verified", "Access granted."), ephemeral=True)
+                    if role:
+                        await interaction.user.add_roles(role, reason="Aegis Tier 4 Manual Success")
+                        await interaction.response.send_message(embed=success_embed("Verified", "Access granted."), ephemeral=True)
+                    else:
+                        await interaction.response.send_message("Error: Role not found.", ephemeral=True)
 
 # ── Main Cog ─────────────────────────────────────────────────────────────────
 
@@ -312,7 +316,9 @@ class Verification(commands.GroupCog, name="verify"):
         log_channel="Where to send security alerts",
         quarantine_role="Role for restricted users (Tier 4)",
         question="Custom question (Tier 2)",
-        answer="Custom answer (Tier 2)"
+        answer="Custom answer (Tier 2)",
+        use_brand_image="Whether to use the Unified Brand Image (True) or a custom image (False)",
+        custom_image="Custom image URL to use for this panel (if use_brand_image is False)"
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction, 
@@ -321,7 +327,9 @@ class Verification(commands.GroupCog, name="verify"):
                     log_channel: discord.TextChannel = None,
                     quarantine_role: discord.Role = None,
                     question: str = None,
-                    answer: str = None):
+                    answer: str = None,
+                    use_brand_image: bool = True,
+                    custom_image: str = None):
         
         if tier not in [1, 2, 3, 4]:
             return await interaction.response.send_message("Invalid tier. Choose 1-4.", ephemeral=True)
@@ -363,8 +371,13 @@ class Verification(commands.GroupCog, name="verify"):
             author_name=f"{interaction.guild.name.upper()} — SECURITY GATEWAY",
             author_icon=interaction.guild.icon.url if interaction.guild.icon else None
         )
-        panel_embed, file = await brand_embed(panel_embed, interaction.guild, self.bot)
         
+        file = None
+        if use_brand_image:
+            panel_embed, file = await brand_embed(panel_embed, interaction.guild, self.bot)
+        elif custom_image:
+            panel_embed.set_image(url=custom_image)
+            
         await interaction.channel.send(embed=panel_embed, file=file, view=AegisVerifyView(self.bot))
         await interaction.response.send_message(embed=embed)
 
