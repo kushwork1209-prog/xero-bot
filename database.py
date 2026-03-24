@@ -41,6 +41,11 @@ class Database:
                     verify_role_id INTEGER,
                     verify_message TEXT DEFAULT 'Click the button below to verify!',
                     verify_channel_id INTEGER,
+                    verify_tier INTEGER DEFAULT 1,
+                    verify_question TEXT DEFAULT 'What is the server code?',
+                    verify_answer TEXT,
+                    verify_log_channel_id INTEGER,
+                    quarantine_role_id INTEGER,
                     ticket_category_id INTEGER,
                     ticket_support_role_id INTEGER,
                     ticket_log_channel_id INTEGER,
@@ -236,7 +241,7 @@ class Database:
                 )
             """)
 
-            # ── Announcements ─────────────────────────────────────────────
+             # ── Announcements ─────────────────────────────────────────────
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS announcements (
                     announcement_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -244,9 +249,30 @@ class Database:
                     channel_id INTEGER NOT NULL,
                     title TEXT NOT NULL,
                     message TEXT NOT NULL,
-                    scheduled_time DATETIME,
-                    created_by INTEGER,
+                    scheduled_at DATETIME,
                     sent INTEGER DEFAULT 0
+                )
+            """)
+
+            # ── Aegis Protocol (Verification & Risk) ────────────────────────
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS aegis_quarantine (
+                    user_id INTEGER NOT NULL,
+                    guild_id INTEGER NOT NULL,
+                    risk_score INTEGER DEFAULT 0,
+                    risk_factors TEXT,
+                    status TEXT DEFAULT 'pending',
+                    appeal_message TEXT,
+                    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, guild_id)
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS global_risk_cache (
+                    user_id INTEGER PRIMARY KEY,
+                    risk_score INTEGER DEFAULT 0,
+                    cross_server_bans INTEGER DEFAULT 0,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
