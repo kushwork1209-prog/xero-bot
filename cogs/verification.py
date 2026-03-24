@@ -14,7 +14,7 @@ import aiosqlite
 import json
 from utils.embeds import (
     success_embed, error_embed, info_embed, comprehensive_embed, 
-    brand_embed, XERO, XeroColors
+    brand_embed, XERO
 )
 
 logger = logging.getLogger("XERO.Aegis")
