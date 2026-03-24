@@ -80,7 +80,7 @@ class Utility(commands.Cog):
         )
         
         cats=[
-            ("⚙️ Config","dashboard · view · setup welcome · setup farewell · setup logs · setup autorole · setup leveling · setup economy · setup ai-responses · setup ai-persona · reset"),
+            ("⚙️ Config","`/config` · `/settings` · `/branding` · `/view`"),
             ("ℹ️ Info","user · server · role · channel · bot · emoji · invite · permissions"),
             ("🛡️ Moderation","warn · warnings · clearwarns · kick · ban · unban · softban · timeout · untimeout · purge · slowmode · lock · unlock · nick · history"),
             ("🤖 AI","ask · chat · summarize · translate · brainstorm · code-explain · code-debug · sentiment · rewrite · grammar · generate · fact-check · roast · analyze-image · clear-memory"),
@@ -93,7 +93,7 @@ class Utility(commands.Cog):
             ("🎭 Social","hug · kiss · pat · slap · cuddle · dance · highfive · wave · bite · poke · stare · shoot"),
             ("🎉 Giveaway","start · end · reroll · list · cancel · edit-prize · winners · delete"),
             ("📢 Announcement","send · schedule · list · cancel · edit · mention-role · set-channel"),
-            ("✅ Verify","setup · config · update-message · update-role · stats · reset"),
+            ("🛡️ Aegis","`/verify setup` (4-Tier Protection)"),
             ("🎫 Ticket","setup · create · close · add · remove · list · transcript"),
             ("🎵 Music","play · pause · resume · skip · stop · queue · nowplaying · volume · loop · remove · shuffle · clear"),
             ("🎭 Roles","add · remove · info · members · create · delete · color · rename · all · give-all · take-all · bots"),

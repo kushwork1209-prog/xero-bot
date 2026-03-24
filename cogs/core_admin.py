@@ -1315,6 +1315,27 @@ class CoreAdmin(commands.GroupCog, name="core"):
         embed, view = await ManagementDashboard.build(self.bot, interaction.guild)
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
+    @app_commands.command(name="sync", description="FORCE SYNC: Manually push the entire command tree to Discord API.")
+    @is_management()
+    async def sync(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            # Sync global commands
+            synced = await self.bot.tree.sync()
+            # Sync management guild commands
+            mguild = discord.Object(id=self.bot.MANAGEMENT_GUILD_ID)
+            g_synced = await self.bot.tree.sync(guild=mguild)
+            
+            msg = (
+                f"✅ **Force Sync Complete**\n"
+                f"▹ Global Commands: `{len(synced)}` synced\n"
+                f"▹ Management Guild: `{len(g_synced)}` synced\n\n"
+                f"*Note: Discord can take up to 1 hour to update the client cache.*"
+            )
+            await interaction.followup.send(embed=success_embed("System Sync", msg), ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(embed=error_embed("Sync Failed", f"```py\n{e}\n```"), ephemeral=True)
+
     @app_commands.command(name="guild-info", description="Full deep-dive into any server XERO is in — config, DB stats, permissions, boost tier.")
     @app_commands.describe(guild_id="Server ID")
     @is_management()
