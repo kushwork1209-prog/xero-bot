@@ -6,7 +6,10 @@ def command_guard(func):
     @functools.wraps(func)
     async def wrapper(self, interaction: discord.Interaction, *args, **kwargs):
         try:
-            await asyncio.wait_for(func(self, interaction, *args, **kwargs), timeout=25.0)
+            # External APIs (AI/vision/transcription) can legitimately take longer than
+            # the default interaction expectations, especially during provider load.
+            # Keep a guard timeout, but make it less aggressive to avoid false failures.
+            await asyncio.wait_for(func(self, interaction, *args, **kwargs), timeout=60.0)
         except asyncio.TimeoutError:
             _glog.warning(f"Command {func.__name__} timed out")
             try:

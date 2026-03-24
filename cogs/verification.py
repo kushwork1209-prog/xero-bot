@@ -50,13 +50,16 @@ async def calculate_risk_score(member: discord.Member, bot) -> tuple[int, list]:
         factors.append("SUSPICIOUS_USERNAME")
         
     # 4. Cross-Server Ban History (XERO Network)
-    async with aiosqlite.connect(bot.db.db_path) as db:
-        async with db.execute("SELECT COUNT(*) FROM mod_cases WHERE user_id=? AND action='ban'", (member.id,)) as c:
-            row = await c.fetchone()
-            ban_count = row[0] if row else 0
-            if ban_count > 0:
-                score += min(ban_count * 20, 40)
-                factors.append(f"NETWORK_BANS_{ban_count}")
+    try:
+        async with aiosqlite.connect(bot.db.db_path) as db:
+            async with db.execute("SELECT COUNT(*) FROM mod_cases WHERE user_id=? AND action='ban'", (member.id,)) as c:
+                row = await c.fetchone()
+                ban_count = row[0] if row else 0
+                if ban_count > 0:
+                    score += min(ban_count * 20, 40)
+                    factors.append(f"NETWORK_BANS_{ban_count}")
+    except Exception as ex:
+        logger.warning(f"Risk scoring cross-server ban lookup failed for {member.id}: {ex}")
 
     # 5. Discord Flags (if available)
     if member.public_flags.spammer:
@@ -219,8 +222,14 @@ class AegisVerifyView(discord.ui.View):
         if tier == 1:
             role = interaction.guild.get_role(role_id)
             if role:
-                await interaction.user.add_roles(role, reason="Aegis Tier 1 Success")
-                await interaction.response.send_message(embed=success_embed("Verified", "Identity confirmed. Access granted."), ephemeral=True)
+                try:
+                    await interaction.user.add_roles(role, reason="Aegis Tier 1 Success")
+                    await interaction.response.send_message(embed=success_embed("Verified", "Identity confirmed. Access granted."), ephemeral=True)
+                except discord.Forbidden:
+                    await interaction.response.send_message(
+                        embed=error_embed("Missing Permissions", "I can't assign the verification role. Move my role above it and ensure I have **Manage Roles**."),
+                        ephemeral=True
+                    )
             else:
                 await interaction.response.send_message("Error: Role not found.", ephemeral=True)
                 
@@ -252,10 +261,21 @@ class AegisVerifyView(discord.ui.View):
                     # Not quarantined, just verify
                     role = interaction.guild.get_role(role_id)
                     if role:
-                        await interaction.user.add_roles(role, reason="Aegis Tier 4 Manual Success")
-                        await interaction.response.send_message(embed=success_embed("Verified", "Access granted."), ephemeral=True)
+                        try:
+                            await interaction.user.add_roles(role, reason="Aegis Tier 4 Manual Success")
+                            await interaction.response.send_message(embed=success_embed("Verified", "Access granted."), ephemeral=True)
+                        except discord.Forbidden:
+                            await interaction.response.send_message(
+                                embed=error_embed("Missing Permissions", "I can't assign the verification role. Move my role above it and ensure I have **Manage Roles**."),
+                                ephemeral=True
+                            )
                     else:
                         await interaction.response.send_message("Error: Role not found.", ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    embed=error_embed("Configuration Missing", "Tier 4 requires a quarantine role. Run `/verify setup` again and set `quarantine_role`."),
+                    ephemeral=True
+                )
 
 # ── Main Cog ─────────────────────────────────────────────────────────────────
 

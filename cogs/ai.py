@@ -5,7 +5,13 @@ import asyncio
 from discord.ext import commands
 from discord import app_commands
 import logging
-from utils.embeds import comprehensive_embed, success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import (
+    comprehensive_embed,
+    success_embed,
+    error_embed,
+    ai_embed,
+    XERO,
+)
 
 logger = logging.getLogger("XERO.AI")
 
@@ -47,6 +53,11 @@ class AI(commands.GroupCog, name="ai"):
     @command_guard
     async def chat(self, interaction: discord.Interaction, message: str):
         await interaction.response.defer()
+        if interaction.guild is None:
+            return await interaction.followup.send(
+                embed=error_embed("Server Only", "This command can only be used in a server."),
+                ephemeral=True
+            )
         gid = interaction.guild.id
         if gid not in MEMORY:
             MEMORY[gid] = []
@@ -207,6 +218,11 @@ class AI(commands.GroupCog, name="ai"):
     @app_commands.command(name="clear-memory", description="Clear the AI's conversation memory for this server.")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def clear_memory(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            return await interaction.response.send_message(
+                embed=error_embed("Server Only", "This command can only be used in a server."),
+                ephemeral=True
+            )
         gid = interaction.guild.id
         MEMORY.pop(gid, None)
         await interaction.response.send_message(embed=success_embed("Memory Cleared", "The AI's conversation history for this server has been reset."))
