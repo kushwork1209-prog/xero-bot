@@ -35,6 +35,9 @@ XERO = XeroColors()
 DIVIDER = "──────────────────────────"
 FOOTER_MAIN  = "XERO ELITE  •  xero.gg"
 FOOTER_AI    = "XERO NEURAL  •  Powered by NVIDIA Llama 4 Maverick"
+FOOTER_ECO   = "XERO ECONOMY  •  xero.gg"
+FOOTER_MOD   = "XERO MODERATION  •  xero.gg"
+FOOTER_LEVEL = "XERO LEVELS  •  xero.gg"
 
 def _base(
     title: str = "",
