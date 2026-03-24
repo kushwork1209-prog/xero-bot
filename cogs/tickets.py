@@ -118,8 +118,9 @@ async def _close_flow(interaction, bot, reason="Resolved"):
     timeline  = "\n".join(_fmt_event(ev, guild) for ev in staff_evs) if staff_evs else "*No staff events logged.*"
 
     # Case log embed
+    opener_str = opener.mention if opener else f"<@{ticket['user_id']}>"
     fields = [
-        ("Opened By", f"{opener.mention if opener else f'<@{ticket['user_id']}>'}\n`ID: {ticket['user_id']}`", False),
+        ("Opened By", f"{opener_str}\n`ID: {ticket['user_id']}`", False),
         ("Closed By", f"{closer.mention}\n`ID: {closer.id}`", True),
         ("Duration", f"`{duration}`", True),
         ("Messages", f"`{len(messages)}`", True),
