@@ -76,78 +76,34 @@ class Info(commands.GroupCog, name="info"):
             discord.Status.offline:   "⚫ Offline",
         }
 
-        embed = discord.Embed(
-            title=f"{'  '.join(badges)}" if badges else f"👤 {target.display_name}",
-            color=target.color if target.color.value else discord.Color.blurple()
-        )
-        embed.set_author(name=f"{target} — Full Profile", icon_url=target.display_avatar.url)
-        embed.set_thumbnail(url=target.display_avatar.url)
-
-        embed.add_field(name="📋 Account", value=(
-            f"**Username:** {target}\n"
-            f"**Display Name:** {target.display_name}\n"
-            f"**ID:** `{target.id}`\n"
-            f"**Created:** <t:{int(target.created_at.timestamp())}:D> (<t:{int(target.created_at.timestamp())}:R>)\n"
-            f"**Bot:** {'Yes' if target.bot else 'No'}"
-        ), inline=True)
-
-        embed.add_field(name="🏠 In This Server", value=(
-            f"**Joined:** <t:{int(target.joined_at.timestamp())}:D> (<t:{int(target.joined_at.timestamp())}:R>)\n"
-            f"**Status:** {status_icons.get(target.status, '⚫ Unknown')}\n"
-            f"**Top Role:** {target.top_role.mention}\n"
-            f"**Role Count:** {len(target.roles) - 1}\n"
-            f"**Nickname:** {target.nick or 'None'}"
-        ), inline=True)
-
-        embed.add_field(name="📊 Level & XP", value=(
-            f"**Level:** {level}  |  **XP:** {curr_xp:,}/{next_xp:,}\n"
-            f"`{xp_bar}`\n"
-            f"**Total XP:** {total_xp:,}"
-        ), inline=False)
-
-        embed.add_field(name="💰 Economy", value=(
-            f"**Wallet:** ${wallet:,}\n"
-            f"**Bank:** ${bank:,}\n"
-            f"**Net Worth:** ${net_worth:,}"
-        ), inline=True)
-
+        fields = [
+            ("Account Identity", f"**User:** {target}\n**ID:** `{target.id}`\n**Created:** <t:{int(target.created_at.timestamp())}:D>", True),
+            ("Server Presence", f"**Joined:** <t:{int(target.joined_at.timestamp())}:D>\n**Top Role:** {target.top_role.mention}\n**Status:** {status_icons.get(target.status, '⚫ Unknown')}", True),
+            ("Experience", f"**Level:** {level}  |  **Total XP:** {total_xp:,}\n`{xp_bar}`", False),
+            ("Economy", f"**Wallet:** `${wallet:,}`\n**Bank:** `${bank:,}`\n**Net Worth:** `${net_worth:,}`", True),
+        ]
+        
         soft_warns = await self.bot.db.get_soft_warnings_count(interaction.guild.id, target.id)
-        embed.add_field(name="📈 Activity", value=(
-            f"**Commands Used:** {stats_data.get('commands_used', 0):,}\n"
-            f"**Messages Sent:** {stats_data.get('messages_sent', 0):,}\n"
-            f"**Warnings:** {len(warnings)} (Formal)\n"
-            f"**Soft Warns:** {soft_warns} (AutoMod)\n"
-            f"**Mod Cases:** {len(cases)}"
-        ), inline=True)
-
-        # Key permissions
-        key_perms = []
-        perm_map = {
-            "administrator": "Admin", "manage_guild": "Manage Server",
-            "ban_members": "Ban", "kick_members": "Kick",
-            "manage_messages": "Manage Messages", "manage_roles": "Manage Roles",
-            "manage_channels": "Manage Channels", "mention_everyone": "Mention All",
-        }
-        for perm, label in perm_map.items():
-            if getattr(target.guild_permissions, perm):
-                key_perms.append(label)
-        if key_perms:
-            embed.add_field(name="🔑 Key Permissions", value=", ".join(key_perms), inline=False)
-
-        # Roles (up to 10)
+        fields.append(("Activity Stats", f"**Commands:** {stats_data.get('commands_used', 0):,}\n**Messages:** {stats_data.get('messages_sent', 0):,}\n**Warnings:** {len(warnings)}", True))
+        
+        key_perms = [label for perm, label in {"administrator": "Admin", "manage_guild": "Manage Server", "ban_members": "Ban", "kick_members": "Kick", "manage_messages": "Mod"}.items() if getattr(target.guild_permissions, perm)]
+        if key_perms: fields.append(("Key Privileges", ", ".join(key_perms), False))
+        
         roles = [r.mention for r in reversed(target.roles) if r != interaction.guild.default_role]
-        if roles:
-            display = " ".join(roles[:10]) + (f" *+{len(roles)-10} more*" if len(roles) > 10 else "")
-            embed.add_field(name=f"🎭 Roles ({len(roles)})", value=display, inline=False)
+        if roles: fields.append((f"Roles ({len(roles)})", " ".join(roles[:10]) + ("..." if len(roles) > 10 else ""), False))
 
-        # Recent activity
-        if target.activity:
-            act = target.activity
-            act_type = str(act.type).replace("ActivityType.", "").title()
-            embed.add_field(name="🎮 Activity", value=f"**{act_type}:** {act.name}", inline=True)
-
-        embed.set_footer(text=f"Requested by {interaction.user.display_name} | XERO Bot")
-        await interaction.followup.send(embed=embed)
+        embed = comprehensive_embed(
+            title=f"{'  '.join(badges)}" if badges else f"USER PROFILE: {target.display_name}",
+            color=target.color if target.color.value else XERO.PRIMARY,
+            fields=fields,
+            thumbnail=target.display_avatar.url,
+            author_name=f"{target} — ELITE DOSSIER",
+            author_icon=target.display_avatar.url
+        )
+        
+        from utils.embeds import brand_embed
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        await interaction.followup.send(embed=embed, file=file)
 
     # ── /info server ──────────────────────────────────────────────────────
     @app_commands.command(name="server", description="Complete server breakdown — members, channels, boosts, security, activity stats.")

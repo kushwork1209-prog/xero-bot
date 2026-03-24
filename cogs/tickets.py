@@ -118,23 +118,30 @@ async def _close_flow(interaction, bot, reason="Resolved"):
     timeline  = "\n".join(_fmt_event(ev, guild) for ev in staff_evs) if staff_evs else "*No staff events logged.*"
 
     # Case log embed
-    e = discord.Embed(title=f"📁  Case #{tid}  —  Closed", color=TC_CLOSED, timestamp=discord.utils.utcnow())
-    o_str = f"{opener.mention} `{opener}` (`{ticket['user_id']}`)" if opener else f"`<@{ticket['user_id']}>`"
-    c_str = f"{closer.mention} (`{closer}`)"
-    e.add_field(name="👤  Opened By", value=o_str,                                inline=False)
-    e.add_field(name="🔒  Closed By", value=c_str,                                inline=True)
-    e.add_field(name="⏱️  Duration",  value=duration,                             inline=True)
-    e.add_field(name="💬  Messages",  value=str(len(messages)),                   inline=True)
-    e.add_field(name="📂  Topic",     value=ticket.get("topic","General Support"), inline=True)
+    fields = [
+        ("Opened By", f"{opener.mention if opener else f'<@{ticket['user_id']}>'}\n`ID: {ticket['user_id']}`", False),
+        ("Closed By", f"{closer.mention}\n`ID: {closer.id}`", True),
+        ("Duration", f"`{duration}`", True),
+        ("Messages", f"`{len(messages)}`", True),
+        ("Category", f"**{ticket.get('topic','General Support').upper()}**", True),
+    ]
     if ticket.get("rating"):
         fb = f"\n*{ticket['rating_feedback']}*" if ticket.get("rating_feedback") else ""
-        e.add_field(name="⭐  Rating", value=f"{'⭐'*ticket['rating']} ({ticket['rating']}/5){fb}", inline=True)
-    e.add_field(name="📋  Event Timeline",  value=timeline[:900],                  inline=False)
+        fields.append(("User Rating", f"{'⭐'*ticket['rating']} ({ticket['rating']}/5){fb}", True))
+    
+    fields.append(("Event Timeline", f"```\n{timeline[:800]}\n```", False))
     if ai_summary:
-        e.add_field(name="🤖  AI Case Summary", value=ai_summary[:600],            inline=False)
-    if opener:
-        e.set_thumbnail(url=opener.display_avatar.url)
-    e.set_footer(text=f"Case #{tid}  •  {guild.name}  •  XERO Tickets")
+        fields.append(("AI Intelligence Summary", f"```\n{ai_summary[:500]}\n```", False))
+
+    from utils.embeds import comprehensive_embed
+    e = comprehensive_embed(
+        title=f"CASE ARCHIVE: #{tid}",
+        color=XERO.DARK,
+        fields=fields,
+        thumbnail=opener.display_avatar.url if opener else None,
+        author_name=f"{guild.name} — TICKET SYSTEM",
+        author_icon=guild.icon.url if guild.icon else None
+    )
 
     # Transcript file
     lines = [f"CASE #{tid} TRANSCRIPT — {guild.name}", f"Opener: {opener} ({ticket['user_id']})", f"Topic: {ticket.get('topic','General')}", f"Duration: {duration}", "="*60, ""]
@@ -209,16 +216,25 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
             (gid, uid)
         ) as c: prev_tickets = [dict(r) for r in await c.fetchall()]
 
-    e = discord.Embed(title="🛡️  STAFF INTELLIGENCE BRIEF", color=0x2B2D31, timestamp=discord.utils.utcnow())
-    e.set_author(name=f"{member} — {uid}", icon_url=member.display_avatar.url)
-    
-    e.add_field(name="⏳ Account Age", value=f"{age_days} days", inline=True)
-    e.add_field(name="📊 Server Activity", value=f"Level {lvl['level']} ({lvl['total_xp']:,} XP)", inline=True)
-    e.add_field(name="📂 Ticket History", value=f"{tkt['total']} total ({tkt['open_count']} open)", inline=True)
+    fields = [
+        ("Account Age", f"`{age_days} Days`", True),
+        ("Server Status", f"**Level {lvl['level']}**\n`{lvl['total_xp']:,} XP`", True),
+        ("Ticket History", f"**{tkt['total']} Total**\n`{tkt['open_count']} Open`", True),
+    ]
 
     if local_cases:
-        case_list = "\n".join([f"• **{c['action'].upper()}** — {c['timestamp'][:10]} — *{c['reason'][:40]}*" for c in local_cases[:3]])
-        e.add_field(name="⚖️ Recent Mod Cases", value=case_list, inline=False)
+        case_list = "\n".join([f"▹ **{c['action'].upper()}** | {c['timestamp'][:10]}" for c in local_cases[:3]])
+        fields.append(("Recent Internal Violations", f"```\n{case_list}\n```", False))
+
+    from utils.embeds import comprehensive_embed
+    e = comprehensive_embed(
+        title="STAFF INTELLIGENCE BRIEF",
+        color=XERO.MOD,
+        fields=fields,
+        thumbnail=member.display_avatar.url,
+        author_name=f"{member.display_name} — IDENTITY VERIFICATION",
+        author_icon=member.display_avatar.url
+    )
     
     if cross_bans:
         ban_lines = []
@@ -445,17 +461,27 @@ class Tickets(commands.GroupCog, name="ticket"):
         if category:     await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_category_id", category.id)
         if log_channel:  await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_log_channel_id", log_channel.id)
 
-        txt = message or "Welcome to our assistance centre. If you need assistance within the server, please follow the guidelines below to choose the correct support category."
-        emb = discord.Embed(title="Assistance", description=txt, color=TC_OPEN)
+        txt = message or "Welcome to the server assistance centre. If you require support, please select the appropriate category from the menu below. Our staff will be with you shortly."
         
-        # ZNYT Style Layout
-        emb.add_field(name="General Support", value="Basic Questions", inline=False)
-        emb.add_field(name="Senior Support", value="Prize Claims\nPartnership Requests", inline=False)
-        emb.add_field(name="Executive Support", value="Career Opportunities\nReports & Appeals", inline=False)
-        
-        if interaction.guild.icon: emb.set_thumbnail(url=interaction.guild.icon.url)
+        fields = [
+            ("General Support", "Basic Questions & Inquiries", False),
+            ("Senior Support", "Prize Claims\nPartnership Requests", False),
+            ("Executive Support", "Career Opportunities\nReports & Appeals", False),
+        ]
+
+        from utils.embeds import comprehensive_embed
+        emb = comprehensive_embed(
+            title="SERVER ASSISTANCE CENTRE",
+            description=txt,
+            color=XERO.PRIMARY,
+            fields=fields,
+            thumbnail=interaction.guild.icon.url if interaction.guild.icon else None,
+            author_name=f"{interaction.guild.name.upper()} — ELITE SUPPORT",
+            author_icon=interaction.guild.icon.url if interaction.guild.icon else None
+        )
         
         # Apply Branding
+        from utils.embeds import brand_embed
         emb, file = await brand_embed(emb, interaction.guild, self.bot)
         
         if file:

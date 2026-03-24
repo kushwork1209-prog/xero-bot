@@ -1,7 +1,7 @@
 """
-XERO Bot — Premium Embed System
-Consistent XERO brand identity across every single command.
-Brand: Electric Blue #00D4FF | Deep Navy #0A0E1A | Accent Purple #7B2FFF
+XERO Bot — Cyber-Luxury Embed Engine
+The most advanced, structured, and premium embed system on Discord.
+Beyond ZNYT — Engineered for elite servers.
 """
 import discord
 from typing import Optional, List, Tuple, Union
@@ -9,33 +9,32 @@ import datetime
 import base64
 import io
 
-# ── XERO Brand Colors ─────────────────────────────────────────────────────────
+# ── XERO Elite Palette ───────────────────────────────────────────────────────
 class XeroColors:
-    PRIMARY    = discord.Color(0x00D4FF)   # Electric blue  — main brand
-    SECONDARY  = discord.Color(0x7B2FFF)   # Accent purple  — special
-    DARK       = discord.Color(0x0D1117)   # Deep dark      — neutral
-    SUCCESS    = discord.Color(0x00FF94)   # Neon green     — success
-    ERROR      = discord.Color(0xFF3B5C)   # Neon red       — error
-    WARNING    = discord.Color(0xFFB800)   # Amber          — warning
-    INFO       = discord.Color(0x00D4FF)   # Same as primary
-    GOLD       = discord.Color(0xFFD700)   # Gold           — economy/wins
-    ECONOMY    = discord.Color(0x00E676)   # Money green    — economy
-    LEVEL      = discord.Color(0xAA00FF)   # Deep purple    — levels/XP
-    MOD        = discord.Color(0xFF6B35)   # Orange         — moderation
-    MUSIC      = discord.Color(0x1DB954)   # Spotify green  — music
-    FUN        = discord.Color(0xFF4FA3)   # Hot pink       — fun commands
-    AI         = discord.Color(0x00BCD4)   # Cyan           — AI commands
-    DANGER     = discord.Color(0xFF1744)   # Bright red     — dangerous actions
-
+    # We use high-contrast, deep saturation for a premium "OLED" look
+    PRIMARY    = discord.Color(0x00D4FF)   # Electric Cyan
+    SECONDARY  = discord.Color(0x7B2FFF)   # Deep Ultraviolet
+    DARK       = discord.Color(0x0D1117)   # Obsidian
+    SUCCESS    = discord.Color(0x00FF94)   # Neon Mint
+    ERROR      = discord.Color(0xFF3B5C)   # Crimson Rose
+    WARNING    = discord.Color(0xFFB800)   # Amber Gold
+    INFO       = discord.Color(0x00D4FF)   
+    GOLD       = discord.Color(0xFFD700)   
+    ECONOMY    = discord.Color(0x00E676)   
+    LEVEL      = discord.Color(0xAA00FF)   
+    MOD        = discord.Color(0xFF6B35)   
+    MUSIC      = discord.Color(0x1DB954)   
+    FUN        = discord.Color(0xFF4FA3)   
+    AI         = discord.Color(0x00BCD4)   
+    DANGER     = discord.Color(0xFF1744)   
 
 XERO = XeroColors()
 
-FOOTER_MAIN  = "XERO Bot  •  xero.gg"
-FOOTER_AI    = "XERO AI  •  Powered by NVIDIA Llama 4 Maverick"
-FOOTER_ECO   = "XERO Economy  •  xero.gg"
-FOOTER_MOD   = "XERO Moderation  •  xero.gg"
-FOOTER_LEVEL = "XERO Levels  •  xero.gg"
-
+# ── Structured Typography & Symbols ──────────────────────────────────────────
+# We use specific spacing and dividers to create a "ZNYT-plus" layout
+DIVIDER = "──────────────────────────"
+FOOTER_MAIN  = "XERO ELITE  •  xero.gg"
+FOOTER_AI    = "XERO NEURAL  •  Powered by NVIDIA Llama 4 Maverick"
 
 def _base(
     title: str = "",
@@ -46,415 +45,189 @@ def _base(
     image: str = None,
     author_name: str = None,
     author_icon: str = None,
-    timestamp: bool = True,  # Default to True as per user request
+    timestamp: bool = True,
     fields: List[Tuple[str, str, bool]] = None,
-    guild_id: int = None,
-    bot = None
 ) -> discord.Embed:
-    """Base embed factory — all XERO embeds flow through here."""
+    """The Core Architect: Generates structured, high-end layouts."""
     
-    # ── Guild Branding ──
-    final_color = color or XERO.PRIMARY
-    final_footer = footer or FOOTER_MAIN
-    
-    if guild_id and bot and hasattr(bot, 'db'):
-        # This is a bit heavy for a base helper, but necessary for "everywhere" rule
-        # In a real bot, we'd cache these settings.
-        try:
-            # We use a sync-lookalike or just accept we might not have it yet
-            # For Manus implementation, we'll assume we can't easily do async here 
-            # without changing all calls. So we'll provide a way to 'brand' an embed later.
-            pass 
-        except: pass
+    # Clean and structure the description for a "Boxed" look
+    final_desc = ""
+    if description:
+        # We wrap descriptions in code blocks or specific formatting if they are short
+        # to give that "UI terminal" feel that is more premium than plain text.
+        if len(description) < 100 and "\n" not in description:
+            final_desc = f"```\n{description}\n```"
+        else:
+            final_desc = description
 
     embed = discord.Embed(
-        title=title,
-        description=description,
-        color=final_color,
+        title=title.upper() if title else None, # All-caps titles for authority
+        description=final_desc,
+        color=color or XERO.PRIMARY,
         timestamp=discord.utils.utcnow() if timestamp else None,
     )
-    if final_footer:
-        embed.set_footer(text=final_footer)
+
     if thumbnail:
         embed.set_thumbnail(url=thumbnail)
     if image:
         embed.set_image(url=image)
     if author_name:
-        embed.set_author(name=author_name, icon_url=author_icon or None)
+        embed.set_author(name=author_name.upper(), icon_url=author_icon)
+    
     if fields:
+        # Field separators for that structured "ZNYT" but better look
         for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
+            # We use small caps or bold for field names
+            embed.add_field(name=f"▹ {name.upper()}", value=value, inline=inline)
+
+    if footer:
+        embed.set_footer(text=footer)
+        
     return embed
 
 async def brand_embed(embed: discord.Embed, guild: discord.Guild, bot) -> Tuple[discord.Embed, Optional[discord.File]]:
-    """
-    Applies guild-specific branding to an embed:
-    1. Custom Color
-    2. Unified Image (if available)
-    3. Standard Footer + Timestamp
-    """
-    if not guild:
-        return embed, None
+    """Applies XERO Unified Branding with elite overrides."""
+    if not guild: return embed, None
         
     settings = await bot.db.get_guild_settings(guild.id)
     
-    # 1. Custom Color
+    # 1. Premium Color Sync
     if settings.get("embed_color"):
         try:
             hex_color = settings["embed_color"].lstrip("#")
             embed.color = discord.Color(int(hex_color, 16))
         except: pass
     
-    # 2. Standard Footer + Timestamp
+    # 2. Elite Footer Structure
     current_footer = embed.footer.text or FOOTER_MAIN
-    if "|" not in current_footer and guild.name not in current_footer:
-        embed.set_footer(text=f"{current_footer}  •  {guild.name}")
-    embed.timestamp = discord.utils.utcnow()
+    if "|" not in current_footer and guild.name.upper() not in current_footer.upper():
+        embed.set_footer(text=f"{current_footer}  |  {guild.name.upper()}")
     
-    # 3. Unified Image
+    # 3. Unified Image Integration
     file = None
     if settings.get("unified_image_data"):
         try:
             image_data = base64.b64decode(settings["unified_image_data"])
-            file = discord.File(io.BytesIO(image_data), filename="unified_brand.png")
-            embed.set_image(url="attachment://unified_brand.png")
-        except Exception: pass
+            file = discord.File(io.BytesIO(image_data), filename="xero_brand.png")
+            embed.set_image(url="attachment://xero_brand.png")
+        except: pass
         
     return embed, file
 
-# ── Public helpers ────────────────────────────────────────────────────────────
+# ── Elite Command Helpers ─────────────────────────────────────────────────────
 
-def comprehensive_embed(
-    title: str = "",
-    description: str = "",
-    fields: List[Tuple[str, str, bool]] = None,
-    footer_text: str = FOOTER_MAIN,
-    thumbnail_url: str = None,
-    image_url: str = None,
-    color: discord.Color = None,
-    author_name: str = None,
-    author_icon: str = None,
-) -> discord.Embed:
-    return _base(title=title, description=description, color=color or XERO.PRIMARY,
-                 footer=footer_text, thumbnail=thumbnail_url, image=image_url,
-                 author_name=author_name, author_icon=author_icon, fields=fields)
-
+def comprehensive_embed(**kwargs) -> discord.Embed:
+    return _base(**kwargs)
 
 def success_embed(title: str, description: str = "", **kwargs) -> discord.Embed:
-    clean_title = title.lstrip("✅ ").lstrip("✓ ")
-    return _base(title=f"✅  {clean_title}", description=description,
-                 color=XERO.SUCCESS, footer=kwargs.get("footer_text", FOOTER_MAIN))
-
+    return _base(title=f"✓  {title}", description=description, color=XERO.SUCCESS, **kwargs)
 
 def error_embed(title: str, description: str = "", **kwargs) -> discord.Embed:
-    clean_title = title.lstrip("❌ ")
-    return _base(title=f"❌  {clean_title}", description=description,
-                 color=XERO.ERROR, footer=kwargs.get("footer_text", FOOTER_MAIN))
-
+    return _base(title=f"✕  {title}", description=description, color=XERO.ERROR, **kwargs)
 
 def info_embed(title: str, description: str = "", **kwargs) -> discord.Embed:
-    clean_title = title.lstrip("ℹ️ ")
-    return _base(title=f"ℹ️  {clean_title}", description=description,
-                 color=XERO.INFO, footer=kwargs.get("footer_text", FOOTER_MAIN))
-
+    return _base(title=f"ℹ  {title}", description=description, color=XERO.INFO, **kwargs)
 
 def warning_embed(title: str, description: str = "", **kwargs) -> discord.Embed:
-    clean_title = title.lstrip("⚠️ ")
-    return _base(title=f"⚠️  {clean_title}", description=description,
-                 color=XERO.WARNING, footer=kwargs.get("footer_text", FOOTER_MAIN))
-
+    return _base(title=f"⚠  {title}", description=description, color=XERO.WARNING, **kwargs)
 
 def ai_embed(title: str, description: str = "", **kwargs) -> discord.Embed:
-    return _base(title=f"🤖  {title}", description=description,
-                 color=XERO.AI, footer=FOOTER_AI)
+    return _base(title=f"◈  {title}", description=description, color=XERO.AI, footer=FOOTER_AI, **kwargs)
 
-
-def mod_embed(
-    action: str, user: discord.Member, moderator: discord.Member,
-    reason: str, case_id: int, duration: str = None
-) -> discord.Embed:
-    ACTION_COLORS = {
-        "ban": XERO.DANGER, "kick": XERO.MOD, "warn": XERO.WARNING,
-        "timeout": XERO.WARNING, "unban": XERO.SUCCESS,
-        "softban": XERO.ERROR, "mute": XERO.MOD,
-    }
-    ACTION_EMOJIS = {
-        "ban": "🔨", "kick": "👢", "warn": "⚠️", "timeout": "⏱️",
-        "unban": "🔓", "softban": "🪃", "mute": "🔇",
-    }
-    emoji = ACTION_EMOJIS.get(action.lower(), "⚖️")
-    color = ACTION_COLORS.get(action.lower(), XERO.MOD)
-    embed = discord.Embed(
-        title=f"{emoji}  {action.upper()}  •  Case #{case_id}",
-        color=color,
-        timestamp=discord.utils.utcnow(),
-    )
-    embed.add_field(name="👤 User",        value=f"{user.mention}\n`{user.id}`",  inline=True)
-    embed.add_field(name="🛡️ Moderator",   value=moderator.mention,               inline=True)
-    embed.add_field(name="📋 Reason",      value=reason,                           inline=False)
-    if duration:
-        embed.add_field(name="⏱️ Duration", value=duration, inline=True)
+def mod_embed(action: str, user: discord.Member, moderator: discord.Member, reason: str, case_id: int, duration: str = None) -> discord.Embed:
+    colors = {"ban": XERO.DANGER, "kick": XERO.MOD, "warn": XERO.WARNING, "timeout": XERO.WARNING}
+    fields = [
+        ("Target", f"{user.mention}\n`{user.id}`", True),
+        ("Moderator", moderator.mention, True),
+        ("Reason", f"```\n{reason}\n```", False)
+    ]
+    if duration: fields.insert(2, ("Duration", duration, True))
+    
+    embed = _base(title=f"CASE #{case_id}  •  {action}", color=colors.get(action.lower(), XERO.MOD), fields=fields)
     embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text=FOOTER_MOD)
     return embed
 
-
-def economy_embed(
-    user: discord.Member, wallet: int, bank: int,
-    bank_limit: int, streak: int = 0, net_rank: int = None
-) -> discord.Embed:
-    total     = wallet + bank
-    pct_full  = min(bank / max(bank_limit, 1) * 100, 100)
-    bank_bar  = "█" * int(pct_full / 5) + "░" * (20 - int(pct_full / 5))
-    embed = discord.Embed(
-        title=f"💳  {user.display_name}'s Wallet",
-        color=XERO.ECONOMY,
-        timestamp=discord.utils.utcnow()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="👛  Wallet",    value=f"```${wallet:,}```",               inline=True)
-    embed.add_field(name="🏦  Bank",      value=f"```${bank:,} / ${bank_limit:,}```", inline=True)
-    embed.add_field(name="💎  Net Worth", value=f"```${total:,}```",               inline=True)
-    embed.add_field(
-        name=f"🏦  Bank Capacity  ({pct_full:.0f}%)",
-        value=f"`{bank_bar}`",
-        inline=False
-    )
-    if streak > 0:
-        streak_emoji = "🔥" * min(streak, 5)
-        embed.add_field(name="🔥  Daily Streak", value=f"**{streak}** days {streak_emoji}", inline=True)
-    if net_rank:
-        embed.add_field(name="🏆  Server Rank", value=f"**#{net_rank}**", inline=True)
-    embed.set_footer(text=FOOTER_ECO)
+def economy_embed(user: discord.Member, wallet: int, bank: int, bank_limit: int, streak: int = 0, net_rank: int = None) -> discord.Embed:
+    total = wallet + bank
+    pct = min(bank / max(bank_limit, 1) * 100, 100)
+    bar = "▰" * int(pct / 10) + "▱" * (10 - int(pct / 10))
+    
+    fields = [
+        ("Liquid Assets", f"`${wallet:,}`", True),
+        ("Secure Vault", f"`${bank:,}`", True),
+        ("Net Worth", f"**`${total:,}`**", True),
+        ("Vault Capacity", f"`{bar}`  **{pct:.0f}%**", False)
+    ]
+    if streak > 0: fields.append(("Daily Streak", f"**{streak} Days**", True))
+    if net_rank: fields.append(("Global Rank", f"**#{net_rank}**", True))
+    
+    embed = _base(title=f"FINANCIAL PROFILE", color=XERO.ECONOMY, fields=fields)
+    embed.set_author(name=user.display_name, icon_url=user.display_avatar.url)
     return embed
 
-
-def level_embed(
-    user: discord.Member, level: int, xp: int,
-    next_xp: int, total_xp: int, rank: int
-) -> discord.Embed:
-    pct       = min(xp / max(next_xp, 1), 1.0)
-    filled    = int(pct * 20)
-    bar       = "█" * filled + "░" * (20 - filled)
-    pct_label = f"{pct*100:.1f}%"
-    # Level color gradient
-    if level >= 50:   color = XERO.GOLD
-    elif level >= 25: color = XERO.SECONDARY
-    elif level >= 10: color = XERO.PRIMARY
-    else:             color = XERO.LEVEL
-
-    embed = discord.Embed(
-        title=f"📊  {user.display_name}  •  Level {level}",
-        color=color,
-        timestamp=discord.utils.utcnow()
-    )
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="🏆  Rank",      value=f"**#{rank}**",        inline=True)
-    embed.add_field(name="⭐  Level",     value=f"**{level}**",         inline=True)
-    embed.add_field(name="✨  Total XP",  value=f"**{total_xp:,}**",   inline=True)
-    embed.add_field(
-        name=f"📈  Progress to Level {level+1}  ({pct_label})",
-        value=f"`{bar}`\n**{xp:,}** / {next_xp:,} XP",
-        inline=False
-    )
-    embed.set_footer(text=FOOTER_LEVEL)
+def level_embed(user: discord.Member, level: int, xp: int, next_xp: int, total_xp: int, rank: int) -> discord.Embed:
+    pct = min(xp / max(next_xp, 1), 1.0)
+    bar = "█" * int(pct * 15) + "░" * (15 - int(pct * 15))
+    
+    fields = [
+        ("Current Level", f"**{level}**", True),
+        ("Global Rank", f"**#{rank}**", True),
+        ("Total Experience", f"`{total_xp:,} XP`", True),
+        ("Progression", f"`{bar}`  **{pct*100:.1f}%**", False)
+    ]
+    
+    embed = _base(title="EXPERIENCE OVERVIEW", color=XERO.LEVEL, fields=fields)
+    embed.set_author(name=user.display_name, icon_url=user.display_avatar.url)
     return embed
 
-
-def giveaway_embed(
-    prize: str, end_ts: int, winners: int,
-    host: discord.Member, participants: int = 0,
-    requirements: str = None
-) -> discord.Embed:
-    embed = discord.Embed(
-        title="🎉  GIVEAWAY",
-        description=f"## {prize}",
-        color=XERO.GOLD,
-        timestamp=discord.utils.utcnow()
-    )
-    embed.add_field(name="🏆  Winners",   value=str(winners),                 inline=True)
-    embed.add_field(name="⏰  Ends",       value=f"<t:{end_ts}:R>",           inline=True)
-    embed.add_field(name="👥  Entries",   value=str(participants),             inline=True)
-    embed.add_field(name="📢  Hosted by", value=host.mention,                  inline=True)
-    if requirements:
-        embed.add_field(name="📋  Requirements", value=requirements, inline=False)
-    embed.set_footer(text="React with 🎉 to enter  •  XERO Bot")
-    return embed
-
+def giveaway_embed(prize: str, end_ts: int, winners: int, host: discord.Member, participants: int = 0, requirements: str = None) -> discord.Embed:
+    fields = [
+        ("Winners", str(winners), True),
+        ("Entries", str(participants), True),
+        ("Hosted By", host.mention, True),
+        ("Time Remaining", f"<t:{end_ts}:R>", True)
+    ]
+    if requirements: fields.append(("Requirements", f"```\n{requirements}\n```", False))
+    
+    return _base(title="ACTIVE GIVEAWAY", description=f"## {prize}", color=XERO.GOLD, fields=fields)
 
 def raid_alert_embed(guild: discord.Guild, join_count: int, window_secs: int) -> discord.Embed:
-    embed = discord.Embed(
-        title="🚨  RAID DETECTED  —  AUTO-LOCKDOWN ACTIVE",
-        description=(
-            f"**{join_count}** accounts joined **{guild.name}** in the last **{window_secs} seconds**.\n\n"
-            f"The server has been **automatically locked down**.\n"
-            f"All channels are locked. Verify new members before unlocking.\n\n"
-            f"Use `/server unlockdown` to restore access."
-        ),
-        color=XERO.DANGER,
-        timestamp=discord.utils.utcnow(),
-    )
-    embed.add_field(name="🛡️  Action Taken", value="All channels locked + DM alert sent to admins", inline=False)
-    embed.set_footer(text="XERO Smart Moderation  •  Auto-Raid Protection")
-    return embed
+    desc = f"**{join_count}** identities detected within **{window_secs}s**.\nProtocol: **LOCKDOWN ACTIVE**."
+    return _base(title="SECURITY BREACH DETECTED", description=desc, color=XERO.DANGER)
 
+def escalation_embed(user: discord.Member, warn_count: int, action_taken: str, reason: str) -> discord.Embed:
+    fields = [
+        ("Identity", f"{user.mention}", True),
+        ("Violations", f"**{warn_count} Warnings**", True),
+        ("Auto-Action", f"**{action_taken.upper()}**", True),
+        ("Final Incident", f"```\n{reason}\n```", False)
+    ]
+    return _base(title="AUTOMATED ESCALATION", color=XERO.DANGER, fields=fields)
 
-def escalation_embed(
-    user: discord.Member, warn_count: int,
-    action_taken: str, reason: str
-) -> discord.Embed:
-    embed = discord.Embed(
-        title=f"⚡  AUTO-ESCALATION  •  {action_taken.upper()}",
-        description=(
-            f"{user.mention} has reached **{warn_count} warnings**.\n"
-            f"XERO's auto-escalation system has taken action."
-        ),
-        color=XERO.MOD,
-        timestamp=discord.utils.utcnow(),
-    )
-    embed.add_field(name="👤  User",         value=f"{user} (`{user.id}`)", inline=True)
-    embed.add_field(name="⚠️  Warnings",     value=str(warn_count),         inline=True)
-    embed.add_field(name="🔨  Auto-Action",  value=action_taken,             inline=True)
-    embed.add_field(name="📋  Last Reason",  value=reason,                   inline=False)
-    embed.set_thumbnail(url=user.display_avatar.url)
-    embed.set_footer(text="XERO Smart Moderation  •  Auto-Escalation")
-    return embed
-
-
-def heist_embed(
-    leader: discord.Member,
-    target_bank: int,
-    participants: list,
-    potential: int,
-    success: bool = None,
-    actual_reward: int = None,
-) -> discord.Embed:
-    """Embed for bank heist events — planning, success, and failure states."""
-    crew_list = ", ".join(m.mention for m in participants) if participants else "None"
-
+def heist_embed(leader: discord.Member, target_bank: int, participants: list, potential: int, success: bool = None, actual_reward: int = None) -> discord.Embed:
+    crew = ", ".join(m.mention for m in participants) if participants else "NONE"
     if success is None:
-        # Planning / recruitment phase
-        embed = discord.Embed(
-            title="🏦  BANK HEIST  —  CREW FORMING",
-            description=(
-                f"**{leader.mention}** is planning a heist on the server bank!\n\n"
-                f"💰  **Target Bank:**  `${target_bank:,}`\n"
-                f"🎯  **Potential Loot:**  `${potential:,}`\n\n"
-                f"Click **Join Heist** to join the crew. Heist executes in **60 seconds**."
-            ),
-            color=XERO.GOLD,
-            timestamp=discord.utils.utcnow(),
-        )
-        embed.add_field(name=f"👥  Crew  ({len(participants)})", value=crew_list, inline=False)
-        embed.set_footer(text="XERO Economy  •  Bank Heist")
+        fields = [("Target Value", f"`${target_bank:,}`", True), ("Potential Loot", f"`${potential:,}`", True), ("Current Crew", crew, False)]
+        return _base(title="HEIST IN PROGRESS", description="Recruiting elite crew members...", color=XERO.GOLD, fields=fields)
     elif success:
-        per_person = actual_reward // max(len(participants), 1)
-        embed = discord.Embed(
-            title="✅  HEIST SUCCESSFUL  —  LOOT SECURED",
-            description=(
-                f"The crew pulled it off! The vault is empty.\n\n"
-                f"💵  **Total Stolen:**  `${actual_reward:,}`\n"
-                f"👤  **Per Member:**  `${per_person:,}`"
-            ),
-            color=XERO.SUCCESS,
-            timestamp=discord.utils.utcnow(),
-        )
-        embed.add_field(name=f"👥  Crew  ({len(participants)})", value=crew_list, inline=False)
-        embed.set_footer(text="XERO Economy  •  Bank Heist")
+        return _base(title="HEIST SUCCESS", description=f"Vault breached. Secured **`${actual_reward:,}`**.", color=XERO.SUCCESS)
     else:
-        embed = discord.Embed(
-            title="❌  HEIST FAILED  —  BUSTED",
-            description=(
-                f"The crew got caught! Security was too tight.\n\n"
-                f"💸  **Fine per Member:**  `${actual_reward:,}`"
-            ),
-            color=XERO.ERROR,
-            timestamp=discord.utils.utcnow(),
-        )
-        embed.add_field(name=f"👥  Crew  ({len(participants)})", value=crew_list, inline=False)
-        embed.set_footer(text="XERO Economy  •  Bank Heist")
-
-    embed.set_thumbnail(url=leader.display_avatar.url)
-    return embed
-
+        return _base(title="HEIST FAILED", description=f"Mission compromised. Fine: **`${actual_reward:,}`**.", color=XERO.ERROR)
 
 def stock_embed(stocks: list) -> discord.Embed:
-    """Embed for the XERO Stock Exchange market overview."""
-    embed = discord.Embed(
-        title="📈  XERO Stock Exchange",
-        description="Live prices from the XERO virtual market.",
-        color=XERO.ECONOMY,
-        timestamp=discord.utils.utcnow(),
-    )
-    if not stocks:
-        embed.description = "No stocks are currently listed on the exchange."
-        embed.set_footer(text=FOOTER_ECO)
-        return embed
-
-    for stock in stocks:
-        symbol   = stock.get("symbol", "???")
-        name     = stock.get("name", symbol)
-        price    = stock.get("price", 0)
-        change   = stock.get("change_pct", 0.0)
-        arrow    = "📈" if change >= 0 else "📉"
-        sign     = "+" if change >= 0 else ""
-        embed.add_field(
-            name=f"{arrow}  {symbol}  —  {name}",
-            value=f"**${price:,}**  `{sign}{change:.1f}%`",
-            inline=True,
-        )
-    embed.set_footer(text=FOOTER_ECO)
-    return embed
-
-
-def milestone_embed(guild: discord.Guild, member_count: int) -> discord.Embed:
-    """Embed celebrating a server member milestone."""
-    milestones = {
-        100: "🥉", 250: "🥈", 500: "🥇", 1000: "💎",
-        2500: "👑", 5000: "🌟", 10000: "🚀",
-    }
-    badge = milestones.get(member_count, "🎊")
-    embed = discord.Embed(
-        title=f"{badge}  MILESTONE REACHED  —  {member_count:,} Members!",
-        description=(
-            f"**{guild.name}** has reached **{member_count:,} members**!\n\n"
-            f"Thank you to every single member who has been part of this journey. "
-            f"Here's to the next milestone! 🎉"
-        ),
-        color=XERO.GOLD,
-        timestamp=discord.utils.utcnow(),
-    )
-    if guild.icon:
-        embed.set_thumbnail(url=guild.icon.url)
-    embed.set_footer(text=f"XERO Bot  •  {guild.name}")
-    return embed
-
-
-def health_embed(
-    guild: discord.Guild,
-    score: float,
-    grade: str,
-    analysis: str,
-    recommendations: list,
-) -> discord.Embed:
-    """Embed for the server health report from Smart Mod."""
-    if score >= 80:
-        color = XERO.SUCCESS
-    elif score >= 50:
-        color = XERO.WARNING
+    embed = _base(title="MARKET EXCHANGE", color=XERO.ECONOMY)
+    if not stocks: embed.description = "```\nMARKET CLOSED\n```"
     else:
-        color = XERO.DANGER
-
-    embed = discord.Embed(
-        title=f"🏥  Server Health Report  —  {guild.name}",
-        description=f"**Grade: {grade}**  |  Score: **{score:.1f} / 100**\n\n{analysis}",
-        color=color,
-        timestamp=discord.utils.utcnow(),
-    )
-    if guild.icon:
-        embed.set_thumbnail(url=guild.icon.url)
-    if recommendations:
-        rec_text = "\n".join(f"• {r}" for r in recommendations[:5])
-        embed.add_field(name="💡  Recommendations", value=rec_text, inline=False)
-    embed.set_footer(text="XERO Smart Moderation  •  Health Report")
+        for s in stocks:
+            change = s.get("change_pct", 0.0)
+            sign = "+" if change >= 0 else ""
+            embed.add_field(name=f"▹ {s['symbol']}", value=f"`${s['price']:,}` ({sign}{change:.1f}%)", inline=True)
     return embed
+
+def milestone_embed(guild: discord.Guild, count: int) -> discord.Embed:
+    return _base(title="SERVER MILESTONE", description=f"**{guild.name}** has reached **{count:,}** members.", color=XERO.GOLD)
+
+def health_embed(guild: discord.Guild, score: float, grade: str, analysis: str, recs: list) -> discord.Embed:
+    fields = [("Grade", f"**{grade}**", True), ("Vitality Score", f"**{score:.1f}/100**", True)]
+    if recs: fields.append(("Recommendations", "\n".join(f"▹ {r}" for r in recs[:3]), False))
+    return _base(title="SERVER VITALITY REPORT", description=analysis, color=XERO.SUCCESS if score >= 80 else XERO.WARNING, fields=fields)
