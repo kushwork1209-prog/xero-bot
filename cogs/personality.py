@@ -104,30 +104,14 @@ class Personality(commands.Cog):
     # ── Called by events.py on member join ────────────────────────────────
     async def on_member_welcome(self, member: discord.Member, channel: discord.TextChannel):
         """Send a witty welcome line alongside the embed."""
-        settings = await self.bot.db.get_guild_settings(member.guild.id)
-        if not settings.get("personality_enabled", 1):
-            return
-        line = random.choice(WELCOME_LINES).format(member=member.mention)
-        try:
-            await channel.send(line)
-        except Exception:
-            pass
+        # Feature disabled as per user request to reduce noise
+        pass
 
     # ── Called by events.py on level up ───────────────────────────────────
     async def on_level_up(self, member: discord.Member, level: int, channel: discord.TextChannel):
         """Add a witty line to level-up announcements."""
-        settings = await self.bot.db.get_guild_settings(member.guild.id)
-        if not settings.get("personality_enabled", 1):
-            return
-        # Special lines for milestone levels
-        if level in (5, 10, 25, 50, 100):
-            line = f"🏆 **MILESTONE LEVEL {level}** reached by {member.mention}! That's genuinely impressive. Not everyone makes it here."
-        else:
-            line = random.choice(LEVEL_UP_LINES).format(member=member.mention, level=level)
-        try:
-            await channel.send(line)
-        except Exception:
-            pass
+        # Feature disabled as per user request to reduce noise
+        pass
 
     # ── Called by economy after slot result ───────────────────────────────
     async def get_slot_comment(self, won: bool) -> str:

@@ -1,7 +1,7 @@
 from utils.guard import command_guard
 """
 XERO Bot — Ticket System (Complete Rewrite)
-ZNYT-style category dropdowns, emoji-named channels, and staff intelligence briefs.
+elite-style category dropdowns, emoji-named channels, and staff intelligence briefs.
 """
 import discord, aiosqlite, asyncio, io, logging, datetime
 from discord.ext import commands
@@ -292,7 +292,7 @@ class TicketCategorySelect(discord.ui.Select):
         if role: ow[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
         
         try:
-            # ZNYT Style: emoji-name (🔧-john_doe)
+            # Elite Style: emoji-name (🔧-john_doe)
             clean_name = interaction.user.display_name[:18].lower().replace(' ','-')
             channel_name = f"{category_info['emoji']}-{clean_name}"
             
@@ -452,7 +452,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         bot.add_view(TicketOpenView())
         bot.add_view(TicketActionView(bot))
 
-    @app_commands.command(name="setup", description="Set up the ZNYT-style ticket panel with category dropdown.")
+    @app_commands.command(name="setup", description="Set up the elite-style ticket panel with category dropdown.")
     @app_commands.describe(channel="Where to post the panel", support_role="Role to ping", category="Category for ticket channels", log_channel="Where case logs are posted on close", message="Custom panel message")
     @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel,
@@ -490,7 +490,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         else:
             await channel.send(embed=emb, view=TicketOpenView())
             
-        desc = f"ZNYT-style ticket panel posted in {channel.mention}."
+        desc = f"elite-style ticket panel posted in {channel.mention}."
         if support_role: desc += f"\nSupport role: {support_role.mention}"
         if category:     desc += f"\nCategory: {category.mention}"
         if log_channel:  desc += f"\nCase logs → {log_channel.mention}"

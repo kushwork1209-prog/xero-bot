@@ -1,7 +1,7 @@
 """
 XERO Bot — Cyber-Luxury Embed Engine
 The most advanced, structured, and premium embed system on Discord.
-Beyond ZNYT — Engineered for elite servers.
+XERO ELITE — Engineered for high-performance servers.
 """
 import discord
 from typing import Optional, List, Tuple, Union
@@ -31,7 +31,7 @@ class XeroColors:
 XERO = XeroColors()
 
 # ── Structured Typography & Symbols ──────────────────────────────────────────
-# We use specific spacing and dividers to create a "ZNYT-plus" layout
+# We use specific spacing and dividers to create a "Cyber-Luxury" layout
 DIVIDER = "──────────────────────────"
 FOOTER_MAIN  = "XERO ELITE  •  xero.gg"
 FOOTER_AI    = "XERO NEURAL  •  Powered by NVIDIA Llama 4 Maverick"
@@ -78,7 +78,7 @@ def _base(
         embed.set_author(name=author_name.upper(), icon_url=author_icon)
     
     if fields:
-        # Field separators for that structured "ZNYT" but better look
+        # Field separators for that structured "XERO" elite look
         for name, value, inline in fields:
             # We use small caps or bold for field names
             embed.add_field(name=f"▹ {name.upper()}", value=value, inline=inline)

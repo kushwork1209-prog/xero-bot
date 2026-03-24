@@ -295,6 +295,22 @@ class Database:
                 )
             """)
 
+            # ── Logging Ignores ───────────────────────────────────────────
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS log_ignored_channels (
+                    guild_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, channel_id)
+                )
+            """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS log_ignored_roles (
+                    guild_id INTEGER NOT NULL,
+                    role_id INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, role_id)
+                )
+            """)
+
             # ── Server Backups ────────────────────────────────────────────
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS server_backups (

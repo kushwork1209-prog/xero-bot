@@ -151,6 +151,15 @@ class AdvancedLogger(commands.Cog):
     async def on_message_edit(self, before, after):
         if before.author.bot or not before.guild: return
         if before.content == after.content: return
+        
+        # Ignore check
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with db.execute("SELECT 1 FROM log_ignored_channels WHERE guild_id=? AND channel_id=?", (before.guild.id, before.channel.id)) as c:
+                if await c.fetchone(): return
+            for r in before.author.roles:
+                async with db.execute("SELECT 1 FROM log_ignored_roles WHERE guild_id=? AND role_id=?", (before.guild.id, r.id)) as c:
+                    if await c.fetchone(): return
+
         gid, uid = before.guild.id, before.author.id
         now = datetime.datetime.now()
         if gid not in self._msg_pattern: self._msg_pattern[gid] = {}
@@ -174,6 +183,15 @@ class AdvancedLogger(commands.Cog):
     @commands.Cog.listener()
     async def on_message_delete(self, message):
         if message.author.bot or not message.guild: return
+        
+        # Ignore check
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with db.execute("SELECT 1 FROM log_ignored_channels WHERE guild_id=? AND channel_id=?", (message.guild.id, message.channel.id)) as c:
+                if await c.fetchone(): return
+            for r in message.author.roles:
+                async with db.execute("SELECT 1 FROM log_ignored_roles WHERE guild_id=? AND role_id=?", (message.guild.id, r.id)) as c:
+                    if await c.fetchone(): return
+
         deleter_str = "*Unknown — may be self-deleted*"
         sus_flag    = False
         try:
@@ -987,40 +1005,39 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         view  = UserLogView(pages, user)
         await interaction.followup.send(embed=pages[0].embed, view=view)
 
-    @app_commands.command(name="setup", description="Configure logging. Set one unified channel or separate channels per event type.")
-    @app_commands.describe(unified="One channel for ALL events",messages="Edits/deletes",members="Joins/leaves/bans",server="Channels/roles/server changes",voice="Voice events")
+    @app_commands.command(name="setup", description="Configure the elite logging system with smart defaults.")
+    @app_commands.describe(channel="Primary channel for ALL logs (Unified)", messages="Specific channel for edits/deletes", members="Specific channel for joins/leaves/roles", server="Specific channel for server/role changes", voice="Specific channel for voice sessions")
     @app_commands.checks.has_permissions(administrator=True)
-    async def setup(self, interaction: discord.Interaction,
-                    unified: discord.TextChannel=None, messages: discord.TextChannel=None,
-                    members: discord.TextChannel=None, server: discord.TextChannel=None,
-                    voice: discord.TextChannel=None):
-        updates = {}
-        if unified:
-            for k in ["log_channel_id","message_log_channel_id","member_log_channel_id","server_log_channel_id","voice_log_channel_id"]:
-                updates[k] = unified.id
-        if messages: updates["message_log_channel_id"] = messages.id
-        if members:  updates["member_log_channel_id"]  = members.id
-        if server:   updates["server_log_channel_id"]  = server.id
-        if voice:    updates["voice_log_channel_id"]   = voice.id
+    async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel, messages: discord.TextChannel=None, members: discord.TextChannel=None, server: discord.TextChannel=None, voice: discord.TextChannel=None):
+        updates = {"log_channel_id": channel.id}
+        if not messages: updates["message_log_channel_id"] = channel.id
+        else: updates["message_log_channel_id"] = messages.id
+        if not members: updates["member_log_channel_id"] = channel.id
+        else: updates["member_log_channel_id"] = members.id
+        if not server: updates["server_log_channel_id"] = channel.id
+        else: updates["server_log_channel_id"] = server.id
+        if not voice: updates["voice_log_channel_id"] = channel.id
+        else: updates["voice_log_channel_id"] = voice.id
+        
         for k,v in updates.items(): await self.bot.db.update_guild_setting(interaction.guild.id,k,v)
         adv = self.bot.cogs.get("AdvancedLogger")
         if adv: adv._cache.pop(interaction.guild.id, None)
-        def fmt(ch): return ch.mention if ch else "—"
+        
+        def fmt(cid): return f"<#{cid}>" if cid else "—"
         embed = discord.Embed(
-            title="📋  Logging Configured",
+            title="📋  Logging Protocol Initialized",
             description=(
-                "XERO now logs **every** Discord event with AI threat scoring, "
-                "full permission diffs, invite tracking, voice session durations, "
-                "WHO deleted each message, and bulk-delete transcripts.\n\n"
+                "XERO elite logging is now active. We monitor every event with AI threat scoring, "
+                "permission diffs, and deep audit integration.\n\n"
                 "**The most detailed logging of any bot. Period.**"
             ),
             color=0x00D4FF, timestamp=discord.utils.utcnow()
         )
-        embed.add_field(name="🌐 Unified",  value=fmt(unified),  inline=True)
-        embed.add_field(name="💬 Messages", value=fmt(messages), inline=True)
-        embed.add_field(name="👥 Members",  value=fmt(members),  inline=True)
-        embed.add_field(name="🏰 Server",   value=fmt(server),   inline=True)
-        embed.add_field(name="🔊 Voice",    value=fmt(voice),    inline=True)
+        embed.add_field(name="🌐 Unified",  value=channel.mention,  inline=True)
+        embed.add_field(name="💬 Messages", value=fmt(updates.get("message_log_channel_id")), inline=True)
+        embed.add_field(name="👥 Members",  value=fmt(updates.get("member_log_channel_id")),  inline=True)
+        embed.add_field(name="🏰 Server",   value=fmt(updates.get("server_log_channel_id")),   inline=True)
+        embed.add_field(name="🔊 Voice",    value=fmt(updates.get("voice_log_channel_id")),    inline=True)
         embed.add_field(name="📋 What's Logged", value=(
             "✅ Message edits (before/after + char diff)\n"
             "✅ Deletions (who deleted + full content + attachments)\n"
@@ -1048,6 +1065,24 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         ), inline=False)
         embed.set_footer(text="XERO Logging  •  Period.")
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="ignore-channel", description="Exclude a channel from message logging.")
+    @app_commands.describe(channel="Channel to ignore")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def ignore_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            await db.execute("INSERT OR IGNORE INTO log_ignored_channels (guild_id, channel_id) VALUES (?,?)", (interaction.guild.id, channel.id))
+            await db.commit()
+        await interaction.response.send_message(embed=success_embed("Channel Ignored", f"Messages in {channel.mention} will no longer be logged."))
+
+    @app_commands.command(name="ignore-role", description="Exclude a role from message logging.")
+    @app_commands.describe(role="Role to ignore")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def ignore_role(self, interaction: discord.Interaction, role: discord.Role):
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            await db.execute("INSERT OR IGNORE INTO log_ignored_roles (guild_id, role_id) VALUES (?,?)", (interaction.guild.id, role.id))
+            await db.commit()
+        await interaction.response.send_message(embed=success_embed("Role Ignored", f"Users with the {role.mention} role will no longer have their messages logged."))
 
     @app_commands.command(name="view", description="View current logging configuration.")
     @app_commands.checks.has_permissions(manage_guild=True)
