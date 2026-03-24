@@ -21,8 +21,8 @@ class AI(commands.GroupCog, name="ai"):
         return text[:limit] + ("..." if len(text) > limit else "")
 
     async def _send(self, interaction: discord.Interaction, title: str, content: str, color=None):
-        import discord as d
-        embed = comprehensive_embed(title=title, description=self._chunk(content), color=color or d.Color.blurple(), footer_text="XERO AI | Powered by NVIDIA Llama 4 Maverick")
+        from utils.embeds import ai_embed
+        embed = ai_embed(title=title, description=self._chunk(content), color=color)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed)
         else:
@@ -182,7 +182,15 @@ class AI(commands.GroupCog, name="ai"):
     async def roast(self, interaction: discord.Interaction, target: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.roast(target)
-        await self._send(interaction, f"🔥 Roast: {target[:30]}", response, discord.Color.dark_orange())
+        if not response:
+            response = "I tried to roast them, but they're too boring to even insult."
+        
+        embed = ai_embed(
+            title=f"🔥 ROASTED: {target[:30]}",
+            description=response,
+            color=XERO.ERROR
+        )
+        await interaction.followup.send(embed=embed)
 
     # ── Image Analyze ─────────────────────────────────────────────────────
     @app_commands.command(name="analyze-image", description="Analyze any image URL using NVIDIA Vision AI.")

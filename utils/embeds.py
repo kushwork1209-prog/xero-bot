@@ -56,10 +56,9 @@ def _base(
     # Clean and structure the description for a "Boxed" look
     final_desc = ""
     if description:
-        # We wrap descriptions in code blocks or specific formatting if they are short
-        # to give that "UI terminal" feel that is more premium than plain text.
-        if len(description) < 100 and "\n" not in description:
-            final_desc = f"```\n{description}\n```"
+        # Premium layout: use specific formatting for short descriptions
+        if len(description) < 150 and "\n" not in description:
+            final_desc = f"### {description}"
         else:
             final_desc = description
 
