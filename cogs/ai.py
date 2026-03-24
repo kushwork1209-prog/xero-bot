@@ -5,7 +5,7 @@ import asyncio
 from discord.ext import commands
 from discord import app_commands
 import logging
-from utils.embeds import comprehensive_embed, success_embed, error_embed, info_embed
+from utils.embeds import comprehensive_embed, success_embed, error_embed, info_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.AI")
 

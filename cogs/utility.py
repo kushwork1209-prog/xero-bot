@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, time, datetime
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Utility")
 
@@ -41,7 +41,7 @@ class Utility(commands.Cog):
     @app_commands.describe(question="Poll question",option1="Option 1",option2="Option 2",option3="Option 3",option4="Option 4")
     async def poll(self, interaction: discord.Interaction, question: str, option1: str, option2: str, option3: str=None, option4: str=None):
         options=[o for o in [option1,option2,option3,option4] if o]; emojis=["1️⃣","2️⃣","3️⃣","4️⃣"]
-        embed=discord.Embed(title=f"📊 {question}",color=XERO.PRIMARY)
+        embed=comprehensive_embed(title=f"📊 {question}",color=XERO.PRIMARY)
         for i,opt in enumerate(options): embed.add_field(name=f"{emojis[i]} Option {i+1}",value=opt,inline=False)
         embed.set_footer(text=f"Poll by {interaction.user.display_name} • React to vote!")
         msg=await interaction.channel.send(embed=embed)
@@ -57,7 +57,7 @@ class Utility(commands.Cog):
     @app_commands.command(name="invite", description="Get the invite link for XERO Bot.")
     async def invite(self, interaction: discord.Interaction):
         url = discord.utils.oauth_url(self.bot.user.id, permissions=discord.Permissions(8), scopes=("bot", "applications.commands"))
-        embed = discord.Embed(title="👋 Invite XERO", description="Click below to add XERO to your server!\n• 400+ Commands\n• AI & Music\n• 100% Free", color=XERO.PRIMARY)
+        embed = comprehensive_embed(title="👋 Invite XERO", description="Click below to add XERO to your server!\n• 400+ Commands\n• AI & Music\n• 100% Free", color=XERO.PRIMARY)
         view = discord.ui.View().add_item(discord.ui.Button(label="Invite XERO", url=url, style=discord.ButtonStyle.link))
         await interaction.response.send_message(embed=embed, view=view)
 
@@ -132,7 +132,7 @@ class Utility(commands.Cog):
                 rows = [dict(r) for r in await c.fetchall()]
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Reminders","You have no active reminders. Use `/remind` to create one."))
-        embed = discord.Embed(title=f"⏰  Your Reminders ({len(rows)})", color=0x00D4FF)
+        embed = comprehensive_embed(title=f"⏰  Your Reminders ({len(rows)})", color=0x00D4FF)
         for r in rows:
             try:
                 dt  = datetime.datetime.fromisoformat(r["remind_at"])
@@ -169,7 +169,7 @@ class Utility(commands.Cog):
         msg = snipes.get(interaction.channel.id)
         if not msg:
             return await interaction.response.send_message(embed=info_embed("Nothing to Snipe","No recently deleted messages cached."))
-        embed = discord.Embed(description=msg['content'] or "*no text*", color=0xFF3B5C, timestamp=msg['deleted_at'])
+        embed = comprehensive_embed(description=msg['content'] or "*no text*", color=0xFF3B5C, timestamp=msg['deleted_at'])
         embed.set_author(name=msg['author'], icon_url=msg['avatar'])
         embed.set_footer(text=f"Sniped from #{interaction.channel.name}  •  XERO Snipe")
         await interaction.response.send_message(embed=embed)

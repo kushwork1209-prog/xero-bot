@@ -5,7 +5,7 @@ from discord import app_commands
 import logging
 import datetime
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Announcement")
 
@@ -31,8 +31,8 @@ class Announcement(commands.GroupCog, name="announcement"):
                 try:
                     ch = self.bot.get_channel(ann["channel_id"])
                     if ch:
-                        from utils.embeds import brand_embed
-                        embed = discord.Embed(title=f"📢 {ann['title']}", description=ann["message"], color=discord.Color.blurple())
+                        from utils.embeds import brand_embed, comprehensive_embed
+                        embed = comprehensive_embed(title=f"📢 {ann['title']}", description=ann["message"], color=discord.Color.blurple())
                         embed.set_footer(text="Scheduled Announcement")
                         
                         # Unified Branding
@@ -67,8 +67,8 @@ class Announcement(commands.GroupCog, name="announcement"):
                    ping_everyone: bool = False, color: str = "blue"):
         color_map = {"blue": discord.Color.blue(), "red": discord.Color.red(), "green": discord.Color.green(),
                      "gold": discord.Color.gold(), "purple": discord.Color.purple()}
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title=f"📢 {title}", description=message, color=color_map.get(color, discord.Color.blue()))
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title=f"📢 {title}", description=message, color=color_map.get(color, discord.Color.blue()))
         embed.set_footer(text=f"Announced by {interaction.user.display_name}")
         content = "@everyone" if ping_everyone else None
         
@@ -139,7 +139,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.describe(role="Role to mention", channel="Target channel", title="Title", message="Message body")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def mention_role(self, interaction: discord.Interaction, role: discord.Role, channel: discord.TextChannel, title: str, message: str):
-        embed = discord.Embed(title=f"📢 {title}", description=message, color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"📢 {title}", description=message, color=discord.Color.blurple())
         embed.set_footer(text=f"Announced by {interaction.user.display_name} | XERO Bot")
         await channel.send(content=role.mention, embed=embed)
         await interaction.response.send_message(embed=success_embed("Announcement Sent!", f"Announcement sent with {role.mention} in {channel.mention}."))

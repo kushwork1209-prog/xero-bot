@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, datetime, math, urllib.parse, aiohttp
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Tools")
 SNIPE_CACHE: dict = {}
@@ -53,7 +53,7 @@ class Tools(commands.GroupCog, name="tools"):
             c=data["current_condition"][0]; area=data["nearest_area"][0]
             desc=c["weatherDesc"][0]["value"]; dl=desc.lower()
             emo="⛈️" if "thunder" in dl else "🌧️" if "rain" in dl else "🌨️" if "snow" in dl else "🌫️" if "fog" in dl else "☁️" if "cloud" in dl else "⛅" if "partly" in dl else "☀️"
-            embed=discord.Embed(title=f"{emo} {area['areaName'][0]['value']}, {area['country'][0]['value']}",description=f"**{desc}**",color=XERO.INFO)
+            embed=comprehensive_embed(title=f"{emo} {area['areaName'][0]['value']}, {area['country'][0]['value']}",description=f"**{desc}**",color=XERO.INFO)
             embed.add_field(name="🌡️ Temp",      value=f"**{c['temp_C']}°C** / {c['temp_F']}°F\nFeels: {c['FeelsLikeC']}°C",inline=True)
             embed.add_field(name="💧 Humidity",  value=f"**{c['humidity']}%**",inline=True)
             embed.add_field(name="💨 Wind",       value=f"**{c['windspeedKmph']} km/h {c['winddir16Point']}**",inline=True)
@@ -115,7 +115,7 @@ class Tools(commands.GroupCog, name="tools"):
                 elif cmax==g_: h=60*((b_-r_)/delta+2)
                 else: h=60*((r_-g_)/delta+4)
             comp=f"{255-r:02X}{255-g:02X}{255-b:02X}"
-            embed=discord.Embed(title=f"🎨 Color: #{clean}",color=discord.Color(int(clean,16)))
+            embed=comprehensive_embed(title=f"🎨 Color: #{clean}",color=discord.Color(int(clean,16)))
             embed.add_field(name="HEX",value=f"`#{clean}`",inline=True)
             embed.add_field(name="RGB",value=f"`rgb({r},{g},{b})`",inline=True)
             embed.add_field(name="HSL",value=f"`hsl({int(h)}°,{int(s*100)}%,{int(l*100)}%)`",inline=True)
@@ -141,7 +141,7 @@ class Tools(commands.GroupCog, name="tools"):
     async def snipe(self, interaction: discord.Interaction):
         cached=SNIPE_CACHE.get(interaction.channel.id)
         if not cached: return await interaction.response.send_message(embed=info_embed("Nothing to Snipe","No recently deleted messages here."),ephemeral=True)
-        embed=discord.Embed(title="🔫 Sniped Message",description=cached["content"][:2000] or "*[No text content]*",color=XERO.WARNING)
+        embed=comprehensive_embed(title="🔫 Sniped Message",description=cached["content"][:2000] or "*[No text content]*",color=XERO.WARNING)
         embed.set_author(name=cached["author"],icon_url=cached.get("avatar") or discord.Embed.Empty)
         embed.set_footer(text=f"Deleted at {cached['timestamp'].strftime('%H:%M:%S, %B %d %Y')}")
         if cached.get("image"): embed.set_image(url=cached["image"])

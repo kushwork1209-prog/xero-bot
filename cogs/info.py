@@ -17,7 +17,7 @@ try:
 except ImportError:
     HAS_PSUTIL = False
 import os
-from utils.embeds import comprehensive_embed, info_embed, error_embed
+from utils.embeds import comprehensive_embed, info_embed, error_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Info")
 
@@ -101,7 +101,7 @@ class Info(commands.GroupCog, name="info"):
             author_icon=target.display_avatar.url
         )
         
-        from utils.embeds import brand_embed
+        from utils.embeds import brand_embed, comprehensive_embed
         embed, file = await brand_embed(embed, interaction.guild, self.bot)
         await interaction.followup.send(embed=embed, file=file)
 

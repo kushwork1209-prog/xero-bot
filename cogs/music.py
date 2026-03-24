@@ -11,7 +11,7 @@ import asyncio
 import random as _random
 import aiohttp
 import urllib.parse
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 from utils.guard import command_guard
 
 logger = logging.getLogger("XERO.Music")
@@ -263,7 +263,7 @@ class Music(commands.GroupCog, name="music"):
     @app_commands.command(name="queue", description="Show the current music queue.")
     async def queue_cmd(self, interaction: discord.Interaction):
         queue = self.get_queue(interaction.guild.id)
-        embed = discord.Embed(title="🎶 Music Queue", color=discord.Color.purple())
+        embed = comprehensive_embed(title="🎶 Music Queue", color=discord.Color.purple())
         if queue.now_playing:
             embed.description = (
                 f"**Now Playing:** [{queue.now_playing['title']}]({queue.now_playing['webpage_url']})"

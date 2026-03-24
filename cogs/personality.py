@@ -15,7 +15,7 @@ import aiosqlite
 from utils.embeds import (
     success_embed, error_embed, info_embed, comprehensive_embed,
     milestone_embed, XERO, FOOTER_MAIN
-)
+, comprehensive_embed)
 
 logger = logging.getLogger("XERO.Personality")
 

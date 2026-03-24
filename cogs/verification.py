@@ -4,7 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 import logging
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Verification")
 
@@ -61,8 +61,8 @@ class Verification(commands.GroupCog, name="verify"):
             await db.commit()
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_role_id", role.id)
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_channel_id", channel.id)
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title="✅ Verification Required", description=msg, color=discord.Color.green())
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title="✅ Verification Required", description=msg, color=discord.Color.green())
         embed.add_field(name="Instructions", value="1. Click **Verify** below\n2. You'll receive access instantly!", inline=False)
         embed.set_footer(text="Verification")
         if interaction.guild.icon:

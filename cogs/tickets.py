@@ -6,7 +6,7 @@ ZNYT-style category dropdowns, emoji-named channels, and staff intelligence brie
 import discord, aiosqlite, asyncio, io, logging, datetime
 from discord.ext import commands
 from discord import app_commands
-from utils.embeds import XERO, success_embed, error_embed, info_embed, brand_embed
+from utils.embeds import XERO, success_embed, error_embed, info_embed, brand_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Tickets")
 
@@ -69,7 +69,7 @@ async def _close_flow(interaction, bot, reason="Resolved"):
     opener = guild.get_member(ticket["user_id"])
     closer = interaction.user
 
-    await interaction.response.send_message(embed=discord.Embed(description="🔒  Closing — generating case log...", color=TC_CLOSED))
+    await interaction.response.send_message(embed=comprehensive_embed(description="🔒  Closing — generating case log...", color=TC_CLOSED))
 
     await _log_event(db_path, tid, guild.id, closer.id, "closed", f"Closed by {closer} — {reason}")
 
@@ -133,7 +133,7 @@ async def _close_flow(interaction, bot, reason="Resolved"):
     if ai_summary:
         fields.append(("AI Intelligence Summary", f"```\n{ai_summary[:500]}\n```", False))
 
-    from utils.embeds import comprehensive_embed
+    from utils.embeds import comprehensive_embed, comprehensive_embed
     e = comprehensive_embed(
         title=f"CASE ARCHIVE: #{tid}",
         color=XERO.DARK,
@@ -226,7 +226,7 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
         case_list = "\n".join([f"▹ **{c['action'].upper()}** | {c['timestamp'][:10]}" for c in local_cases[:3]])
         fields.append(("Recent Internal Violations", f"```\n{case_list}\n```", False))
 
-    from utils.embeds import comprehensive_embed
+    from utils.embeds import comprehensive_embed, comprehensive_embed
     e = comprehensive_embed(
         title="STAFF INTELLIGENCE BRIEF",
         color=XERO.MOD,
@@ -310,7 +310,7 @@ class TicketCategorySelect(discord.ui.Select):
 
         await _log_event(bot.db.db_path, tid, guild.id, interaction.user.id, "opened", f"Opened {category_info['label']} ticket")
 
-        emb = discord.Embed(title=f"Ticket #{tid} — {category_info['label']}", description=f"Hello {interaction.user.mention}!\n\nYou have opened a **{category_info['label']}** ticket. Describe your issue clearly and staff will assist you shortly.", color=TC_OPEN, timestamp=discord.utils.utcnow())
+        emb = comprehensive_embed(title=f"Ticket #{tid} — {category_info['label']}", description=f"Hello {interaction.user.mention}!\n\nYou have opened a **{category_info['label']}** ticket. Describe your issue clearly and staff will assist you shortly.", color=TC_OPEN, timestamp=discord.utils.utcnow())
         emb.set_thumbnail(url=interaction.user.display_avatar.url)
         emb.set_footer(text=f"Case #{tid}  •  XERO Tickets")
         
@@ -356,7 +356,7 @@ class TicketActionView(discord.ui.View):
             await db.execute("UPDATE tickets SET claimed_by=? WHERE ticket_id=?", (interaction.user.id, ticket["ticket_id"]))
             await db.commit()
         await _log_event(bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "claimed", f"Claimed by {interaction.user.display_name}")
-        await interaction.response.send_message(embed=discord.Embed(description=f"🙋 {interaction.user.mention} claimed this ticket.", color=TC_CLAIMED))
+        await interaction.response.send_message(embed=comprehensive_embed(description=f"🙋 {interaction.user.mention} claimed this ticket.", color=TC_CLAIMED))
 
     @discord.ui.button(label="Unclaim", style=discord.ButtonStyle.secondary, custom_id="xero_t_unclaim_v2", emoji="🔓")
     async def unclaim(self, interaction, button):
@@ -369,7 +369,7 @@ class TicketActionView(discord.ui.View):
             await db.execute("UPDATE tickets SET claimed_by=NULL WHERE ticket_id=?", (ticket["ticket_id"],))
             await db.commit()
         await _log_event(bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "unclaimed", f"Released by {interaction.user.display_name}")
-        await interaction.response.send_message(embed=discord.Embed(description=f"🔓 {interaction.user.mention} released this ticket.", color=TC_OPEN))
+        await interaction.response.send_message(embed=comprehensive_embed(description=f"🔓 {interaction.user.mention} released this ticket.", color=TC_OPEN))
 
     @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="xero_t_close_v2", emoji="🔒")
     async def close(self, interaction, button):
@@ -411,7 +411,7 @@ class TicketHistoryView(discord.ui.View):
         staff_evs = [ev for ev in events if ev["event_type"] not in ("opened","message")]
         timeline  = "\n".join(_fmt_event(ev, self.guild) for ev in staff_evs) if staff_evs else "*No staff events on record.*"
 
-        e = discord.Embed(title=f"📁  Case #{t['ticket_id']}", color=TC_HISTORY, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"📁  Case #{t['ticket_id']}", color=TC_HISTORY, timestamp=discord.utils.utcnow())
         e.add_field(name="👤  Opened By",  value=o_str,                               inline=False)
         e.add_field(name="🔒  Closed By",  value=c_str,                               inline=True)
         e.add_field(name="⏱️  Duration",   value=duration,                            inline=True)
@@ -469,7 +469,7 @@ class Tickets(commands.GroupCog, name="ticket"):
             ("Executive Support", "Career Opportunities\nReports & Appeals", False),
         ]
 
-        from utils.embeds import comprehensive_embed
+        from utils.embeds import comprehensive_embed, comprehensive_embed
         emb = comprehensive_embed(
             title="SERVER ASSISTANCE CENTRE",
             description=txt,
@@ -481,7 +481,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         )
         
         # Apply Branding
-        from utils.embeds import brand_embed
+        from utils.embeds import brand_embed, comprehensive_embed
         emb, file = await brand_embed(emb, interaction.guild, self.bot)
         
         if file:
@@ -513,7 +513,7 @@ class Tickets(commands.GroupCog, name="ticket"):
             await db.execute("UPDATE tickets SET claimed_by=? WHERE ticket_id=?", (interaction.user.id, ticket["ticket_id"]))
             await db.commit()
         await _log_event(self.bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "claimed", f"Claimed by {interaction.user.display_name}")
-        await interaction.response.send_message(embed=discord.Embed(description=f"🙋 {interaction.user.mention} claimed this ticket.", color=TC_CLAIMED))
+        await interaction.response.send_message(embed=comprehensive_embed(description=f"🙋 {interaction.user.mention} claimed this ticket.", color=TC_CLAIMED))
 
     @app_commands.command(name="unclaim", description="Release this ticket so another staff member can take it.")
     @app_commands.checks.has_permissions(manage_channels=True)
@@ -524,7 +524,7 @@ class Tickets(commands.GroupCog, name="ticket"):
             await db.execute("UPDATE tickets SET claimed_by=NULL WHERE ticket_id=?", (ticket["ticket_id"],))
             await db.commit()
         await _log_event(self.bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "unclaimed", f"Released by {interaction.user.display_name}")
-        await interaction.response.send_message(embed=discord.Embed(description=f"🔓 {interaction.user.mention} released this ticket.", color=TC_OPEN))
+        await interaction.response.send_message(embed=comprehensive_embed(description=f"🔓 {interaction.user.mention} released this ticket.", color=TC_OPEN))
 
     @app_commands.command(name="add", description="Add a user to this ticket.")
     @app_commands.describe(user="User to add")
@@ -533,7 +533,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         await interaction.channel.set_permissions(user, view_channel=True, send_messages=True, read_message_history=True)
         ticket = await _get_ticket(self.bot.db.db_path, interaction.channel.id)
         if ticket: await _log_event(self.bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "user_added", f"{user.display_name} added by {interaction.user.display_name}")
-        await interaction.response.send_message(embed=discord.Embed(description=f"➕ {user.mention} added.", color=TC_CLAIMED))
+        await interaction.response.send_message(embed=comprehensive_embed(description=f"➕ {user.mention} added.", color=TC_CLAIMED))
 
     @app_commands.command(name="remove", description="Remove a user from this ticket.")
     @app_commands.describe(user="User to remove")
@@ -542,7 +542,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         await interaction.channel.set_permissions(user, overwrite=None)
         ticket = await _get_ticket(self.bot.db.db_path, interaction.channel.id)
         if ticket: await _log_event(self.bot.db.db_path, ticket["ticket_id"], interaction.guild.id, interaction.user.id, "user_removed", f"{user.display_name} removed by {interaction.user.display_name}")
-        await interaction.response.send_message(embed=discord.Embed(description=f"➖ {user.mention} removed.", color=TC_OPEN))
+        await interaction.response.send_message(embed=comprehensive_embed(description=f"➖ {user.mention} removed.", color=TC_OPEN))
 
     @app_commands.command(name="list", description="View all open tickets.")
     @app_commands.checks.has_permissions(manage_channels=True)
@@ -553,7 +553,7 @@ class Tickets(commands.GroupCog, name="ticket"):
                 tickets = [dict(r) for r in await c.fetchall()]
         if not tickets:
             return await interaction.response.send_message(embed=info_embed("No Open Tickets","All quiet."))
-        e = discord.Embed(title=f"Open Tickets — {len(tickets)} active", color=TC_OPEN, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"Open Tickets — {len(tickets)} active", color=TC_OPEN, timestamp=discord.utils.utcnow())
         for t in tickets[:10]:
             ch = interaction.guild.get_channel(t["channel_id"])
             opener  = interaction.guild.get_member(t["user_id"])
@@ -604,7 +604,7 @@ class Tickets(commands.GroupCog, name="ticket"):
             await db.execute("UPDATE tickets SET rating=?, rating_feedback=? WHERE ticket_id=?", (stars, feedback, row["ticket_id"]))
             await db.commit()
         await _log_event(self.bot.db.db_path, row["ticket_id"], interaction.guild.id, interaction.user.id, "rating", f"{stars}/5 — {feedback[:80] if feedback else 'no comment'}")
-        e = discord.Embed(description=f"{'⭐'*stars} — Thank you{(f': *{feedback}*') if feedback else '!'}", color=TC_CLAIMED)
+        e = comprehensive_embed(description=f"{'⭐'*stars} — Thank you{(f': *{feedback}*') if feedback else '!'}", color=TC_CLAIMED)
         e.set_footer(text="XERO Tickets  •  Your feedback helps the team")
         await interaction.response.send_message(embed=e)
 
@@ -619,7 +619,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         if not lines:
             return await interaction.followup.send(embed=error_embed("Empty","No messages."), ephemeral=True)
         f = discord.File(io.StringIO("\n".join(lines)), filename=f"{interaction.channel.name}-transcript.txt")
-        await interaction.followup.send(embed=discord.Embed(description=f"📄 {len(lines)} messages exported.", color=TC_OPEN), file=f)
+        await interaction.followup.send(embed=comprehensive_embed(description=f"📄 {len(lines)} messages exported.", color=TC_OPEN), file=f)
 
 
 async def setup(bot):

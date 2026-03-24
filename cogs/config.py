@@ -14,7 +14,7 @@ Features covered:
 import discord, aiosqlite, logging, asyncio, re, io
 from discord.ext import commands
 from discord import app_commands
-from utils.embeds import success_embed, error_embed, info_embed, XERO
+from utils.embeds import success_embed, error_embed, info_embed, XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Config")
 
@@ -506,7 +506,7 @@ class SubView(discord.ui.View):
 class WelcomePanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="👋  Welcome System", color=XERO.SUCCESS)
+        e = comprehensive_embed(title="👋  Welcome System", color=XERO.SUCCESS)
         e.add_field(name="📢 Channel",      value=_ch(s.get("welcome_channel_id")),                    inline=True)
         e.add_field(name="📤 Farewell Ch",  value=_ch(s.get("farewell_channel_id")),                   inline=True)
         e.add_field(name="📨 Welcome DM",   value=_on(s.get("welcome_dm_enabled",0)),                  inline=True)
@@ -579,7 +579,7 @@ class WelcomePanel(SubView):
 class LoggingPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="📋  Logging System", color=0xFFB800)
+        e = comprehensive_embed(title="📋  Logging System", color=0xFFB800)
         e.add_field(name="🌐 Unified",   value=_ch(s.get("log_channel_id")),            inline=True)
         e.add_field(name="💬 Messages",  value=_ch(s.get("message_log_channel_id")),    inline=True)
         e.add_field(name="👥 Members",   value=_ch(s.get("member_log_channel_id")),     inline=True)
@@ -619,7 +619,7 @@ class LoggingPanel(SubView):
                 ch = await adv._ch(self.guild, lt)
                 if ch and ch.id not in sent:
                     try:
-                        te = discord.Embed(title="🧪 XERO Logging Test", description="✅ Log channel confirmed and working.", color=XERO.PRIMARY)
+                        te = comprehensive_embed(title="🧪 XERO Logging Test", description="✅ Log channel confirmed and working.", color=XERO.PRIMARY)
                         await ch.send(embed=te); sent.append(ch.id)
                     except Exception: pass
         result = f"Tests sent to {len(sent)} channel(s)." if sent else "No log channels set yet."
@@ -638,7 +638,7 @@ class VerificationPanel(SubView):
             async with db.execute("SELECT channel_id, role_id, message FROM verification_config WHERE guild_id=?",
                                   (self.guild.id,)) as c:
                 vc = await c.fetchone()
-        e = discord.Embed(title="✅  Verification System", color=XERO.SUCCESS)
+        e = comprehensive_embed(title="✅  Verification System", color=XERO.SUCCESS)
         if vc:
             e.add_field(name="📢 Channel",   value=_ch(vc[0]),           inline=True)
             e.add_field(name="🎭 Role",      value=_role(vc[1]),          inline=True)
@@ -669,7 +669,7 @@ class TicketsPanel(SubView):
             async with db.execute("SELECT COUNT(*) FROM tickets WHERE guild_id=?",
                                   (self.guild.id,)) as c:
                 total_tix = (await c.fetchone())[0]
-        e = discord.Embed(title="🎫  Ticket System", color=XERO.PRIMARY)
+        e = comprehensive_embed(title="🎫  Ticket System", color=XERO.PRIMARY)
         e.add_field(name="🎭 Support Role", value=_role(s.get("ticket_support_role_id")), inline=True)
         e.add_field(name="📁 Category",     value=_ch(s.get("ticket_category_id")),       inline=True)
         e.add_field(name="🎫 Open Tickets", value=str(open_tix),                           inline=True)
@@ -690,7 +690,7 @@ class TicketsPanel(SubView):
 class AutoModPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🤖  AutoMod", color=0xFF6B35)
+        e = comprehensive_embed(title="🤖  AutoMod", color=0xFF6B35)
         e.add_field(name="Status",         value=_on(s.get("automod_enabled",0)),             inline=True)
         e.add_field(name="Anti-Spam",      value=_on(s.get("automod_anti_spam",0)),           inline=True)
         e.add_field(name="Anti-Caps",      value=_on(s.get("automod_anti_caps",0)),           inline=True)
@@ -738,7 +738,7 @@ class AutoModPanel(SubView):
 class SecurityPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🛡️  Security", color=0xFF1744)
+        e = comprehensive_embed(title="🛡️  Security", color=0xFF1744)
         e.add_field(name="Anti-Nuke",     value=_on(s.get("anti_nuke_enabled",0)),             inline=True)
         e.add_field(name="Nuke Thresh",   value=f"{s.get('anti_nuke_threshold',3)}/60s",        inline=True)
         e.add_field(name="Role Restore",  value=_on(s.get("role_restore_enabled",0)),           inline=True)
@@ -779,7 +779,7 @@ class SecurityPanel(SubView):
 class LevelingPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="📊  Leveling & XP", color=0xAA00FF)
+        e = comprehensive_embed(title="📊  Leveling & XP", color=0xAA00FF)
         e.add_field(name="Leveling",       value=_on(s.get("leveling_enabled",1)),               inline=True)
         e.add_field(name="Voice XP",       value=_on(s.get("voice_xp_enabled",0)),              inline=True)
         e.add_field(name="Voice Rate",     value=f"{s.get('voice_xp_rate',5)} XP/min",           inline=True)
@@ -830,7 +830,7 @@ class EconomyPanel(SubView):
             async with db.execute("SELECT COUNT(*), SUM(wallet+bank), MAX(wallet+bank) FROM economy WHERE guild_id=?",
                                   (self.guild.id,)) as c:
                 row = await c.fetchone()
-        e = discord.Embed(title="💰  Economy", color=0x00E676)
+        e = comprehensive_embed(title="💰  Economy", color=0x00E676)
         e.add_field(name="Economy",     value=_on(s.get("economy_enabled",1)),             inline=True)
         e.add_field(name="Active Users",value=str(row[0] or 0),                            inline=True)
         e.add_field(name="Total Wealth",value=f"${int(row[1] or 0):,}",                   inline=True)
@@ -857,7 +857,7 @@ class AIPanel(SubView):
     }
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🤖  AI & Persona", color=0x00BCD4)
+        e = comprehensive_embed(title="🤖  AI & Persona", color=0x00BCD4)
         e.add_field(name="AI Responses",   value=_on(s.get("ai_enabled",1)),                         inline=True)
         e.add_field(name="Persona",        value=self.PERSONAS.get(s.get("persona","neutral"),"⚖️"), inline=True)
         e.add_field(name="Personality",    value=_on(s.get("personality_enabled",1)),                 inline=True)
@@ -915,7 +915,7 @@ class _PersonaSelectView(discord.ui.View):
 class RolesPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🎭  Roles", color=0x7B2FFF)
+        e = comprehensive_embed(title="🎭  Roles", color=0x7B2FFF)
         e.add_field(name="Auto-Role",      value=_role(s.get("autorole_id")),             inline=True)
         e.add_field(name="Mute Role",      value=_role(s.get("mute_role_id")),            inline=True)
         e.add_field(name="Verify Role",    value=_role(s.get("verify_role_id")),          inline=True)
@@ -1126,7 +1126,7 @@ class Config(commands.GroupCog, name="config"):
         def ch(k): return _ch(s.get(k))
         def ro(k): return _role(s.get(k))
         def on(k, d=0): return _on(s.get(k, d))
-        e = discord.Embed(title=f"⚙️  Full Config — {interaction.guild.name}", color=XERO.PRIMARY, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"⚙️  Full Config — {interaction.guild.name}", color=XERO.PRIMARY, timestamp=discord.utils.utcnow())
         e.add_field(name="📢 Channels", value=(
             f"Welcome: {ch('welcome_channel_id')}\nFarewell: {ch('farewell_channel_id')}\n"
             f"Logs: {ch('log_channel_id')}\nLevel-Up: {ch('level_up_channel_id')}\nBirthday: {ch('birthday_channel_id')}"
@@ -1414,7 +1414,7 @@ class Config(commands.GroupCog, name="config"):
         has_card = _get_base_image(interaction.guild.id)
         ch = interaction.guild.get_channel(s.get("welcome_channel_id") or 0)
 
-        embed = discord.Embed(title="👋  Welcome Setup", color=XERO.SUCCESS, timestamp=discord.utils.utcnow())
+        embed = comprehensive_embed(title="👋  Welcome Setup", color=XERO.SUCCESS, timestamp=discord.utils.utcnow())
         embed.add_field(name="📢 Channel",     value=ch.mention if ch else "❌ Not set — use `/config welcome #channel`", inline=True)
         embed.add_field(name="📨 DM on Join",  value=_on(s.get("welcome_dm_enabled", 0)), inline=True)
         embed.add_field(name="🖼️ Card Image", value="✅ Uploaded" if has_card else "❌ None", inline=True)
@@ -1512,7 +1512,7 @@ class Config(commands.GroupCog, name="config"):
             .replace("{server}", interaction.guild.name) \
             .replace("{count}", str(interaction.guild.member_count))
 
-        embed = discord.Embed(title="📨  Welcome DM Configured", color=XERO.SUCCESS)
+        embed = comprehensive_embed(title="📨  Welcome DM Configured", color=XERO.SUCCESS)
         embed.add_field(name="Status",     value=_on(s.get("welcome_dm_enabled",0)), inline=True)
         embed.add_field(name="DM Image",   value="✅ Custom image set" if s.get("welcome_dm_image_url") else "Uses channel welcome image", inline=True)
         embed.add_field(name="📋 Changes", value="\n".join(changed) or "No changes — specify at least one option.", inline=False)

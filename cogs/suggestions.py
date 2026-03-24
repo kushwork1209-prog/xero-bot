@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_MAIN
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_MAIN, comprehensive_embed
 
 logger = logging.getLogger("XERO.Suggestions")
 STATUS_COLORS={"pending":XERO.PRIMARY,"approved":XERO.SUCCESS,"denied":XERO.ERROR,"implemented":XERO.GOLD,"considering":XERO.WARNING}
@@ -12,7 +12,7 @@ STATUS_EMOJIS={"pending":"🔵","approved":"✅","denied":"❌","implemented":"�
 def sug_embed(sid,title,desc,author,avatar,status,up,down,note=None):
     color=STATUS_COLORS.get(status,XERO.PRIMARY); total=up+down; pct=int(up/total*100) if total else 50
     bar="█"*int(pct/5)+"░"*(20-int(pct/5))
-    embed=discord.Embed(title=f"💡  #{sid}  •  {title}",description=desc,color=color)
+    embed=comprehensive_embed(title=f"💡  #{sid}  •  {title}",description=desc,color=color)
     embed.set_author(name=f"Suggested by {author}",icon_url=avatar or discord.Embed.Empty)
     embed.add_field(name="Status",value=f"{STATUS_EMOJIS.get(status,'🔵')} **{status.capitalize()}**",inline=True)
     embed.add_field(name="👍 Up",value=str(up),inline=True); embed.add_field(name="👎 Down",value=str(down),inline=True)
@@ -76,7 +76,7 @@ class Suggestions(commands.GroupCog, name="suggest"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             async with db.execute("INSERT INTO suggestions (guild_id,user_id,channel_id,title,description,author_name,author_avatar) VALUES (?,?,?,?,?,?,?)",(interaction.guild.id,interaction.user.id,channel_id,title[:100],description[:1000],interaction.user.display_name,str(interaction.user.display_avatar.url))) as c: sid=c.lastrowid
             await db.commit()
-        from utils.embeds import brand_embed
+        from utils.embeds import brand_embed, comprehensive_embed
         embed=sug_embed(sid,title,description,interaction.user.display_name,str(interaction.user.display_avatar.url),"pending",0,0)
         
         # Unified Branding

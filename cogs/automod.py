@@ -4,7 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 import logging
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.AutoMod")
 
@@ -189,7 +189,7 @@ class AutoMod(commands.GroupCog, name="automod"):
                     
                     # DM User
                     try:
-                        dm_embed = discord.Embed(title="⚠️ Software Warning", color=discord.Color.orange())
+                        dm_embed = comprehensive_embed(title="⚠️ Software Warning", color=discord.Color.orange())
                         dm_embed.description = f"Yo, I detected you saying something harsh in **{message.guild.name}**.\n\n**Message:** {message.content}\n**Reason:** {reason}\n\nPlease follow the community guidelines to avoid further action."
                         await message.author.send(embed=dm_embed)
                     except Exception: pass
@@ -198,7 +198,7 @@ class AutoMod(commands.GroupCog, name="automod"):
                     if config.get("log_channel_id"):
                         log_ch = message.guild.get_channel(config["log_channel_id"])
                         if log_ch:
-                            log_embed = discord.Embed(title="🛡️ AutoMod Action", color=discord.Color.red(), timestamp=discord.utils.utcnow())
+                            log_embed = comprehensive_embed(title="🛡️ AutoMod Action", color=discord.Color.red(), timestamp=discord.utils.utcnow())
                             log_embed.add_field(name="User", value=f"{message.author.mention} ({message.author.id})")
                             log_embed.add_field(name="Action", value="Message Deleted + Soft Warning")
                             log_embed.add_field(name="Reason", value=reason)

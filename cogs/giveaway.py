@@ -7,7 +7,7 @@ import logging
 import datetime
 import random
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, giveaway_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, giveaway_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Giveaway")
 
@@ -61,12 +61,12 @@ class Giveaway(commands.GroupCog, name="giveaway"):
             if channel:
                 if winners:
                     winner_mentions = " ".join(f"<@{w}>" for w in winners)
-                    embed = discord.Embed(title="🎉 Giveaway Ended!", color=discord.Color.gold())
+                    embed = comprehensive_embed(title="🎉 Giveaway Ended!", color=discord.Color.gold())
                     embed.add_field(name="🏆 Prize", value=gw["prize"], inline=False)
                     embed.add_field(name="🎊 Winners", value=winner_mentions, inline=False)
                     embed.add_field(name="👥 Total Entries", value=str(len(participants)), inline=True)
                 else:
-                    embed = discord.Embed(title="🎉 Giveaway Ended", description="No one entered the giveaway!", color=discord.Color.red())
+                    embed = comprehensive_embed(title="🎉 Giveaway Ended", description="No one entered the giveaway!", color=discord.Color.red())
                     embed.add_field(name="Prize", value=gw["prize"], inline=False)
                 try:
                     await channel.send(embed=embed)
@@ -100,8 +100,8 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         req = []
         if required_role: req.append("Must have " + required_role.mention)
         if bonus_role:    req.append(bonus_role.mention + " gets 2x entries")
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title="🎉  GIVEAWAY!", description="## " + prize, color=0xFFD700)
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title="🎉  GIVEAWAY!", description="## " + prize, color=0xFFD700)
         embed.add_field(name="🏆 Winners",  value=str(w_count),                  inline=True)
         embed.add_field(name="⏰ Ends",      value="<t:" + str(end_ts) + ":R>",  inline=True)
         embed.add_field(name="📢 Host",     value=interaction.user.mention,       inline=True)
@@ -118,7 +118,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE giveaways SET message_id=? WHERE giveaway_id=?",(msg.id,gw_id))
             await db.commit()
-        await interaction.followup.send(embed=discord.Embed(description="✅ Giveaway started in " + ch.mention,color=0x00FF94),ephemeral=True)
+        await interaction.followup.send(embed=comprehensive_embed(description="✅ Giveaway started in " + ch.mention,color=0x00FF94),ephemeral=True)
 
     @app_commands.command(name="end", description="Immediately end a giveaway and pick winners.")
     @app_commands.describe(giveaway_id="ID of the giveaway to end")

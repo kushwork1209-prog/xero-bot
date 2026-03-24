@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, datetime, asyncio, aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, warning_embed, comprehensive_embed, XERO, FOOTER_MOD
+from utils.embeds import success_embed, error_embed, info_embed, warning_embed, comprehensive_embed, XERO, FOOTER_MOD, comprehensive_embed
 
 logger = logging.getLogger("XERO.Security")
 
@@ -101,7 +101,7 @@ class Security(commands.GroupCog, name="security"):
 
         def tog(val): return "✅ On" if val else "❌ Off"
 
-        embed = discord.Embed(title="🔒  Security Configuration", color=XERO.PRIMARY)
+        embed = comprehensive_embed(title="🔒  Security Configuration", color=XERO.PRIMARY)
         embed.add_field(name="🚨 Anti-Nuke",       value=tog(settings.get("anti_nuke_enabled",0)),     inline=True)
         embed.add_field(name="👶 Account Age",      value=f"{settings.get('min_account_age_days',0)}d minimum", inline=True)
         embed.add_field(name="🔗 Link Filter",      value=tog(settings.get("link_filter_enabled",0)),   inline=True)

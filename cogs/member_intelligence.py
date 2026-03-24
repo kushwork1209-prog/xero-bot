@@ -32,7 +32,7 @@ Relevance threshold: only replies if confidence > 0.72
 """
 import discord, aiosqlite, asyncio, json, logging, datetime, random
 from discord.ext import commands, tasks
-from utils.embeds import XERO
+from utils.embeds import XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Intelligence")
 

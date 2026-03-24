@@ -5,7 +5,7 @@ from discord import app_commands
 import logging
 import aiosqlite
 import json
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.ReactionRoles")
 
@@ -125,8 +125,8 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         if not roles_data:
             return await interaction.response.send_message(embed=error_embed("No Roles", "Add roles first with `/reactionroles add-role`."), ephemeral=True)
         ch = interaction.guild.get_channel(panel["channel_id"]) or interaction.channel
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
         embed.set_footer(text="Click a button to get/remove the role")
         role_list = []
         for r in roles_data:

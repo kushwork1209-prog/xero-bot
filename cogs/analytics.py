@@ -6,7 +6,7 @@ from discord import app_commands
 import logging
 import aiosqlite
 import datetime
-from utils.embeds import comprehensive_embed, info_embed, success_embed
+from utils.embeds import comprehensive_embed, info_embed, success_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Analytics")
 
@@ -326,7 +326,7 @@ class Analytics(commands.GroupCog, name="analytics"):
             bar = "█" * int(count / max_count * 12)
             active = " ◄ PEAK" if h == peak_hour else ""
             bar_lines.append(f"`{h:02d}:00` {bar or '░'} {count}{active}")
-        embed = discord.Embed(title=f"⏰  Peak Hours — {interaction.guild.name}", color=0x00D4FF)
+        embed = comprehensive_embed(title=f"⏰  Peak Hours — {interaction.guild.name}", color=0x00D4FF)
         mid = len(bar_lines) // 2
         embed.add_field(name="🌅 00:00–11:59", value="\n".join(bar_lines[:12]), inline=True)
         embed.add_field(name="🌇 12:00–23:59", value="\n".join(bar_lines[12:]), inline=True)
@@ -374,7 +374,7 @@ class Analytics(commands.GroupCog, name="analytics"):
             health_score = 70; recs = ["Increase member engagement with events","Set up auto-moderation","Configure welcome messages"]
         color = 0x00FF94 if health_score >= 75 else 0xFFB800 if health_score >= 50 else 0xFF3B5C
         bar   = "█" * (health_score//10) + "░" * (10 - health_score//10)
-        embed = discord.Embed(title=f"❤️  Server Health — {guild.name}", color=color)
+        embed = comprehensive_embed(title=f"❤️  Server Health — {guild.name}", color=color)
         embed.add_field(name="💊 Health Score", value=f"**{health_score}/100**\n`{bar}`", inline=True)
         embed.add_field(name="👥 Online Rate",  value=f"{online_pct:.0f}%",               inline=True)
         embed.add_field(name="💎 Boost Level",  value=f"Level {guild.premium_tier}",       inline=True)

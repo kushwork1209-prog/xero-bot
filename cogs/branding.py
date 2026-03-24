@@ -6,7 +6,7 @@ import aiosqlite
 import io
 import base64
 import logging
-from utils.embeds import success_embed, error_embed, info_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Branding")
 
@@ -66,7 +66,7 @@ class Branding(commands.GroupCog, name="branding"):
         await self.bot.db.update_guild_setting(interaction.guild.id, "embed_color", f"#{hex_code}")
         
         color = discord.Color(int(hex_code, 16))
-        embed = discord.Embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color, timestamp=discord.utils.utcnow())
+        embed = comprehensive_embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color, timestamp=discord.utils.utcnow())
         embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
         await interaction.response.send_message(embed=embed)
 

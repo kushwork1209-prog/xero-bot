@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, datetime, aiosqlite, asyncio
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_ECO, FOOTER_MAIN
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_ECO, FOOTER_MAIN, comprehensive_embed
 
 logger = logging.getLogger("XERO.ProfileExtras")
 
@@ -117,7 +117,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
 
         rep = row[0] if row else 0
         bar = "⭐" * min(rep, 10) + "☆" * max(0, 10-rep)
-        embed = discord.Embed(title=f"⭐  {target.display_name}'s Reputation", color=XERO.GOLD)
+        embed = comprehensive_embed(title=f"⭐  {target.display_name}'s Reputation", color=XERO.GOLD)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="⭐ Total Rep", value=f"**{rep}**", inline=True)
         embed.add_field(name="🏆 Server Rank", value=f"**#{rank}**", inline=True)
@@ -135,7 +135,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Rep Yet", "Nobody has rep yet! Use `/rep give @user` to start."))
         medals = ["🥇","🥈","🥉"] + [f"#{i}" for i in range(4,11)]
-        embed = discord.Embed(title="⭐  Reputation Leaderboard", color=XERO.GOLD)
+        embed = comprehensive_embed(title="⭐  Reputation Leaderboard", color=XERO.GOLD)
         desc = ""
         for i,(uid,rep) in enumerate(rows):
             m = interaction.guild.get_member(uid)
@@ -221,7 +221,7 @@ class MarriageSystem(commands.GroupCog, name="marry"):
             ) as c:
                 row = await c.fetchone()
         married_at = row[0] if row else None
-        embed = discord.Embed(title=f"💍  {target.display_name}'s Relationship", color=XERO.SECONDARY)
+        embed = comprehensive_embed(title=f"💍  {target.display_name}'s Relationship", color=XERO.SECONDARY)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="💑 Partner", value=partner.mention if partner else f"<@{partner_id}>", inline=True)
         if married_at:

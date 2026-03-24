@@ -13,7 +13,7 @@ Dashboard: /core dashboard
 import discord, aiosqlite, asyncio, traceback, sys, logging, datetime, time, os
 from discord.ext import commands
 from discord import app_commands
-from utils.embeds import success_embed, error_embed, XERO
+from utils.embeds import success_embed, error_embed, XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.CoreAdmin")
 
@@ -47,7 +47,7 @@ def is_management():
 
 
 def _de(title="", desc="", color=D_BLUE) -> discord.Embed:
-    e = discord.Embed(title=title, description=desc,
+    e = comprehensive_embed(title=title, description=desc,
                       color=discord.Color(color), timestamp=discord.utils.utcnow())
     e.set_footer(text="XERO Management  ·  Team Flame")
     return e
@@ -1116,7 +1116,7 @@ class _ServerDetailsModal(discord.ui.Modal, title="Server Deep Dive"):
         def t(v): return "✅" if v else "❌"
         mp = g.me.guild_permissions
 
-        e = discord.Embed(title=g.name, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=g.name, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
         if g.icon: e.set_thumbnail(url=g.icon.url)
 
         e.add_field(name="Identity", value=(
@@ -1338,7 +1338,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
         )
         def t(v): return "✅" if v else "❌"
         mp = g.me.guild_permissions
-        e = discord.Embed(title=g.name, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=g.name, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
         if g.icon: e.set_thumbnail(url=g.icon.url)
         e.add_field(name="Identity", value=f"ID: `{g.id}`\nOwner: <@{g.owner_id}>\nCreated: <t:{int(g.created_at.timestamp())}:D>", inline=True)
         e.add_field(name="Size",     value=f"Members: **{g.member_count:,}**\nChannels: **{len(g.channels)}**\nRoles: **{len(g.roles)}**", inline=True)
@@ -1368,7 +1368,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
             embed=success_embed("📢 Broadcast Started", f"Sending to **{len(self.bot.guilds)}** servers..."),
             ephemeral=True
         )
-        embed = discord.Embed(title=f"📢  {title}", description=message, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        embed = comprehensive_embed(title=f"📢  {title}", description=message, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
         embed.set_author(name="XERO Bot  ·  Official Notice", icon_url=self.bot.user.display_avatar.url)
         embed.set_footer(text="XERO Bot  ·  Team Flame")
         sent = failed = 0
@@ -1401,7 +1401,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
             embed=success_embed("📣 Announce Started", f"Sending to **{len(self.bot.guilds)}** servers..."),
             ephemeral=True
         )
-        embed = discord.Embed(title=f"📣  {title}", description=body, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        embed = comprehensive_embed(title=f"📣  {title}", description=body, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
         embed.set_author(name="XERO Bot  ·  Announcement", icon_url=self.bot.user.display_avatar.url)
         embed.set_footer(text="XERO Bot  ·  Team Flame")
         sent = failed = 0
@@ -1440,7 +1440,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
         except Exception:
             output = "❌ " + traceback.format_exc()[-1200:]
         await interaction.followup.send(
-            embed=discord.Embed(title="⚡ Eval", description=f"```py\n{output[:1800]}\n```", color=discord.Color(D_BLUE)),
+            embed=comprehensive_embed(title="⚡ Eval", description=f"```py\n{output[:1800]}\n```", color=discord.Color(D_BLUE)),
             ephemeral=True
         )
 
@@ -1466,7 +1466,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
         except Exception as e:
             output = f"❌ {e}"
         await interaction.followup.send(
-            embed=discord.Embed(title="🗄️ SQL Result", description=f"```\n{output[:1800]}\n```", color=discord.Color(D_BLUE)),
+            embed=comprehensive_embed(title="🗄️ SQL Result", description=f"```\n{output[:1800]}\n```", color=discord.Color(D_BLUE)),
             ephemeral=True
         )
 

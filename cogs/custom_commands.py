@@ -7,7 +7,7 @@ from discord.ext import commands
 from discord import app_commands
 import logging
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.CustomCommands")
 
@@ -92,7 +92,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
         response_text = cmd["response"].replace("{user}", interaction.user.mention)
         if cmd.get("embed_title"):
             color = COLOR_MAP.get(cmd.get("embed_color", "blue"), discord.Color.blue())
-            embed = discord.Embed(title=cmd["embed_title"], description=response_text, color=color)
+            embed = comprehensive_embed(title=cmd["embed_title"], description=response_text, color=color)
             embed.set_footer(text=f"Custom Command: {name} | XERO Bot")
             await interaction.response.send_message(embed=embed)
         else:

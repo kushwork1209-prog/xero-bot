@@ -4,7 +4,7 @@ from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging, random, aiohttp
-from utils.embeds import XERO
+from utils.embeds import XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Social")
 
@@ -51,7 +51,7 @@ class Social(commands.GroupCog, name="social"):
         await interaction.response.defer()
         info=ACTION_DATA.get(action,{"emoji":"✨","color":0x7B2FFF,"lines":["did something to"]})
         verb=random.choice(info["lines"])
-        embed=discord.Embed(description=f"{interaction.user.mention} **{verb}** {user.mention}! {info['emoji']}",color=discord.Color(info["color"]))
+        embed=comprehensive_embed(description=f"{interaction.user.mention} **{verb}** {user.mention}! {info['emoji']}",color=discord.Color(info["color"]))
         gif=await fetch_gif(action)
         if gif: embed.set_image(url=gif)
         embed.set_footer(text="XERO Social • nekos.best")

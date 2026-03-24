@@ -4,7 +4,7 @@ from discord.ext import commands
 from discord import app_commands
 import logging
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Engagement")
 
@@ -122,7 +122,7 @@ class Confessions(commands.GroupCog, name="confess"):
                                   (interaction.guild.id, interaction.user.id, message)) as c:
                 confession_id = c.lastrowid
             await db.commit()
-        embed = discord.Embed(title=f"Anonymous Confession #{confession_id}", description=message, color=discord.Color.purple())
+        embed = comprehensive_embed(title=f"Anonymous Confession #{confession_id}", description=message, color=discord.Color.purple())
         embed.set_footer(text=f"Confession #{confession_id} | XERO Anonymous System")
         await channel.send(embed=embed)
         await interaction.response.send_message(

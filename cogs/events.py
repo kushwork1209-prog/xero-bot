@@ -36,7 +36,7 @@ class Events(commands.Cog):
             reminders = await self.bot.db.get_due_reminders()
             for r in reminders:
                 try:
-                    from utils.embeds import XERO
+                    from utils.embeds import XERO, comprehensive_embed
                     embed = discord.Embed(
                         title="⏰  Reminder!",
                         description=r["message"],
@@ -164,7 +164,7 @@ class Events(commands.Cog):
                     ch = self.bot.get_channel(msg["channel_id"])
                     if ch:
                         if msg.get("embed_title"):
-                            embed = discord.Embed(title=msg["embed_title"], description=msg["message"], color=discord.Color.blurple())
+                            embed = comprehensive_embed(title=msg["embed_title"], description=msg["message"], color=discord.Color.blurple())
                             await ch.send(embed=embed)
                         else:
                             await ch.send(msg["message"])
@@ -189,7 +189,7 @@ class Events(commands.Cog):
         await self.bot.db.create_guild_settings(guild.id)
         logger.info(f"Joined: {guild.name} ({guild.id})")
         if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-            from utils.embeds import XERO
+            from utils.embeds import XERO, comprehensive_embed
             embed = discord.Embed(
                 title="👋  Hey, I'm XERO!",
                 description=(
@@ -278,7 +278,7 @@ class Events(commands.Cog):
             
             if ch:
                 try:
-                    from utils.embeds import XERO
+                    from utils.embeds import XERO, comprehensive_embed
                     raw = settings.get("welcome_message") or "Welcome {user} to **{server}**! You are member #{count}. 🎉"
                     msg = raw \
                         .replace("{user}",   member.mention) \
@@ -286,7 +286,7 @@ class Events(commands.Cog):
                         .replace("{server}", member.guild.name) \
                         .replace("{count}",  str(member.guild.member_count))
 
-                    from utils.embeds import brand_embed
+                    from utils.embeds import brand_embed, comprehensive_embed
                     embed = discord.Embed(
                         title=f"👋  Welcome to {member.guild.name}!",
                         description=msg,
@@ -361,7 +361,7 @@ class Events(commands.Cog):
         # ── Welcome DM ────────────────────────────────────────────────────
         if settings.get("welcome_dm_enabled", 0):
             try:
-                from utils.embeds import XERO
+                from utils.embeds import XERO, comprehensive_embed
                 dm_raw = settings.get("welcome_dm_message") or (
                     "Hey {name}! 👋\n\nWelcome to **{server}**! "
                     "We're glad to have you.\n\nCheck out the channels and enjoy your stay!"
@@ -460,12 +460,12 @@ class Events(commands.Cog):
         ch = member.guild.get_channel(settings["farewell_channel_id"])
         if not ch: return
         try:
-            from utils.embeds import XERO, brand_embed
+            from utils.embeds import XERO, brand_embed, comprehensive_embed
             msg = (settings.get("farewell_message") or "Goodbye **{name}**, we'll miss you!") \
                 .replace("{user}", member.display_name) \
                 .replace("{name}", member.display_name) \
                 .replace("{server}", member.guild.name)
-            embed = discord.Embed(description=msg, color=XERO.ERROR)
+            embed = comprehensive_embed(description=msg, color=XERO.ERROR)
             embed.set_author(name=f"{member.display_name} left the server", icon_url=member.display_avatar.url)
             embed.set_footer(text=f"Members: {member.guild.member_count:,}")
             
@@ -880,7 +880,7 @@ class Events(commands.Cog):
             # If pinged with no message, send a friendly prompt instead of silently ignoring
             if not content:
                 try:
-                    from utils.embeds import XERO as _XERO
+                    from utils.embeds import XERO as _XERO, comprehensive_embed
                     greet_embed = discord.Embed(
                         description=(
                             f"Hey {message.author.mention}! 👋\n\n"
@@ -972,11 +972,11 @@ class Events(commands.Cog):
                     .replace("{user}", member.display_name) \
                     .replace("{level}", str(level)) \
                     .replace("{server}", member.guild.name)
-                await member.send(embed=discord.Embed(description=dm_msg, color=0x00FF94))
+                await member.send(embed=comprehensive_embed(description=dm_msg, color=0x00FF94))
             except Exception:
                 pass  # DMs disabled
         # Channel announcement below
-        from utils.embeds import XERO
+        from utils.embeds import XERO, comprehensive_embed
         level_ch_id = settings.get("level_up_channel_id")
         ch = member.guild.get_channel(level_ch_id) if level_ch_id else fallback_ch
         if not ch: return
@@ -1010,7 +1010,7 @@ class Events(commands.Cog):
         embed.set_footer(text="Keep chatting to level up!")
 
         # Unified Branding
-        from utils.embeds import brand_embed
+        from utils.embeds import brand_embed, comprehensive_embed
         embed, file = await brand_embed(embed, member.guild, self.bot)
         
         try:
@@ -1063,7 +1063,7 @@ class Events(commands.Cog):
                 if log_ch_id:
                     log_ch = message.guild.get_channel(log_ch_id)
                     if log_ch:
-                        from utils.embeds import XERO
+                        from utils.embeds import XERO, comprehensive_embed
                         embed = discord.Embed(
                             title="🤖 AI AutoMod Action",
                             color=XERO.WARNING,

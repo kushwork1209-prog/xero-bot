@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import app_commands
 import logging
 import datetime
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, warning_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, warning_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Server")
 

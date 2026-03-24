@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, random, datetime, aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, economy_embed, XERO, FOOTER_ECO
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, economy_embed, XERO, FOOTER_ECO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Economy")
 JOBS=[("Software Engineer",1400,2800),("Doctor",1600,3200),("Chef",700,1500),("Lawyer",1300,2600),("Artist",500,1200),("Pilot",1500,2900),("Teacher",800,1700),("Mechanic",750,1600),("Scientist",1100,2300),("Nurse",900,1900),("Writer",500,1100),("Trader",1200,2500),("Crypto Bro",200,5000),("Streamer",300,3000)]
@@ -114,7 +114,7 @@ class Economy(commands.GroupCog, name="economy"):
         won = s1==s2==s3 or s1==s2 or s2==s3 or s1==s3
         personality = self.bot.cogs.get("Personality")
         comment = await personality.get_slot_comment(won) if personality else ""
-        embed=discord.Embed(title="🎰  Slot Machine",description=f"**[ {s1}  {s2}  {s3} ]**\n\n{res}" + (f"\n\n*{comment}*" if comment else ""),color=color)
+        embed=comprehensive_embed(title="🎰  Slot Machine",description=f"**[ {s1}  {s2}  {s3} ]**\n\n{res}" + (f"\n\n*{comment}*" if comment else ""),color=color)
         embed.set_footer(text=FOOTER_ECO); await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="blackjack", description="Play blackjack against the dealer.")
@@ -140,7 +140,7 @@ class Economy(commands.GroupCog, name="economy"):
         elif dv>21 or pv>dv: await self.bot.db.update_economy(interaction.user.id,interaction.guild.id,wallet_delta=amount,earned_delta=amount); res,color=f"You win! {pv} vs {dv}. **+${amount:,}**!",XERO.SUCCESS
         elif pv==dv: res,color=f"Push! {pv} vs {dv}.",XERO.WARNING
         else: await self.bot.db.update_economy(interaction.user.id,interaction.guild.id,wallet_delta=-amount,spent_delta=amount); res,color=f"Dealer wins. {pv} vs {dv}. **-${amount:,}**.",XERO.ERROR
-        embed=discord.Embed(title="🃏  Blackjack",color=color)
+        embed=comprehensive_embed(title="🃏  Blackjack",color=color)
         embed.add_field(name=f"You ({pv})",value=fmt(p),inline=True); embed.add_field(name=f"Dealer ({dv})",value=fmt(d),inline=True)
         embed.add_field(name="Result",value=res,inline=False); embed.set_footer(text=FOOTER_ECO)
         await interaction.response.send_message(embed=embed)

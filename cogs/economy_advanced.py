@@ -14,7 +14,7 @@ import aiosqlite
 from utils.embeds import (
     success_embed, error_embed, info_embed, comprehensive_embed,
     heist_embed, stock_embed, XERO, FOOTER_ECO
-)
+, comprehensive_embed)
 
 logger = logging.getLogger("XERO.EcoAdvanced")
 

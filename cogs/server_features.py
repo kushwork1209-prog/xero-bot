@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, datetime, asyncio, aiosqlite, random
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_MAIN, FOOTER_ECO
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_MAIN, FOOTER_ECO, comprehensive_embed
 
 logger = logging.getLogger("XERO.ServerFeatures")
 
@@ -92,7 +92,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
                 if not guild: continue
                 ch = guild.get_channel(channel_id)
                 if not ch: continue
-                from utils.embeds import XERO
+                from utils.embeds import XERO, comprehensive_embed
                 embed = discord.Embed(
                     title="⬆️  Time to Bump!",
                     description=(
@@ -349,7 +349,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
             )
             await db.commit()
 
-        embed = discord.Embed(title="🗓️  Weekly Reward Claimed!", color=XERO.GOLD)
+        embed = comprehensive_embed(title="🗓️  Weekly Reward Claimed!", color=XERO.GOLD)
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
         embed.add_field(name="💰 Reward",      value=f"**${total:,}**",        inline=True)
         embed.add_field(name="⚡ Multiplier",  value=f"**{mult:.2f}×**",        inline=True)

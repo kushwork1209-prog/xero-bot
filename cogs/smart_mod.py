@@ -13,7 +13,7 @@ import aiosqlite
 from utils.embeds import (
     success_embed, error_embed, info_embed, comprehensive_embed,
     raid_alert_embed, escalation_embed, health_embed, XERO, FOOTER_MOD
-)
+, comprehensive_embed)
 
 logger = logging.getLogger("XERO.SmartMod")
 

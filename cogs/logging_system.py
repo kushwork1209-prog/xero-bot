@@ -24,7 +24,7 @@ from utils.guard import command_guard
 from discord.ext import commands, tasks
 from discord import app_commands
 import logging, datetime, aiosqlite
-from utils.embeds import XERO
+from utils.embeds import XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Logging")
 
@@ -117,7 +117,7 @@ class AdvancedLogger(commands.Cog):
         except Exception as e: logger.debug(f"Log: {e}")
 
     def _e(self, t, title):
-        return discord.Embed(title=title, color=discord.Color(C.get(t,0x00D4FF)), timestamp=discord.utils.utcnow())
+        return comprehensive_embed(title=title, color=discord.Color(C.get(t,0x00D4FF)), timestamp=discord.utils.utcnow())
 
     def _f(self, embed, *parts):
         embed.set_footer(text="  •  ".join(str(p) for p in parts if p))
@@ -856,7 +856,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
     if mod_cases:
         for chunk_start in range(0, len(mod_cases), 10):
             chunk = mod_cases[chunk_start:chunk_start+10]
-            e = discord.Embed(title=f"🛡️  Mod Cases — {user.display_name}", color=C_MOD, timestamp=discord.utils.utcnow())
+            e = comprehensive_embed(title=f"🛡️  Mod Cases — {user.display_name}", color=C_MOD, timestamp=discord.utils.utcnow())
             for case in chunk:
                 mod = guild.get_member(case["mod_id"])
                 mod_str = mod.display_name if mod else f"ID:{case['mod_id']}"
@@ -870,7 +870,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
 
     # ── PAGE: Warnings ────────────────────────────────────────────────────
     if warnings:
-        e = discord.Embed(title=f"⚠️  Warnings — {user.display_name}", color=C_WARN, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"⚠️  Warnings — {user.display_name}", color=C_WARN, timestamp=discord.utils.utcnow())
         e.description = f"**{len(warnings)}** warning(s) in this server"
         for w in warnings[:12]:
             mod = guild.get_member(w["mod_id"])
@@ -883,7 +883,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
     if tickets:
         for chunk_start in range(0, len(tickets), 5):
             chunk = tickets[chunk_start:chunk_start+5]
-            e = discord.Embed(title=f"🎫  Tickets — {user.display_name}", color=C_TICKET, timestamp=discord.utils.utcnow())
+            e = comprehensive_embed(title=f"🎫  Tickets — {user.display_name}", color=C_TICKET, timestamp=discord.utils.utcnow())
             for t in chunk:
                 status_icon = "🟢" if t["status"] == "open" else "⚫"
                 summary_short = (t.get("ai_summary") or "No summary")[:80]
@@ -899,7 +899,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
 
     # ── PAGE: Economy ─────────────────────────────────────────────────────
     if eco:
-        e = discord.Embed(title=f"💰  Economy — {user.display_name}", color=C_ECO, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"💰  Economy — {user.display_name}", color=C_ECO, timestamp=discord.utils.utcnow())
         e.add_field(name="👛 Wallet",       value=f"${eco.get('wallet',0):,}",        inline=True)
         e.add_field(name="🏦 Bank",         value=f"${eco.get('bank',0):,}",          inline=True)
         e.add_field(name="📈 Total Earned", value=f"${eco.get('total_earned',0):,}",  inline=True)
@@ -983,7 +983,7 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         await interaction.response.defer(ephemeral=True)
         pages = await _collect_user_logs(self.bot, interaction.guild, user)
         if not pages:
-            return await interaction.followup.send(embed=discord.Embed(description=f"No XERO records found for {user.mention}.", color=0x2B2D31))
+            return await interaction.followup.send(embed=comprehensive_embed(description=f"No XERO records found for {user.mention}.", color=0x2B2D31))
         view  = UserLogView(pages, user)
         await interaction.followup.send(embed=pages[0].embed, view=view)
 
@@ -1054,7 +1054,7 @@ class LoggingConfig(commands.GroupCog, name="logs"):
     async def view(self, interaction: discord.Interaction):
         s = await self.bot.db.get_guild_settings(interaction.guild.id)
         def ch(cid): return f"<#{cid}>" if cid else "❌ Not set"
-        embed = discord.Embed(title=f"📋  Logging — {interaction.guild.name}", color=0x00D4FF)
+        embed = comprehensive_embed(title=f"📋  Logging — {interaction.guild.name}", color=0x00D4FF)
         embed.add_field(name="🌐 Unified",   value=ch(s.get("log_channel_id")),           inline=True)
         embed.add_field(name="💬 Messages",  value=ch(s.get("message_log_channel_id")),   inline=True)
         embed.add_field(name="👥 Members",   value=ch(s.get("member_log_channel_id")),    inline=True)
@@ -1073,7 +1073,7 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         if adv: adv._cache.pop(interaction.guild.id, None)
         msg = ("✅ **Webhook Protection enabled.**\nWebhooks created by non-admins are auto-deleted instantly." if enabled
                else "❌ **Webhook Protection disabled.**")
-        await interaction.response.send_message(embed=discord.Embed(description=msg,color=0x00FF94 if enabled else 0xFF3B5C))
+        await interaction.response.send_message(embed=comprehensive_embed(description=msg,color=0x00FF94 if enabled else 0xFF3B5C))
 
     @app_commands.command(name="test", description="Send test log messages to all configured channels.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -1086,14 +1086,14 @@ class LoggingConfig(commands.GroupCog, name="logs"):
             ch = await adv._ch(interaction.guild, lt)
             if ch and ch.id not in sent:
                 try:
-                    e = discord.Embed(title="🧪  XERO Logging Test",
+                    e = comprehensive_embed(title="🧪  XERO Logging Test",
                                      description=f"✅ **{lt.replace('_',' ').title()}** logs working!",
                                      color=0x00D4FF, timestamp=discord.utils.utcnow())
                     e.set_footer(text=f"Tested by {interaction.user}  •  XERO Logging")
                     await ch.send(embed=e); sent.add(ch.id)
                 except Exception: pass
         result = f"✅ Tests sent to {len(sent)} channel(s)." if sent else "❌ No log channels set. Use `/logs setup` first."
-        await interaction.followup.send(embed=discord.Embed(description=result,color=0x00FF94 if sent else 0xFF3B5C),ephemeral=True)
+        await interaction.followup.send(embed=comprehensive_embed(description=result,color=0x00FF94 if sent else 0xFF3B5C),ephemeral=True)
 
 
 async def setup(bot):
