@@ -25,6 +25,7 @@ import json
 import gzip
 import io
 import os
+from typing import Optional
 from datetime import datetime
 
 logger = logging.getLogger("XERO.Backup")
