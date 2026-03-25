@@ -12,6 +12,7 @@ Dashboard: /core dashboard
   Colors: Black XERO.PRIMARY · White XERO.PRIMARY · Baby Blue XERO.PRIMARY
 """
 import discord, aiosqlite, asyncio, traceback, sys, logging, datetime, time, os
+from typing import Optional
 from discord.ext import commands
 from discord import app_commands
 from utils.embeds import success_embed, error_embed, XERO
