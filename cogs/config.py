@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 from utils.guard import command_guard
 """
 XERO Bot — Unified Configuration Dashboard
@@ -507,6 +508,8 @@ class WelcomePanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
         e = discord.Embed(title="👋  Welcome System", color=XERO.SUCCESS)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="📢 Channel",      value=_ch(s.get("welcome_channel_id")),                    inline=True)
         e.add_field(name="📤 Farewell Ch",  value=_ch(s.get("farewell_channel_id")),                   inline=True)
         e.add_field(name="📨 Welcome DM",   value=_on(s.get("welcome_dm_enabled",0)),                  inline=True)
@@ -564,7 +567,7 @@ class WelcomePanel(SubView):
             "🎨  Welcome Card Settings",
             "Use **`/config welcome-upload`** and pick your settings:\n\n"
             "• **Name position:** Bottom left, center, top, etc.\n"
-            "• **Text color:** Any hex color (#FFFFFF)\n"
+            "• **Text color:** Any hex color (XERO.PRIMARY)\n"
             "• **Overlay style:** Gradient, bar, full, none\n"
             "• **Show/hide:** Name, avatar, member count\n\n"
             "Or just re-upload with new settings — it replaces instantly."
@@ -579,7 +582,9 @@ class WelcomePanel(SubView):
 class LoggingPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="📋  Logging System", color=0xFFB800)
+        e = discord.Embed(title="📋  Logging System", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="🌐 Unified",   value=_ch(s.get("log_channel_id")),            inline=True)
         e.add_field(name="💬 Messages",  value=_ch(s.get("message_log_channel_id")),    inline=True)
         e.add_field(name="👥 Members",   value=_ch(s.get("member_log_channel_id")),     inline=True)
@@ -620,6 +625,8 @@ class LoggingPanel(SubView):
                 if ch and ch.id not in sent:
                     try:
                         te = discord.Embed(title="🧪 XERO Logging Test", description="✅ Log channel confirmed and working.", color=XERO.PRIMARY)
+                        te, file = await brand_embed(te, guild, bot)
+                        te, file = await brand_embed(te, guild, bot)
                         await ch.send(embed=te); sent.append(ch.id)
                     except Exception: pass
         result = f"Tests sent to {len(sent)} channel(s)." if sent else "No log channels set yet."
@@ -639,6 +646,8 @@ class VerificationPanel(SubView):
                                   (self.guild.id,)) as c:
                 vc = await c.fetchone()
         e = discord.Embed(title="✅  Verification System", color=XERO.SUCCESS)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         if vc:
             e.add_field(name="📢 Channel",   value=_ch(vc[0]),           inline=True)
             e.add_field(name="🎭 Role",      value=_role(vc[1]),          inline=True)
@@ -670,6 +679,8 @@ class TicketsPanel(SubView):
                                   (self.guild.id,)) as c:
                 total_tix = (await c.fetchone())[0]
         e = discord.Embed(title="🎫  Ticket System", color=XERO.PRIMARY)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="🎭 Support Role", value=_role(s.get("ticket_support_role_id")), inline=True)
         e.add_field(name="📁 Category",     value=_ch(s.get("ticket_category_id")),       inline=True)
         e.add_field(name="🎫 Open Tickets", value=str(open_tix),                           inline=True)
@@ -690,7 +701,9 @@ class TicketsPanel(SubView):
 class AutoModPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🤖  AutoMod", color=0xFF6B35)
+        e = discord.Embed(title="🤖  AutoMod", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="Status",         value=_on(s.get("automod_enabled",0)),             inline=True)
         e.add_field(name="Anti-Spam",      value=_on(s.get("automod_anti_spam",0)),           inline=True)
         e.add_field(name="Anti-Caps",      value=_on(s.get("automod_anti_caps",0)),           inline=True)
@@ -738,7 +751,9 @@ class AutoModPanel(SubView):
 class SecurityPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🛡️  Security", color=0xFF1744)
+        e = discord.Embed(title="🛡️  Security", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="Anti-Nuke",     value=_on(s.get("anti_nuke_enabled",0)),             inline=True)
         e.add_field(name="Nuke Thresh",   value=f"{s.get('anti_nuke_threshold',3)}/60s",        inline=True)
         e.add_field(name="Role Restore",  value=_on(s.get("role_restore_enabled",0)),           inline=True)
@@ -779,7 +794,9 @@ class SecurityPanel(SubView):
 class LevelingPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="📊  Leveling & XP", color=0xAA00FF)
+        e = discord.Embed(title="📊  Leveling & XP", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="Leveling",       value=_on(s.get("leveling_enabled",1)),               inline=True)
         e.add_field(name="Voice XP",       value=_on(s.get("voice_xp_enabled",0)),              inline=True)
         e.add_field(name="Voice Rate",     value=f"{s.get('voice_xp_rate',5)} XP/min",           inline=True)
@@ -830,7 +847,9 @@ class EconomyPanel(SubView):
             async with db.execute("SELECT COUNT(*), SUM(wallet+bank), MAX(wallet+bank) FROM economy WHERE guild_id=?",
                                   (self.guild.id,)) as c:
                 row = await c.fetchone()
-        e = discord.Embed(title="💰  Economy", color=0x00E676)
+        e = discord.Embed(title="💰  Economy", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="Economy",     value=_on(s.get("economy_enabled",1)),             inline=True)
         e.add_field(name="Active Users",value=str(row[0] or 0),                            inline=True)
         e.add_field(name="Total Wealth",value=f"${int(row[1] or 0):,}",                   inline=True)
@@ -857,7 +876,9 @@ class AIPanel(SubView):
     }
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🤖  AI & Persona", color=0x00BCD4)
+        e = discord.Embed(title="🤖  AI & Persona", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="AI Responses",   value=_on(s.get("ai_enabled",1)),                         inline=True)
         e.add_field(name="Persona",        value=self.PERSONAS.get(s.get("persona","neutral"),"⚖️"), inline=True)
         e.add_field(name="Personality",    value=_on(s.get("personality_enabled",1)),                 inline=True)
@@ -915,7 +936,9 @@ class _PersonaSelectView(discord.ui.View):
 class RolesPanel(SubView):
     async def embed(self):
         s = await _s(self.bot, self.guild.id)
-        e = discord.Embed(title="🎭  Roles", color=0x7B2FFF)
+        e = discord.Embed(title="🎭  Roles", color=XERO.PRIMARY,)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="Auto-Role",      value=_role(s.get("autorole_id")),             inline=True)
         e.add_field(name="Mute Role",      value=_role(s.get("mute_role_id")),            inline=True)
         e.add_field(name="Verify Role",    value=_role(s.get("verify_role_id")),          inline=True)
@@ -1127,6 +1150,8 @@ class Config(commands.GroupCog, name="config"):
         def ro(k): return _role(s.get(k))
         def on(k, d=0): return _on(s.get(k, d))
         e = discord.Embed(title=f"⚙️  Full Config — {interaction.guild.name}", color=XERO.PRIMARY, timestamp=discord.utils.utcnow())
+        e, file = await brand_embed(e, interaction.guild, bot)
+        e, file = await brand_embed(e, interaction.guild, bot)
         e.add_field(name="📢 Channels", value=(
             f"Welcome: {ch('welcome_channel_id')}\nFarewell: {ch('farewell_channel_id')}\n"
             f"Logs: {ch('log_channel_id')}\nLevel-Up: {ch('level_up_channel_id')}\nBirthday: {ch('birthday_channel_id')}"
@@ -1265,7 +1290,7 @@ class Config(commands.GroupCog, name="config"):
         show_avatar="Show their avatar as a circle on the card (default: yes)",
         show_count="Show member count on the card (default: yes)",
         text_position="Where to place the name on the image",
-        text_color="Text color as hex (default #FFFFFF)",
+        text_color="Text color as hex (default XERO.PRIMARY)",
         overlay_style="Readability overlay behind the text",
     )
     @app_commands.choices(
@@ -1293,7 +1318,7 @@ class Config(commands.GroupCog, name="config"):
         show_avatar: bool = True,
         show_count: bool = True,
         text_position: str = "bottom_left",
-        text_color: str = "#FFFFFF",
+        text_color: str = "XERO.PRIMARY",
         overlay_style: str = "gradient",
     ):
         await interaction.response.defer(ephemeral=True)
@@ -1415,6 +1440,8 @@ class Config(commands.GroupCog, name="config"):
         ch = interaction.guild.get_channel(s.get("welcome_channel_id") or 0)
 
         embed = discord.Embed(title="👋  Welcome Setup", color=XERO.SUCCESS, timestamp=discord.utils.utcnow())
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="📢 Channel",     value=ch.mention if ch else "❌ Not set — use `/config welcome #channel`", inline=True)
         embed.add_field(name="📨 DM on Join",  value=_on(s.get("welcome_dm_enabled", 0)), inline=True)
         embed.add_field(name="🖼️ Card Image", value="✅ Uploaded" if has_card else "❌ None", inline=True)
@@ -1432,7 +1459,7 @@ class Config(commands.GroupCog, name="config"):
                 f"Avatar: {'✅' if s.get('welcome_card_show_avatar',1) else '❌'}  "
                 f"Count: {'✅' if s.get('welcome_card_show_count',1) else '❌'}\n"
                 f"Position: `{s.get('welcome_card_text_pos','bottom_left')}`  "
-                f"Color: `{s.get('welcome_card_text_color','#FFFFFF')}`  "
+                f"Color: `{s.get('welcome_card_text_color','XERO.PRIMARY')}`  "
                 f"Overlay: `{s.get('welcome_card_overlay','gradient')}`"
             ), inline=False)
             av   = await fetch_avatar(str(interaction.user.display_avatar.url))
@@ -1440,7 +1467,7 @@ class Config(commands.GroupCog, name="config"):
                 guild_id=interaction.guild.id,
                 member_name=interaction.user.display_name,
                 member_avatar_bytes=av,
-                text_color=s.get("welcome_card_text_color","#FFFFFF"),
+                text_color=s.get("welcome_card_text_color","XERO.PRIMARY"),
                 text_position=s.get("welcome_card_text_pos","bottom_left"),
                 show_name=bool(s.get("welcome_card_show_name",1)),
                 show_avatar=bool(s.get("welcome_card_show_avatar",1)),
@@ -1513,6 +1540,8 @@ class Config(commands.GroupCog, name="config"):
             .replace("{count}", str(interaction.guild.member_count))
 
         embed = discord.Embed(title="📨  Welcome DM Configured", color=XERO.SUCCESS)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="Status",     value=_on(s.get("welcome_dm_enabled",0)), inline=True)
         embed.add_field(name="DM Image",   value="✅ Custom image set" if s.get("welcome_dm_image_url") else "Uses channel welcome image", inline=True)
         embed.add_field(name="📋 Changes", value="\n".join(changed) or "No changes — specify at least one option.", inline=False)

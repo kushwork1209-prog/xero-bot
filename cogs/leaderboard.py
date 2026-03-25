@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Leaderboards (3 commands) — XP, Economy, Activity"""
 import discord
 from utils.guard import command_guard

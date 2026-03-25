@@ -1,3 +1,5 @@
+from utils.embeds import brand_embed
+from utils.embeds import brand_embed
 from utils.guard import command_guard
 from discord import app_commands
 """
@@ -455,7 +457,7 @@ class Intelligence(commands.GroupCog, name="intel"):
 
         e = discord.Embed(
             title=f"🧠  What XERO knows about {target.display_name}",
-            color=0x2B2D31,
+            color=XERO.PRIMARY,
             timestamp=discord.utils.utcnow()
         )
         e.set_thumbnail(url=target.display_avatar.url)
@@ -512,13 +514,13 @@ class Intelligence(commands.GroupCog, name="intel"):
         if not experts:
             e = discord.Embed(
                 description=f"XERO hasn't detected anyone skilled in **{skill}** in this server yet.\nThe more people talk here, the more XERO learns.",
-                color=0x2B2D31
+                color=XERO.PRIMARY,
             )
             return await interaction.followup.send(embed=e)
 
         e = discord.Embed(
             title=f"⚡  Who knows {skill}?",
-            color=0x2B2D31,
+            color=XERO.PRIMARY,
             timestamp=discord.utils.utcnow()
         )
         for uid, sk, conf in experts:
@@ -546,7 +548,7 @@ class Intelligence(commands.GroupCog, name="intel"):
         await interaction.response.send_message(
             embed=discord.Embed(
                 description="✅ XERO's learned data about you has been cleared.",
-                color=0x2B2D31
+                color=XERO.PRIMARY,
             ), ephemeral=True
         )
 
@@ -560,7 +562,7 @@ class Intelligence(commands.GroupCog, name="intel"):
         await interaction.response.send_message(
             embed=discord.Embed(
                 description=f"XERO's unprompted chat participation is now **{status}**.",
-                color=0x2B2D31
+                color=XERO.PRIMARY,
             ), ephemeral=True
         )
 

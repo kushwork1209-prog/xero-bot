@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — AutoMod System (8 commands)"""
 import discord
 from discord.ext import commands
@@ -122,7 +123,7 @@ class AutoMod(commands.GroupCog, name="automod"):
                 filters = [dict(r) for r in await c.fetchall()]
 
         def toggle(val): return "✅" if val else "❌"
-        embed = comprehensive_embed(title="🛡️ AutoMod Configuration", color=discord.Color.orange())
+        embed = comprehensive_embed(title="🛡️ AutoMod Configuration", color=XERO.PRIMARY,)
         embed.add_field(name="Status", value=(
             f"**AutoMod:** {toggle(config.get('enabled'))} {'Enabled' if config.get('enabled') else 'Disabled'}\n"
             f"**Anti-Spam:** {toggle(config.get('anti_spam'))} (threshold: {config.get('spam_threshold', 5)})\n"
@@ -189,7 +190,9 @@ class AutoMod(commands.GroupCog, name="automod"):
                     
                     # DM User
                     try:
-                        dm_embed = discord.Embed(title="⚠️ Software Warning", color=discord.Color.orange())
+                        dm_embed = discord.Embed(title="⚠️ Software Warning", color=XERO.PRIMARY,)
+                        dm_embed, file = await brand_embed(dm_embed, guild, bot)
+                        dm_embed, file = await brand_embed(dm_embed, guild, bot)
                         dm_embed.description = f"Yo, I detected you saying something harsh in **{message.guild.name}**.\n\n**Message:** {message.content}\n**Reason:** {reason}\n\nPlease follow the community guidelines to avoid further action."
                         await message.author.send(embed=dm_embed)
                     except Exception: pass
@@ -198,7 +201,9 @@ class AutoMod(commands.GroupCog, name="automod"):
                     if config.get("log_channel_id"):
                         log_ch = message.guild.get_channel(config["log_channel_id"])
                         if log_ch:
-                            log_embed = discord.Embed(title="🛡️ AutoMod Action", color=discord.Color.red(), timestamp=discord.utils.utcnow())
+                            log_embed = discord.Embed(title="🛡️ AutoMod Action", color=XERO.PRIMARY, timestamp=discord.utils.utcnow())
+                            log_embed, file = await brand_embed(log_embed, guild, bot)
+                            log_embed, file = await brand_embed(log_embed, guild, bot)
                             log_embed.add_field(name="User", value=f"{message.author.mention} ({message.author.id})")
                             log_embed.add_field(name="Action", value="Message Deleted + Soft Warning")
                             log_embed.add_field(name="Reason", value=reason)

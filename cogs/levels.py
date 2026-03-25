@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Levels & XP System (8 commands)"""
 import discord
 from utils.guard import command_guard
@@ -35,7 +36,6 @@ class Levels(commands.GroupCog, name="levels"):
         rewards  = await self.bot.db.get_level_rewards(interaction.guild.id)
         next_reward = next((r for r in sorted(rewards, key=lambda x: x["level"]) if r["level"] > level), None)
 
-        from utils.embeds import brand_embed
         embed = level_embed(target, level, xp, next_xp, total_xp, rank)
         embed.add_field(name="⚡ XP Multipliers", value=f"Messaging: **{passive:.2f}×**\nBot commands: **{cmd_mult:.2f}×**", inline=True)
         embed.add_field(name="📊 Server Rank", value=f"**#{rank}** of {len(lb)} ranked", inline=True)
@@ -57,8 +57,7 @@ class Levels(commands.GroupCog, name="levels"):
         lb = await self.bot.db.get_level_leaderboard(interaction.guild.id, 10)
         if not lb:
             return await interaction.response.send_message(embed=info_embed("Empty", "No level data yet. Start chatting to earn XP!"))
-        from utils.embeds import brand_embed
-        embed = comprehensive_embed(title="📊 XP Leaderboard", description="Top 10 members by total XP", color=discord.Color.purple())
+        embed = comprehensive_embed(title="📊 XP Leaderboard", description="Top 10 members by total XP", color=XERO.PRIMARY,)
         medals = ["🥇", "🥈", "🥉"] + [f"**#{i}**" for i in range(4, 11)]
         for i, row in enumerate(lb):
             user = interaction.guild.get_member(row["user_id"])
@@ -117,8 +116,7 @@ class Levels(commands.GroupCog, name="levels"):
         rewards = await self.bot.db.get_level_rewards(interaction.guild.id)
         if not rewards:
             return await interaction.response.send_message(embed=info_embed("No Rewards", "No level rewards configured. Admins can add them with `/levels reward-add`."))
-        from utils.embeds import brand_embed
-        embed = comprehensive_embed(title="🎁 Level Rewards", description="Earn these roles by leveling up!", color=discord.Color.purple())
+        embed = comprehensive_embed(title="🎁 Level Rewards", description="Earn these roles by leveling up!", color=XERO.PRIMARY,)
         for r in rewards:
             role = interaction.guild.get_role(r["role_id"])
             role_mention = role.mention if role else f"Deleted Role ({r['role_id']})"

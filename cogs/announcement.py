@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Announcements (7 commands)"""
 import discord
 from discord.ext import commands, tasks
@@ -31,11 +32,8 @@ class Announcement(commands.GroupCog, name="announcement"):
                 try:
                     ch = self.bot.get_channel(ann["channel_id"])
                     if ch:
-                        from utils.embeds import brand_embed
-                        embed = discord.Embed(title=f"📢 {ann['title']}", description=ann["message"], color=discord.Color.blurple())
+                        embed = discord.Embed(title=f"📢 {ann['title']}", description=ann['message'], color=XERO.PRIMARY)
                         embed.set_footer(text="Scheduled Announcement")
-                        
-                        # Unified Branding
                         embed, file = await brand_embed(embed, ch.guild, self.bot)
                         if file:
                             await ch.send(embed=embed, file=file)
@@ -54,7 +52,7 @@ class Announcement(commands.GroupCog, name="announcement"):
         await self.bot.wait_until_ready()
 
     @app_commands.command(name="send", description="Send an announcement immediately to a channel.")
-    @app_commands.describe(channel="Target channel", title="Announcement title", message="Announcement body", ping_everyone="Ping @everyone with the announcement", color="Embed color")
+    @app_commands.describe(channel="Target channel (defaults to set announcement channel)", title="Announcement title", message="Announcement body", ping_everyone="Ping @everyone with the announcement", color="Embed color")
     @app_commands.choices(color=[
         app_commands.Choice(name="Blue (Default)", value="blue"),
         app_commands.Choice(name="Red", value="red"),
@@ -63,17 +61,22 @@ class Announcement(commands.GroupCog, name="announcement"):
         app_commands.Choice(name="Purple", value="purple"),
     ])
     @app_commands.checks.has_permissions(manage_messages=True)
-    async def send(self, interaction: discord.Interaction, channel: discord.TextChannel, title: str, message: str,
+    async def send(self, interaction: discord.Interaction, title: str, message: str, channel: Optional[discord.TextChannel] = None,
                    ping_everyone: bool = False, color: str = "blue"):
-        color_map = {"blue": discord.Color.blue(), "red": discord.Color.red(), "green": discord.Color.green(),
-                     "gold": discord.Color.gold(), "purple": discord.Color.purple()}
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title=f"📢 {title}", description=message, color=color_map.get(color, discord.Color.blue()))
+        color_map = {"blue": XERO.PRIMARY, "red": XERO.PRIMARY, "green": XERO.PRIMARY,
+                     "gold": XERO.PRIMARY, "purple": XERO.PRIMARY}
+        embed = discord.Embed(title=f"📢 {title}", description=message, color=color_map.get(color, XERO.PRIMARY))
         embed.set_footer(text=f"Announced by {interaction.user.display_name}")
         content = "@everyone" if ping_everyone else None
-        
-        # Unified Branding
         embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if not channel:
+            settings = await self.bot.db.get_guild_settings(interaction.guild.id)
+            announcement_channel_id = settings.get("announcement_channel_id")
+            if announcement_channel_id:
+                channel = interaction.guild.get_channel(announcement_channel_id)
+            if not channel:
+                return await interaction.response.send_message(embed=error_embed("No Channel Set", "Please specify a channel or set a default announcement channel using `/announcement set-channel`."), ephemeral=True)
+
         if file:
             await channel.send(content=content, embed=embed, file=file)
         else:
@@ -81,11 +84,19 @@ class Announcement(commands.GroupCog, name="announcement"):
         await interaction.response.send_message(embed=success_embed("Announcement Sent!", f"**{title}** posted in {channel.mention}."))
 
     @app_commands.command(name="schedule", description="Schedule an announcement for a future time.")
-    @app_commands.describe(channel="Target channel", title="Announcement title", message="Announcement body", minutes_from_now="Minutes from now to send")
+    @app_commands.describe(channel="Target channel (defaults to set announcement channel)", title="Announcement title", message="Announcement body", minutes_from_now="Minutes from now to send")
     @app_commands.checks.has_permissions(manage_messages=True)
-    async def schedule(self, interaction: discord.Interaction, channel: discord.TextChannel, title: str, message: str, minutes_from_now: int = 60):
+    async def schedule(self, interaction: discord.Interaction, title: str, message: str, minutes_from_now: int = 60, channel: Optional[discord.TextChannel] = None):
         minutes_from_now = max(1, min(43200, minutes_from_now))
         scheduled_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=minutes_from_now)
+        if not channel:
+            settings = await self.bot.db.get_guild_settings(interaction.guild.id)
+            announcement_channel_id = settings.get("announcement_channel_id")
+            if announcement_channel_id:
+                channel = interaction.guild.get_channel(announcement_channel_id)
+            if not channel:
+                return await interaction.response.send_message(embed=error_embed("No Channel Set", "Please specify a channel or set a default announcement channel using `/announcement set-channel`."), ephemeral=True)
+
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute(
                 "INSERT INTO announcements (guild_id, channel_id, title, message, scheduled_time, created_by) VALUES (?,?,?,?,?,?)",
@@ -104,7 +115,7 @@ class Announcement(commands.GroupCog, name="announcement"):
                 anns = [dict(r) for r in await c.fetchall()]
         if not anns:
             return await interaction.response.send_message(embed=info_embed("No Pending Announcements", "No scheduled announcements found."))
-        embed = comprehensive_embed(title="📢 Pending Announcements", description=f"**{len(anns)}** scheduled", color=discord.Color.blurple())
+        embed = comprehensive_embed(title="📢 Pending Announcements", description=f"**{len(anns)}** scheduled", color=XERO.PRIMARY,)
         for ann in anns[:8]:
             ch = interaction.guild.get_channel(ann["channel_id"])
             ts = int(datetime.datetime.fromisoformat(ann["scheduled_time"]).timestamp())
@@ -136,12 +147,24 @@ class Announcement(commands.GroupCog, name="announcement"):
         await interaction.response.send_message(embed=success_embed("Announcement Edited", f"Announcement **#{announcement_id}** has been updated."))
 
     @app_commands.command(name="mention-role", description="Send an announcement that pings a specific role.")
-    @app_commands.describe(role="Role to mention", channel="Target channel", title="Title", message="Message body")
+    @app_commands.describe(role="Role to mention", channel="Target channel (defaults to set announcement channel)", title="Title", message="Message body")
     @app_commands.checks.has_permissions(manage_messages=True)
-    async def mention_role(self, interaction: discord.Interaction, role: discord.Role, channel: discord.TextChannel, title: str, message: str):
-        embed = discord.Embed(title=f"📢 {title}", description=message, color=discord.Color.blurple())
+    async def mention_role(self, interaction: discord.Interaction, role: discord.Role, title: str, message: str, channel: Optional[discord.TextChannel] = None):
+        embed = discord.Embed(title=f"📢 {title}", description=message, color=XERO.PRIMARY)
         embed.set_footer(text=f"Announced by {interaction.user.display_name} | XERO Bot")
-        await channel.send(content=role.mention, embed=embed)
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if not channel:
+            settings = await self.bot.db.get_guild_settings(interaction.guild.id)
+            announcement_channel_id = settings.get("announcement_channel_id")
+            if announcement_channel_id:
+                channel = interaction.guild.get_channel(announcement_channel_id)
+            if not channel:
+                return await interaction.response.send_message(embed=error_embed("No Channel Set", "Please specify a channel or set a default announcement channel using `/announcement set-channel`."), ephemeral=True)
+
+        if file:
+            await channel.send(content=role.mention, embed=embed, file=file)
+        else:
+            await channel.send(content=role.mention, embed=embed)
         await interaction.response.send_message(embed=success_embed("Announcement Sent!", f"Announcement sent with {role.mention} in {channel.mention}."))
 
     @app_commands.command(name="set-channel", description="Set the default announcement channel for the server.")

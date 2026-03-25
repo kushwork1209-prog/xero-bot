@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Unified Branding & Customization"""
 import discord
 from discord.ext import commands
@@ -51,12 +52,12 @@ class Branding(commands.GroupCog, name="branding"):
             await interaction.followup.send(embed=error_embed("Upload Failed", f"An error occurred while processing the image: {str(e)}"))
 
     @app_commands.command(name="color", description="Set a custom embed color for the bot in this server.")
-    @app_commands.describe(hex_code="Hex color code (e.g. #FF5733)")
+    @app_commands.describe(hex_code="Hex color code (e.g. XERO.PRIMARY)")
     @app_commands.checks.has_permissions(administrator=True)
     async def set_color(self, interaction: discord.Interaction, hex_code: str):
         hex_code = hex_code.lstrip("#")
         if len(hex_code) != 6:
-            return await interaction.response.send_message(embed=error_embed("Invalid Color", "Please provide a valid 6-character hex code (e.g. #FF5733)."), ephemeral=True)
+            return await interaction.response.send_message(embed=error_embed("Invalid Color", "Please provide a valid 6-character hex code (e.g. XERO.PRIMARY)."), ephemeral=True)
         
         try:
             int(hex_code, 16)
@@ -67,6 +68,8 @@ class Branding(commands.GroupCog, name="branding"):
         
         color = discord.Color(int(hex_code, 16))
         embed = discord.Embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color, timestamp=discord.utils.utcnow())
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
         await interaction.response.send_message(embed=embed)
 
@@ -90,7 +93,7 @@ class Branding(commands.GroupCog, name="branding"):
         settings = await self.bot.db.get_guild_settings(interaction.guild.id)
         
         embed = info_embed("Server Branding", f"Customization settings for **{interaction.guild.name}**")
-        embed.add_field(name="🎨 Embed Color", value=settings.get("embed_color", "#5865F2"), inline=True)
+        embed.add_field(name="🎨 Embed Color", value=settings.get("embed_color", "XERO.PRIMARY"), inline=True)
         embed.add_field(name="🏷️ Bot Nickname", value=settings.get("bot_nickname") or "Default (XERO Bot)", inline=True)
         
         has_image = "Yes" if settings.get("unified_image_data") else "No"

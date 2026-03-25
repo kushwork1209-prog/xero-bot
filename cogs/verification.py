@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Verification System (6 commands)"""
 import discord
 from discord.ext import commands
@@ -61,8 +62,9 @@ class Verification(commands.GroupCog, name="verify"):
             await db.commit()
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_role_id", role.id)
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_channel_id", channel.id)
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title="✅ Verification Required", description=msg, color=discord.Color.green())
+        embed = discord.Embed(title="✅ Verification Required", description=msg, color=XERO.PRIMARY,)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="Instructions", value="1. Click **Verify** below\n2. You'll receive access instantly!", inline=False)
         embed.set_footer(text="Verification")
         if interaction.guild.icon:

@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """
 XERO Bot — Auto-Responder, Sticky Messages, Highlights, Tags
 These are the Carl-bot and Dyno premium features everyone wants.
@@ -163,8 +164,10 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
         # Resend sticky
         try:
             if embed_title:
-                color_int = int(color.lstrip("#"), 16) if color else 0x00D4FF
+                color_int = int(color.lstrip("#"), 16) if color else XERO.PRIMARY
                 embed = discord.Embed(title=embed_title, description=content, color=discord.Color(color_int))
+                embed, file = await brand_embed(embed, guild, bot)
+                embed, file = await brand_embed(embed, guild, bot)
                 embed.set_footer(text="📌 Sticky Message  •  XERO Bot")
                 new_msg = await message.channel.send(embed=embed)
             else:
@@ -367,6 +370,8 @@ class StickyMessages(commands.GroupCog, name="sticky"):
         # Send immediately
         if embed_title:
             embed = discord.Embed(title=embed_title, description=content, color=XERO.PRIMARY)
+            embed, file = await brand_embed(embed, guild, bot)
+            embed, file = await brand_embed(embed, guild, bot)
             embed.set_footer(text="📌 Sticky Message  •  XERO Bot")
             msg = await ch.send(embed=embed)
         else:
@@ -465,6 +470,8 @@ class Highlights(commands.GroupCog, name="highlight"):
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Highlights", "You're not watching any keywords. Use `/highlight add` to add one."))
         embed = discord.Embed(title="🔔  Your Highlights", description="\n".join(f"• `{kw}`" for kw in rows), color=XERO.PRIMARY)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_footer(text=f"{len(rows)}/10 keywords  •  XERO Highlights")
         await interaction.response.send_message(embed=embed)
 
@@ -523,6 +530,8 @@ class Tags(commands.GroupCog, name="tag"):
         # tag = (id, guild_id, name, content, embed_title, uses, created_by)
         if tag[4]:  # embed_title
             embed = discord.Embed(title=tag[4], description=tag[3], color=XERO.PRIMARY)
+            embed, file = await brand_embed(embed, guild, bot)
+            embed, file = await brand_embed(embed, guild, bot)
             embed.set_footer(text=f"Tag: {tag[2]}  •  {tag[5]} uses  •  XERO Bot")
             await interaction.response.send_message(embed=embed)
         else:

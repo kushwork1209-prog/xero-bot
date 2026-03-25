@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — AI Commands (15 commands) — Powered by NVIDIA Llama 4 Maverick"""
 import discord
 from utils.guard import command_guard
@@ -75,7 +76,7 @@ class AI(commands.GroupCog, name="ai"):
                 return await interaction.followup.send(embed=error_embed("No Content", "No messages found to summarize."), ephemeral=True)
             content = "\n".join(reversed(messages))
         response = await self.bot.nvidia.summarize(content)
-        await self._send(interaction, "📝 AI Summary", response, discord.Color.teal())
+        await self._send(interaction, "📝 AI Summary", response, XERO.PRIMARY)
 
     # ── Translate ─────────────────────────────────────────────────────────
     @app_commands.command(name="translate", description="Translate text to any language with high accuracy.")
@@ -84,7 +85,7 @@ class AI(commands.GroupCog, name="ai"):
     async def translate(self, interaction: discord.Interaction, text: str, language: str = "Spanish"):
         await interaction.response.defer()
         response = await self.bot.nvidia.translate(text, language)
-        embed = comprehensive_embed(title=f"🌐 Translation → {language}", description=response, color=discord.Color.blue())
+        embed = comprehensive_embed(title=f"🌐 Translation → {language}", description=response, color=XERO.PRIMARY,)
         embed.add_field(name="Original", value=text[:500], inline=False)
         await interaction.followup.send(embed=embed)
 
@@ -96,7 +97,7 @@ class AI(commands.GroupCog, name="ai"):
         await interaction.response.defer()
         count = max(3, min(15, count))
         response = await self.bot.nvidia.brainstorm(topic, count)
-        await self._send(interaction, f"💡 Brainstorm: {topic[:40]}", response, discord.Color.gold())
+        await self._send(interaction, f"💡 Brainstorm: {topic[:40]}", response, XERO.PRIMARY)
 
     # ── Code Explain ──────────────────────────────────────────────────────
     @app_commands.command(name="code-explain", description="Get a detailed explanation of any code snippet.")
@@ -105,7 +106,7 @@ class AI(commands.GroupCog, name="ai"):
     async def code_explain(self, interaction: discord.Interaction, code: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.explain_code(code)
-        await self._send(interaction, "💻 Code Explanation", response, discord.Color.green())
+        await self._send(interaction, "💻 Code Explanation", response, XERO.PRIMARY)
 
     # ── Code Debug ────────────────────────────────────────────────────────
     @app_commands.command(name="code-debug", description="Debug code and get a fixed version with explanations.")
@@ -114,7 +115,7 @@ class AI(commands.GroupCog, name="ai"):
     async def code_debug(self, interaction: discord.Interaction, code: str, error: str = ""):
         await interaction.response.defer()
         response = await self.bot.nvidia.debug_code(code, error)
-        await self._send(interaction, "🐛 Code Debug", response, discord.Color.red())
+        await self._send(interaction, "🐛 Code Debug", response, XERO.PRIMARY)
 
     # ── Sentiment ─────────────────────────────────────────────────────────
     @app_commands.command(name="sentiment", description="Deep sentiment and emotional analysis of any text.")
@@ -123,7 +124,7 @@ class AI(commands.GroupCog, name="ai"):
     async def sentiment(self, interaction: discord.Interaction, text: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.analyze_sentiment(text)
-        embed = comprehensive_embed(title="😊 Sentiment Analysis", description=response, color=discord.Color.blurple())
+        embed = comprehensive_embed(title="😊 Sentiment Analysis", description=response, color=XERO.PRIMARY,)
         embed.add_field(name="Analyzed Text", value=text[:500], inline=False)
         await interaction.followup.send(embed=embed)
 
@@ -153,7 +154,7 @@ class AI(commands.GroupCog, name="ai"):
     async def grammar(self, interaction: discord.Interaction, text: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.check_grammar(text)
-        await self._send(interaction, "✏️ Grammar Check", response, discord.Color.green())
+        await self._send(interaction, "✏️ Grammar Check", response, XERO.PRIMARY)
 
     # ── Generate ──────────────────────────────────────────────────────────
     @app_commands.command(name="generate", description="Generate any type of content: stories, emails, scripts, posts, etc.")
@@ -162,7 +163,7 @@ class AI(commands.GroupCog, name="ai"):
     async def generate(self, interaction: discord.Interaction, prompt: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.generate(prompt, max_tokens=1500)
-        await self._send(interaction, "📄 Generated Content", response, discord.Color.purple())
+        await self._send(interaction, "📄 Generated Content", response, XERO.PRIMARY)
 
     # ── Fact Check ────────────────────────────────────────────────────────
     @app_commands.command(name="fact-check", description="AI fact-check any claim with detailed analysis and verdict.")
@@ -171,7 +172,7 @@ class AI(commands.GroupCog, name="ai"):
     async def fact_check(self, interaction: discord.Interaction, claim: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.fact_check(claim)
-        embed = comprehensive_embed(title="🔍 Fact Check", description=response, color=discord.Color.orange())
+        embed = comprehensive_embed(title="🔍 Fact Check", description=response, color=XERO.PRIMARY,)
         embed.add_field(name="Claim", value=claim[:400], inline=False)
         await interaction.followup.send(embed=embed)
 
@@ -182,7 +183,7 @@ class AI(commands.GroupCog, name="ai"):
     async def roast(self, interaction: discord.Interaction, target: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.roast(target)
-        await self._send(interaction, f"🔥 Roast: {target[:30]}", response, discord.Color.dark_orange())
+        await self._send(interaction, f"🔥 Roast: {target[:30]}", response, XERO.PRIMARY)
 
     # ── Image Analyze ─────────────────────────────────────────────────────
     @app_commands.command(name="analyze-image", description="Analyze any image URL using NVIDIA Vision AI.")
@@ -191,7 +192,7 @@ class AI(commands.GroupCog, name="ai"):
     async def analyze_image(self, interaction: discord.Interaction, image_url: str, question: str = "Describe this image in comprehensive detail."):
         await interaction.response.defer()
         response = await self.bot.nvidia.analyze_image_url(image_url, question)
-        embed = comprehensive_embed(title="🔭 AI Image Analysis", description=response, color=discord.Color.blurple())
+        embed = comprehensive_embed(title="🔭 AI Image Analysis", description=response, color=XERO.PRIMARY,)
         embed.set_image(url=image_url)
         await interaction.followup.send(embed=embed)
 
@@ -230,7 +231,7 @@ class AI(commands.GroupCog, name="ai"):
         embed = discord.Embed(
             title="🎨  AI Image Generated",
             description=f"**Prompt:** {prompt[:300]}",
-            color=discord.Color.purple()
+            color=XERO.PRIMARY,
         )
         embed.set_image(url=url)
         embed.set_footer(text=f"Style: {style_names.get(style, style)}  •  Powered by FLUX AI  •  XERO Bot")

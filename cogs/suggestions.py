@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Suggestions with live voting buttons"""
 import discord
 from discord.ext import commands
@@ -13,6 +14,8 @@ def sug_embed(sid,title,desc,author,avatar,status,up,down,note=None):
     color=STATUS_COLORS.get(status,XERO.PRIMARY); total=up+down; pct=int(up/total*100) if total else 50
     bar="█"*int(pct/5)+"░"*(20-int(pct/5))
     embed=discord.Embed(title=f"💡  #{sid}  •  {title}",description=desc,color=color)
+    embed, file = await brand_embed(embed, guild, bot)
+    embed, file = await brand_embed(embed, guild, bot)
     embed.set_author(name=f"Suggested by {author}",icon_url=avatar or discord.Embed.Empty)
     embed.add_field(name="Status",value=f"{STATUS_EMOJIS.get(status,'🔵')} **{status.capitalize()}**",inline=True)
     embed.add_field(name="👍 Up",value=str(up),inline=True); embed.add_field(name="👎 Down",value=str(down),inline=True)
@@ -76,7 +79,6 @@ class Suggestions(commands.GroupCog, name="suggest"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             async with db.execute("INSERT INTO suggestions (guild_id,user_id,channel_id,title,description,author_name,author_avatar) VALUES (?,?,?,?,?,?,?)",(interaction.guild.id,interaction.user.id,channel_id,title[:100],description[:1000],interaction.user.display_name,str(interaction.user.display_avatar.url))) as c: sid=c.lastrowid
             await db.commit()
-        from utils.embeds import brand_embed
         embed=sug_embed(sid,title,description,interaction.user.display_name,str(interaction.user.display_avatar.url),"pending",0,0)
         
         # Unified Branding

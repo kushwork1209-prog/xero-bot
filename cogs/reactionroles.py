@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Reaction Roles (Persistent Button Panels) — 6 commands"""
 import discord
 from discord.ext import commands
@@ -125,8 +126,9 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         if not roles_data:
             return await interaction.response.send_message(embed=error_embed("No Roles", "Add roles first with `/reactionroles add-role`."), ephemeral=True)
         ch = interaction.guild.get_channel(panel["channel_id"]) or interaction.channel
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
+        embed = discord.Embed(title=panel["title"], description=panel["description"], color=XERO.PRIMARY,)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_footer(text="Click a button to get/remove the role")
         role_list = []
         for r in roles_data:
@@ -156,7 +158,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
                 panels = [dict(r) for r in await c.fetchall()]
         if not panels:
             return await interaction.response.send_message(embed=info_embed("No Panels", "No reaction role panels found. Create one with `/reactionroles create-panel`."))
-        embed = comprehensive_embed(title="🎭 Reaction Role Panels", description=f"**{len(panels)}** panel(s)", color=discord.Color.blurple())
+        embed = comprehensive_embed(title="🎭 Reaction Role Panels", description=f"**{len(panels)}** panel(s)", color=XERO.PRIMARY,)
         for p in panels:
             roles_data = json.loads(p["roles_data"])
             ch = interaction.guild.get_channel(p["channel_id"])

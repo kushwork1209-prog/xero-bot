@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Advanced AI Features (8 commands) — AI Debate, RPG, Advisor, Coach"""
 import discord
 from utils.guard import command_guard
@@ -28,7 +29,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         intro_embed = comprehensive_embed(
             title=f"⚔️ AI Debate: {topic[:60]}",
             description=f"**{rounds} round(s)** | Two AI personas will argue opposing sides.\n\nPreparing arguments...",
-            color=discord.Color.red()
+            color=XERO.PRIMARY,
         )
         await interaction.followup.send(embed=intro_embed)
 
@@ -58,7 +59,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
             pro_embed = discord.Embed(
                 title=f"🟢 FOR — Round {round_num}",
                 description=pro_response[:2048] if pro_response else "No response.",
-                color=discord.Color.green()
+                color=XERO.PRIMARY,
             )
             pro_embed.set_footer(text=f"⚔️ Debate: {topic[:40]} | Round {round_num}/{rounds}")
             await interaction.channel.send(embed=pro_embed)
@@ -71,7 +72,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
             con_embed = discord.Embed(
                 title=f"🔴 AGAINST — Round {round_num}",
                 description=con_response[:2048] if con_response else "No response.",
-                color=discord.Color.red()
+                color=XERO.PRIMARY,
             )
             con_embed.set_footer(text=f"⚔️ Debate: {topic[:40]} | Round {round_num}/{rounds}")
             await interaction.channel.send(embed=con_embed)
@@ -89,7 +90,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         verdict_embed = comprehensive_embed(
             title="⚖️ Debate Verdict",
             description=verdict[:2048] if verdict else "No verdict available.",
-            color=discord.Color.gold()
+            color=XERO.PRIMARY,
         )
         verdict_embed.set_footer(text=f"Topic: {topic[:60]} | XERO AI Debate")
         await interaction.channel.send(embed=verdict_embed)
@@ -132,7 +133,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         embed = discord.Embed(
             title=f"⚔️ {character_name}'s Adventure Begins — Chapter 1",
             description=response[:2048] if response else "Your adventure begins...",
-            color=discord.Color.dark_purple()
+            color=XERO.PRIMARY,
         )
         embed.add_field(name="❤️ HP", value="100/100", inline=True)
         embed.add_field(name="💰 Gold", value="10", inline=True)
@@ -166,7 +167,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         embed = discord.Embed(
             title=f"⚔️ {game['name']}'s Adventure — Chapter {game['chapter']}",
             description=response[:2048] if response else "The story continues...",
-            color=discord.Color.dark_purple()
+            color=XERO.PRIMARY,
         )
         embed.add_field(name="❤️ HP", value=f"{game['hp']}/100", inline=True)
         embed.add_field(name="💰 Gold", value=str(game["gold"]), inline=True)
@@ -217,7 +218,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         embed = comprehensive_embed(
             title=f"🤖 AI Mod Advisor — {user.display_name}",
             description=response[:2048] if response else "Could not generate advice.",
-            color=discord.Color.orange()
+            color=XERO.PRIMARY,
         )
         embed.add_field(name="Cases", value=str(len(cases)), inline=True)
         embed.add_field(name="Warnings", value=str(warn_count), inline=True)
@@ -246,7 +247,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         embed = comprehensive_embed(
             title="🗣️ Communication Coach Analysis",
             description=response[:2048] if response else "Analysis failed.",
-            color=discord.Color.teal()
+            color=XERO.PRIMARY,
         )
         embed.add_field(name="Your Text", value=text[:400], inline=False)
         embed.set_footer(text="XERO AI Communication Coach | Powered by NVIDIA Llama 4")
@@ -275,7 +276,7 @@ class AIAdvanced(commands.GroupCog, name="nexus"):
         embed = comprehensive_embed(
             title=f"💡 Explanation: {concept[:50]}",
             description=response[:2048] if response else "Could not generate explanation.",
-            color=discord.Color.blurple()
+            color=XERO.PRIMARY,
         )
         embed.add_field(name="Level", value=level.upper(), inline=True)
         embed.set_footer(text="XERO AI Explainer | Powered by NVIDIA Llama 4")

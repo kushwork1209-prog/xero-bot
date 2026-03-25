@@ -1,3 +1,5 @@
+from utils.embeds import brand_embed
+from utils.embeds import XERO
 from utils.guard import command_guard
 """
 XERO Bot — Ticket System (Complete Rewrite)
@@ -6,14 +8,13 @@ ZNYT-style category dropdowns, emoji-named channels, and staff intelligence brie
 import discord, aiosqlite, asyncio, io, logging, datetime
 from discord.ext import commands
 from discord import app_commands
-from utils.embeds import XERO, success_embed, error_embed, info_embed, brand_embed
 
 logger = logging.getLogger("XERO.Tickets")
 
-TC_OPEN    = 0x2B2D31
-TC_CLAIMED = 0x5865F2
-TC_CLOSED  = 0x1A1A1A
-TC_HISTORY = 0x23272A
+TC_OPEN    = XERO.PRIMARY
+TC_CLAIMED = XERO.PRIMARY
+TC_CLOSED  = XERO.PRIMARY
+TC_HISTORY = XERO.PRIMARY
 
 TICKET_CATEGORIES = {
     "general": {"label": "General Support", "emoji": "🔧", "description": "Basic questions and help"},
@@ -119,6 +120,8 @@ async def _close_flow(interaction, bot, reason="Resolved"):
 
     # Case log embed
     e = discord.Embed(title=f"📁  Case #{tid}  —  Closed", color=TC_CLOSED, timestamp=discord.utils.utcnow())
+    e, file = await brand_embed(e, guild, bot)
+    e, file = await brand_embed(e, guild, bot)
     o_str = f"{opener.mention} `{opener}` (`{ticket['user_id']}`)" if opener else f"`<@{ticket['user_id']}>`"
     c_str = f"{closer.mention} (`{closer}`)"
     e.add_field(name="👤  Opened By", value=o_str,                                inline=False)
@@ -209,7 +212,9 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
             (gid, uid)
         ) as c: prev_tickets = [dict(r) for r in await c.fetchall()]
 
-    e = discord.Embed(title="🛡️  STAFF INTELLIGENCE BRIEF", color=0x2B2D31, timestamp=discord.utils.utcnow())
+    e = discord.Embed(title="🛡️  STAFF INTELLIGENCE BRIEF", color=XERO.PRIMARY, timestamp=discord.utils.utcnow())
+    e, file = await brand_embed(e, guild, bot)
+    e, file = await brand_embed(e, guild, bot)
     e.set_author(name=f"{member} — {uid}", icon_url=member.display_avatar.url)
     
     e.add_field(name="⏳ Account Age", value=f"{age_days} days", inline=True)
@@ -295,6 +300,8 @@ class TicketCategorySelect(discord.ui.Select):
         await _log_event(bot.db.db_path, tid, guild.id, interaction.user.id, "opened", f"Opened {category_info['label']} ticket")
 
         emb = discord.Embed(title=f"Ticket #{tid} — {category_info['label']}", description=f"Hello {interaction.user.mention}!\n\nYou have opened a **{category_info['label']}** ticket. Describe your issue clearly and staff will assist you shortly.", color=TC_OPEN, timestamp=discord.utils.utcnow())
+        emb, file = await brand_embed(emb, interaction.guild, bot)
+        emb, file = await brand_embed(emb, interaction.guild, bot)
         emb.set_thumbnail(url=interaction.user.display_avatar.url)
         emb.set_footer(text=f"Case #{tid}  •  XERO Tickets")
         
@@ -396,6 +403,8 @@ class TicketHistoryView(discord.ui.View):
         timeline  = "\n".join(_fmt_event(ev, self.guild) for ev in staff_evs) if staff_evs else "*No staff events on record.*"
 
         e = discord.Embed(title=f"📁  Case #{t['ticket_id']}", color=TC_HISTORY, timestamp=discord.utils.utcnow())
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="👤  Opened By",  value=o_str,                               inline=False)
         e.add_field(name="🔒  Closed By",  value=c_str,                               inline=True)
         e.add_field(name="⏱️  Duration",   value=duration,                            inline=True)
@@ -447,6 +456,8 @@ class Tickets(commands.GroupCog, name="ticket"):
 
         txt = message or "Welcome to our assistance centre. If you need assistance within the server, please follow the guidelines below to choose the correct support category."
         emb = discord.Embed(title="Assistance", description=txt, color=TC_OPEN)
+        emb, file = await brand_embed(emb, guild, bot)
+        emb, file = await brand_embed(emb, guild, bot)
         
         # ZNYT Style Layout
         emb.add_field(name="General Support", value="Basic Questions", inline=False)
@@ -528,6 +539,8 @@ class Tickets(commands.GroupCog, name="ticket"):
         if not tickets:
             return await interaction.response.send_message(embed=info_embed("No Open Tickets","All quiet."))
         e = discord.Embed(title=f"Open Tickets — {len(tickets)} active", color=TC_OPEN, timestamp=discord.utils.utcnow())
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         for t in tickets[:10]:
             ch = interaction.guild.get_channel(t["channel_id"])
             opener  = interaction.guild.get_member(t["user_id"])
@@ -579,6 +592,8 @@ class Tickets(commands.GroupCog, name="ticket"):
             await db.commit()
         await _log_event(self.bot.db.db_path, row["ticket_id"], interaction.guild.id, interaction.user.id, "rating", f"{stars}/5 — {feedback[:80] if feedback else 'no comment'}")
         e = discord.Embed(description=f"{'⭐'*stars} — Thank you{(f': *{feedback}*') if feedback else '!'}", color=TC_CLAIMED)
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         e.set_footer(text="XERO Tickets  •  Your feedback helps the team")
         await interaction.response.send_message(embed=e)
 

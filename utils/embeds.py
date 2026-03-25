@@ -41,40 +41,32 @@ def _base(
     title: str = "",
     description: str = "",
     color: discord.Color = None,
-    footer: str = FOOTER_MAIN,
+    footer: str = None,
     thumbnail: str = None,
     image: str = None,
     author_name: str = None,
     author_icon: str = None,
-    timestamp: bool = True,  # Default to True as per user request
+    timestamp: bool = True,
     fields: List[Tuple[str, str, bool]] = None,
-    guild_id: int = None,
-    bot = None
 ) -> discord.Embed:
     """Base embed factory — all XERO embeds flow through here."""
     
-    # ── Guild Branding ──
-    final_color = color or XERO.PRIMARY
-    final_footer = footer or FOOTER_MAIN
+    # Standardize color to brand primary if not provided
+    final_color = color if color is not None else XERO.PRIMARY
     
-    if guild_id and bot and hasattr(bot, 'db'):
-        # This is a bit heavy for a base helper, but necessary for "everywhere" rule
-        # In a real bot, we'd cache these settings.
-        try:
-            # We use a sync-lookalike or just accept we might not have it yet
-            # For Manus implementation, we'll assume we can't easily do async here 
-            # without changing all calls. So we'll provide a way to 'brand' an embed later.
-            pass 
-        except: pass
-
     embed = discord.Embed(
         title=title,
         description=description,
         color=final_color,
         timestamp=discord.utils.utcnow() if timestamp else None,
     )
-    if final_footer:
-        embed.set_footer(text=final_footer)
+    
+    # Standard footer if none provided
+    if footer:
+        embed.set_footer(text=footer)
+    else:
+        embed.set_footer(text=FOOTER_MAIN)
+        
     if thumbnail:
         embed.set_thumbnail(url=thumbnail)
     if image:
@@ -86,10 +78,10 @@ def _base(
             embed.add_field(name=name, value=value, inline=inline)
     return embed
 
-async def brand_embed(embed: discord.Embed, guild: discord.Guild, bot) -> Tuple[discord.Embed, Optional[discord.File]]:
+async def brand_embed(embed: discord.Embed, guild: discord.Guild, bot, force_color: bool = False) -> Tuple[discord.Embed, Optional[discord.File]]:
     """
     Applies guild-specific branding to an embed:
-    1. Custom Color
+    1. Custom Color (if embed color is default primary or force_color is True)
     2. Unified Image (if available)
     3. Standard Footer + Timestamp
     """
@@ -98,18 +90,23 @@ async def brand_embed(embed: discord.Embed, guild: discord.Guild, bot) -> Tuple[
         
     settings = await bot.db.get_guild_settings(guild.id)
     
-    # 1. Custom Color
-    if settings.get("embed_color"):
-        try:
-            hex_color = settings["embed_color"].lstrip("#")
-            embed.color = discord.Color(int(hex_color, 16))
-        except: pass
+    # 1. Custom Color logic
+    # We only override if it's the default primary or if specifically forced
+    if force_color or embed.color == XERO.PRIMARY:
+        if settings.get("embed_color"):
+            try:
+                hex_color = settings["embed_color"].lstrip("#")
+                embed.color = discord.Color(int(hex_color, 16))
+            except: pass
     
     # 2. Standard Footer + Timestamp
     current_footer = embed.footer.text or FOOTER_MAIN
-    if "|" not in current_footer and guild.name not in current_footer:
-        embed.set_footer(text=f"{current_footer}  •  {guild.name}")
-    embed.timestamp = discord.utils.utcnow()
+    # Clean up the footer to avoid double branding
+    clean_footer = current_footer.split(" • ")[0].split(" | ")[0]
+    embed.set_footer(text=f"{clean_footer}  •  {guild.name}")
+    
+    if not embed.timestamp:
+        embed.timestamp = discord.utils.utcnow()
     
     # 3. Unified Image
     file = None

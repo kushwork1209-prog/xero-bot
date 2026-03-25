@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """
 XERO Bot — Profile Extras & Economy Extras
 Rep system, marriage, user timezones, transaction history, bank interest.
@@ -118,6 +119,8 @@ class ProfileExtras(commands.GroupCog, name="rep"):
         rep = row[0] if row else 0
         bar = "⭐" * min(rep, 10) + "☆" * max(0, 10-rep)
         embed = discord.Embed(title=f"⭐  {target.display_name}'s Reputation", color=XERO.GOLD)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="⭐ Total Rep", value=f"**{rep}**", inline=True)
         embed.add_field(name="🏆 Server Rank", value=f"**#{rank}**", inline=True)
@@ -136,6 +139,8 @@ class ProfileExtras(commands.GroupCog, name="rep"):
             return await interaction.response.send_message(embed=info_embed("No Rep Yet", "Nobody has rep yet! Use `/rep give @user` to start."))
         medals = ["🥇","🥈","🥉"] + [f"#{i}" for i in range(4,11)]
         embed = discord.Embed(title="⭐  Reputation Leaderboard", color=XERO.GOLD)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         desc = ""
         for i,(uid,rep) in enumerate(rows):
             m = interaction.guild.get_member(uid)
@@ -222,6 +227,8 @@ class MarriageSystem(commands.GroupCog, name="marry"):
                 row = await c.fetchone()
         married_at = row[0] if row else None
         embed = discord.Embed(title=f"💍  {target.display_name}'s Relationship", color=XERO.SECONDARY)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="💑 Partner", value=partner.mention if partner else f"<@{partner_id}>", inline=True)
         if married_at:

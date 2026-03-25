@@ -1,3 +1,5 @@
+from utils.embeds import brand_embed
+from utils.embeds import XERO
 """
 XERO Bot — Events
 Handles: welcome/farewell, XP (exponential + multipliers), reminders (channel + DM),
@@ -36,7 +38,6 @@ class Events(commands.Cog):
             reminders = await self.bot.db.get_due_reminders()
             for r in reminders:
                 try:
-                    from utils.embeds import XERO
                     embed = discord.Embed(
                         title="⏰  Reminder!",
                         description=r["message"],
@@ -137,7 +138,7 @@ class Events(commands.Cog):
                     embed = discord.Embed(
                         title="🎂  Happy Birthday!",
                         description=f"Everyone wish {m.mention} a happy birthday! 🎉{age}",
-                        color=discord.Color.pink()
+                        color=XERO.PRIMARY,
                     )
                     embed.set_thumbnail(url=m.display_avatar.url)
                     await ch.send(content=m.mention, embed=embed)
@@ -164,7 +165,9 @@ class Events(commands.Cog):
                     ch = self.bot.get_channel(msg["channel_id"])
                     if ch:
                         if msg.get("embed_title"):
-                            embed = discord.Embed(title=msg["embed_title"], description=msg["message"], color=discord.Color.blurple())
+                            embed = discord.Embed(title=msg["embed_title"], description=msg["message"], color=XERO.PRIMARY,)
+                            embed, file = await brand_embed(embed, guild, bot)
+                            embed, file = await brand_embed(embed, guild, bot)
                             await ch.send(embed=embed)
                         else:
                             await ch.send(msg["message"])
@@ -189,7 +192,6 @@ class Events(commands.Cog):
         await self.bot.db.create_guild_settings(guild.id)
         logger.info(f"Joined: {guild.name} ({guild.id})")
         if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-            from utils.embeds import XERO
             embed = discord.Embed(
                 title="👋  Hey, I'm XERO!",
                 description=(
@@ -226,7 +228,7 @@ class Events(commands.Cog):
                             title=f"❌ Account Too New — {member.guild.name}",
                             description=f"Your account must be at least **{min_age} days old** to join this server.\n"
                                         f"Your account is **{age_days} days old**.\nPlease try again later.",
-                            color=discord.Color.red()
+                            color=XERO.PRIMARY,
                         ))
                     if "ban" in action:
                         await member.ban(reason=f"XERO Account Age Filter: {age_days} days < {min_age} minimum")
@@ -278,7 +280,6 @@ class Events(commands.Cog):
             
             if ch:
                 try:
-                    from utils.embeds import XERO
                     raw = settings.get("welcome_message") or "Welcome {user} to **{server}**! You are member #{count}. 🎉"
                     msg = raw \
                         .replace("{user}",   member.mention) \
@@ -286,7 +287,6 @@ class Events(commands.Cog):
                         .replace("{server}", member.guild.name) \
                         .replace("{count}",  str(member.guild.member_count))
 
-                    from utils.embeds import brand_embed
                     embed = discord.Embed(
                         title=f"👋  Welcome to {member.guild.name}!",
                         description=msg,
@@ -316,7 +316,7 @@ class Events(commands.Cog):
                             base_bytes        = _base_img,
                             member_name       = member.display_name if settings.get("welcome_card_show_name", 1) else "",
                             member_avatar_bytes = avatar_bytes,
-                            text_color        = settings.get("welcome_card_text_color", "#FFFFFF"),
+                            text_color        = settings.get("welcome_card_text_color", "XERO.PRIMARY"),
                             text_position     = settings.get("welcome_card_text_pos", "bottom_left"),
                             show_name         = bool(settings.get("welcome_card_show_name", 1)),
                             show_avatar       = bool(settings.get("welcome_card_show_avatar", 1)),
@@ -330,14 +330,20 @@ class Events(commands.Cog):
                             import io as _io
                             card_file = discord.File(_io.BytesIO(card_bytes), filename="welcome.png")
                             card_embed = discord.Embed(color=XERO.PRIMARY)
+                            card_embed, file = await brand_embed(card_embed, guild, bot)
+                            card_embed, file = await brand_embed(card_embed, guild, bot)
                             card_embed.set_image(url="attachment://welcome.png")
                             await ch.send(embed=card_embed, file=card_file)
                     elif settings.get("welcome_use_banner") and member.guild.banner:
                         img_embed = discord.Embed(color=XERO.PRIMARY)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
                         img_embed.set_image(url=member.guild.banner.url)
                         await ch.send(embed=img_embed)
                     elif settings.get("welcome_image_url"):
                         img_embed = discord.Embed(color=XERO.PRIMARY)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
                         img_embed.set_image(url=settings["welcome_image_url"])
                         await ch.send(embed=img_embed)
                     elif settings.get("welcome_image_enabled"):
@@ -347,6 +353,8 @@ class Events(commands.Cog):
                         )
                         img_url = f"https://image.pollinations.ai/prompt/{prompt}?width=900&height=220&model=flux&nologo=true&seed={member.id%99999}"
                         img_embed = discord.Embed(color=XERO.PRIMARY)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
                         img_embed.set_image(url=img_url)
                         await ch.send(embed=img_embed)
 
@@ -361,7 +369,6 @@ class Events(commands.Cog):
         # ── Welcome DM ────────────────────────────────────────────────────
         if settings.get("welcome_dm_enabled", 0):
             try:
-                from utils.embeds import XERO
                 dm_raw = settings.get("welcome_dm_message") or (
                     "Hey {name}! 👋\n\nWelcome to **{server}**! "
                     "We're glad to have you.\n\nCheck out the channels and enjoy your stay!"
@@ -392,7 +399,7 @@ class Events(commands.Cog):
                         base_bytes          = _base_img,
                         member_name         = member.display_name if settings.get("welcome_card_show_name", 1) else "",
                         member_avatar_bytes = avatar_bytes,
-                        text_color          = settings.get("welcome_card_text_color", "#FFFFFF"),
+                        text_color          = settings.get("welcome_card_text_color", "XERO.PRIMARY"),
                         text_position       = settings.get("welcome_card_text_pos", "bottom_left"),
                         show_name           = bool(settings.get("welcome_card_show_name", 1)),
                         show_avatar         = bool(settings.get("welcome_card_show_avatar", 1)),
@@ -406,6 +413,8 @@ class Events(commands.Cog):
                         import io as _io
                         card_file = discord.File(_io.BytesIO(card_bytes), filename="welcome_dm.png")
                         card_embed = discord.Embed(color=XERO.PRIMARY)
+                        card_embed, file = await brand_embed(card_embed, guild, bot)
+                        card_embed, file = await brand_embed(card_embed, guild, bot)
                         card_embed.set_image(url="attachment://welcome_dm.png")
                         await member.send(embed=card_embed, file=card_file)
                 else:
@@ -416,6 +425,8 @@ class Events(commands.Cog):
                     
                     if dm_img_url:
                         dm_img_embed = discord.Embed(color=XERO.PRIMARY)
+                        dm_img_embed, file = await brand_embed(dm_img_embed, guild, bot)
+                        dm_img_embed, file = await brand_embed(dm_img_embed, guild, bot)
                         dm_img_embed.set_image(url=dm_img_url)
                         await member.send(embed=dm_img_embed)
                     elif settings.get("welcome_image_enabled"):
@@ -423,6 +434,8 @@ class Events(commands.Cog):
                         prompt  = urllib.parse.quote(f"vibrant welcome banner for Discord member {member.display_name}")
                         img_url = f"https://image.pollinations.ai/prompt/{prompt}?width=900&height=220&model=flux&nologo=true"
                         img_embed = discord.Embed(color=XERO.PRIMARY)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
+                        img_embed, file = await brand_embed(img_embed, guild, bot)
                         img_embed.set_image(url=img_url)
                         await member.send(embed=img_embed)
             except discord.Forbidden:
@@ -460,12 +473,13 @@ class Events(commands.Cog):
         ch = member.guild.get_channel(settings["farewell_channel_id"])
         if not ch: return
         try:
-            from utils.embeds import XERO, brand_embed
             msg = (settings.get("farewell_message") or "Goodbye **{name}**, we'll miss you!") \
                 .replace("{user}", member.display_name) \
                 .replace("{name}", member.display_name) \
                 .replace("{server}", member.guild.name)
             embed = discord.Embed(description=msg, color=XERO.ERROR)
+            embed, file = await brand_embed(embed, guild, bot)
+            embed, file = await brand_embed(embed, guild, bot)
             embed.set_author(name=f"{member.display_name} left the server", icon_url=member.display_avatar.url)
             embed.set_footer(text=f"Members: {member.guild.member_count:,}")
             
@@ -655,7 +669,7 @@ class Events(commands.Cog):
                 return
             embed = discord.Embed(
                 description=msg.content or "*[No text]*",
-                color=discord.Color.gold(),
+                color=XERO.PRIMARY,
                 timestamp=msg.created_at
             )
             embed.set_author(name=msg.author.display_name, icon_url=msg.author.display_avatar.url)
@@ -880,7 +894,6 @@ class Events(commands.Cog):
             # If pinged with no message, send a friendly prompt instead of silently ignoring
             if not content:
                 try:
-                    from utils.embeds import XERO as _XERO
                     greet_embed = discord.Embed(
                         description=(
                             f"Hey {message.author.mention}! 👋\n\n"
@@ -972,11 +985,10 @@ class Events(commands.Cog):
                     .replace("{user}", member.display_name) \
                     .replace("{level}", str(level)) \
                     .replace("{server}", member.guild.name)
-                await member.send(embed=discord.Embed(description=dm_msg, color=0x00FF94))
+                await member.send(embed=discord.Embed(description=dm_msg, color=XERO.PRIMARY,))
             except Exception:
                 pass  # DMs disabled
         # Channel announcement below
-        from utils.embeds import XERO
         level_ch_id = settings.get("level_up_channel_id")
         ch = member.guild.get_channel(level_ch_id) if level_ch_id else fallback_ch
         if not ch: return
@@ -990,7 +1002,7 @@ class Events(commands.Cog):
         if level >= 50:   color = XERO.GOLD
         elif level >= 25: color = XERO.SECONDARY
         elif level >= 10: color = XERO.PRIMARY
-        else:             color = discord.Color.purple()
+        else:             color = XERO.PRIMARY
 
         embed = discord.Embed(
             title="⬆️  Level Up!",
@@ -1010,7 +1022,6 @@ class Events(commands.Cog):
         embed.set_footer(text="Keep chatting to level up!")
 
         # Unified Branding
-        from utils.embeds import brand_embed
         embed, file = await brand_embed(embed, member.guild, self.bot)
         
         try:
@@ -1063,7 +1074,6 @@ class Events(commands.Cog):
                 if log_ch_id:
                     log_ch = message.guild.get_channel(log_ch_id)
                     if log_ch:
-                        from utils.embeds import XERO
                         embed = discord.Embed(
                             title="🤖 AI AutoMod Action",
                             color=XERO.WARNING,

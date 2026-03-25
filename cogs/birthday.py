@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Birthday System (7 commands)"""
 import discord
 from discord.ext import commands
@@ -85,7 +86,7 @@ class Birthday(commands.GroupCog, name="birthday"):
 
         month_names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
         sorted_bdays = sorted(birthdays, key=lambda b: days_until(b["month"], b["day"]))
-        embed = comprehensive_embed(title="🎂 Upcoming Birthdays", description=f"**{len(birthdays)}** birthdays registered", color=discord.Color.pink())
+        embed = comprehensive_embed(title="🎂 Upcoming Birthdays", description=f"**{len(birthdays)}** birthdays registered", color=XERO.PRIMARY,)
         for bday in sorted_bdays[:15]:
             member = interaction.guild.get_member(bday["user_id"])
             if not member:
@@ -123,7 +124,7 @@ class Birthday(commands.GroupCog, name="birthday"):
         embed = discord.Embed(
             title="🎂 Happy Birthday!",
             description=f"Everyone wish {user.mention} a very happy birthday! 🎉🎈🎊",
-            color=discord.Color.pink()
+            color=XERO.PRIMARY,
         )
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_footer(text="XERO Birthday System")

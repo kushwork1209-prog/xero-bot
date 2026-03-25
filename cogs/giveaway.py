@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Giveaway System (8 commands)"""
 import discord
 from utils.guard import command_guard
@@ -61,12 +62,16 @@ class Giveaway(commands.GroupCog, name="giveaway"):
             if channel:
                 if winners:
                     winner_mentions = " ".join(f"<@{w}>" for w in winners)
-                    embed = discord.Embed(title="🎉 Giveaway Ended!", color=discord.Color.gold())
+                    embed = discord.Embed(title="🎉 Giveaway Ended!", color=XERO.PRIMARY,)
+                    embed, file = await brand_embed(embed, guild, bot)
+                    embed, file = await brand_embed(embed, guild, bot)
                     embed.add_field(name="🏆 Prize", value=gw["prize"], inline=False)
                     embed.add_field(name="🎊 Winners", value=winner_mentions, inline=False)
                     embed.add_field(name="👥 Total Entries", value=str(len(participants)), inline=True)
                 else:
-                    embed = discord.Embed(title="🎉 Giveaway Ended", description="No one entered the giveaway!", color=discord.Color.red())
+                    embed = discord.Embed(title="🎉 Giveaway Ended", description="No one entered the giveaway!", color=XERO.PRIMARY,)
+                    embed, file = await brand_embed(embed, guild, bot)
+                    embed, file = await brand_embed(embed, guild, bot)
                     embed.add_field(name="Prize", value=gw["prize"], inline=False)
                 try:
                     await channel.send(embed=embed)
@@ -100,8 +105,9 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         req = []
         if required_role: req.append("Must have " + required_role.mention)
         if bonus_role:    req.append(bonus_role.mention + " gets 2x entries")
-        from utils.embeds import brand_embed
-        embed = discord.Embed(title="🎉  GIVEAWAY!", description="## " + prize, color=0xFFD700)
+        embed = discord.Embed(title="🎉  GIVEAWAY!", description="## " + prize, color=XERO.PRIMARY,)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="🏆 Winners",  value=str(w_count),                  inline=True)
         embed.add_field(name="⏰ Ends",      value="<t:" + str(end_ts) + ":R>",  inline=True)
         embed.add_field(name="📢 Host",     value=interaction.user.mention,       inline=True)
@@ -118,7 +124,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE giveaways SET message_id=? WHERE giveaway_id=?",(msg.id,gw_id))
             await db.commit()
-        await interaction.followup.send(embed=discord.Embed(description="✅ Giveaway started in " + ch.mention,color=0x00FF94),ephemeral=True)
+        await interaction.followup.send(embed=discord.Embed(description="✅ Giveaway started in " + ch.mention,color=XERO.PRIMARY,),ephemeral=True)
 
     @app_commands.command(name="end", description="Immediately end a giveaway and pick winners.")
     @app_commands.describe(giveaway_id="ID of the giveaway to end")
@@ -170,7 +176,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
                 giveaways = [dict(r) for r in await c.fetchall()]
         if not giveaways:
             return await interaction.response.send_message(embed=info_embed("No Active Giveaways", "No giveaways are currently running."))
-        embed = comprehensive_embed(title="🎉 Active Giveaways", description=f"**{len(giveaways)}** active giveaway(s)", color=discord.Color.gold())
+        embed = comprehensive_embed(title="🎉 Active Giveaways", description=f"**{len(giveaways)}** active giveaway(s)", color=XERO.PRIMARY,)
         for gw in giveaways[:8]:
             ch = interaction.guild.get_channel(gw["channel_id"])
             end_ts = int(datetime.datetime.fromisoformat(gw["end_time"]).timestamp())

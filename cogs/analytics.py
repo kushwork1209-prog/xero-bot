@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Server Analytics (7 commands)"""
 import discord
 from utils.guard import command_guard
@@ -43,7 +44,7 @@ class Analytics(commands.GroupCog, name="analytics"):
         embed = comprehensive_embed(
             title=f"📊 {guild.name} — Analytics Overview",
             description=f"Comprehensive insights for your server",
-            color=discord.Color.blurple(),
+            color=XERO.PRIMARY,
             thumbnail_url=guild.icon.url if guild.icon else None
         )
         embed.add_field(name="👥 Members", value=(
@@ -108,7 +109,7 @@ class Analytics(commands.GroupCog, name="analytics"):
                 rows = [dict(r) for r in await c.fetchall()]
         if not rows:
             return await interaction.followup.send(embed=info_embed("No Data", "No activity data yet."))
-        embed = comprehensive_embed(title="🏆 Most Active Members", color=discord.Color.gold())
+        embed = comprehensive_embed(title="🏆 Most Active Members", color=XERO.PRIMARY,)
         medals = ["🥇","🥈","🥉"] + [f"**#{i}**" for i in range(4, 11)]
         lines = []
         for i, row in enumerate(rows):
@@ -143,7 +144,7 @@ class Analytics(commands.GroupCog, name="analytics"):
                 purchases = (await c.fetchone())[0]
         if not stats["users"]:
             return await interaction.followup.send(embed=info_embed("No Economy Data", "No economy activity yet."))
-        embed = comprehensive_embed(title="💰 Economy Analytics", description=f"**{stats['users']:,}** active economy users", color=discord.Color.gold())
+        embed = comprehensive_embed(title="💰 Economy Analytics", description=f"**{stats['users']:,}** active economy users", color=XERO.PRIMARY,)
         embed.add_field(name="💵 Wealth Distribution", value=(
             f"**Total in Wallets:** ${int(stats['total_wallet'] or 0):,}\n"
             f"**Total in Banks:** ${int(stats['total_bank'] or 0):,}\n"
@@ -188,7 +189,7 @@ class Analytics(commands.GroupCog, name="analytics"):
                 (interaction.guild.id,)
             ) as c:
                 most_actioned = [dict(r) for r in await c.fetchall()]
-        embed = comprehensive_embed(title="⚖️ Moderation Analytics", color=discord.Color.orange())
+        embed = comprehensive_embed(title="⚖️ Moderation Analytics", color=XERO.PRIMARY,)
         embed.add_field(name="📅 Timeline", value=(
             f"**Last 7 days:** {last_7:,} actions\n"
             f"**Last 30 days:** {last_30:,} actions"
@@ -223,7 +224,7 @@ class Analytics(commands.GroupCog, name="analytics"):
                 stats = dict(await c.fetchone())
         if not stats["users"]:
             return await interaction.followup.send(embed=info_embed("No Level Data", "No leveling data yet."))
-        embed = comprehensive_embed(title="📊 Leveling Analytics", color=discord.Color.purple())
+        embed = comprehensive_embed(title="📊 Leveling Analytics", color=XERO.PRIMARY,)
         embed.add_field(name="👥 Users", value=f"**Ranked:** {stats['users']:,}", inline=True)
         embed.add_field(name="⭐ XP", value=(
             f"**Total Earned:** {int(stats['total_xp'] or 0):,}\n"
@@ -251,7 +252,7 @@ class Analytics(commands.GroupCog, name="analytics"):
         # Account ages
         new_accounts = sum(1 for m in guild.members if not m.bot and (now - m.created_at).days < 30)
         old_accounts = sum(1 for m in guild.members if not m.bot and (now - m.created_at).days > 365)
-        embed = comprehensive_embed(title="📈 Member Growth Analytics", color=discord.Color.green())
+        embed = comprehensive_embed(title="📈 Member Growth Analytics", color=XERO.PRIMARY,)
         embed.add_field(name="📅 Recent Joins", value=(
             f"**Today:** {joined_today:,}\n"
             f"**This Week:** {joined_week:,}\n"
@@ -292,7 +293,7 @@ class Analytics(commands.GroupCog, name="analytics"):
         if not channel_counts:
             return await interaction.followup.send(embed=info_embed("No Data", "Could not read channel history."))
         sorted_channels = sorted(channel_counts.items(), key=lambda x: x[1], reverse=True)
-        embed = comprehensive_embed(title="📡 Channel Activity (Last 7 Days)", description="Human messages per channel", color=discord.Color.blurple())
+        embed = comprehensive_embed(title="📡 Channel Activity (Last 7 Days)", description="Human messages per channel", color=XERO.PRIMARY,)
         for ch, count in sorted_channels[:10]:
             bar = "█" * min(int(count / max(sorted_channels[0][1], 1) * 15), 15)
             embed.add_field(name=f"#{ch.name}", value=f"`{bar}` **{count:,}** messages", inline=False)
@@ -326,7 +327,9 @@ class Analytics(commands.GroupCog, name="analytics"):
             bar = "█" * int(count / max_count * 12)
             active = " ◄ PEAK" if h == peak_hour else ""
             bar_lines.append(f"`{h:02d}:00` {bar or '░'} {count}{active}")
-        embed = discord.Embed(title=f"⏰  Peak Hours — {interaction.guild.name}", color=0x00D4FF)
+        embed = discord.Embed(title=f"⏰  Peak Hours — {interaction.guild.name}", color=XERO.PRIMARY,)
+        embed, file = await brand_embed(embed, interaction.guild, bot)
+        embed, file = await brand_embed(embed, interaction.guild, bot)
         mid = len(bar_lines) // 2
         embed.add_field(name="🌅 00:00–11:59", value="\n".join(bar_lines[:12]), inline=True)
         embed.add_field(name="🌇 12:00–23:59", value="\n".join(bar_lines[12:]), inline=True)
@@ -372,9 +375,11 @@ class Analytics(commands.GroupCog, name="analytics"):
                     for l in lines if 'RECOMMENDATION' in l]
         except Exception:
             health_score = 70; recs = ["Increase member engagement with events","Set up auto-moderation","Configure welcome messages"]
-        color = 0x00FF94 if health_score >= 75 else 0xFFB800 if health_score >= 50 else 0xFF3B5C
+        color = XERO.PRIMARY if health_score >= 75 else XERO.PRIMARY if health_score >= 50 else XERO.PRIMARY
         bar   = "█" * (health_score//10) + "░" * (10 - health_score//10)
         embed = discord.Embed(title=f"❤️  Server Health — {guild.name}", color=color)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="💊 Health Score", value=f"**{health_score}/100**\n`{bar}`", inline=True)
         embed.add_field(name="👥 Online Rate",  value=f"{online_pct:.0f}%",               inline=True)
         embed.add_field(name="💎 Boost Level",  value=f"Level {guild.premium_tier}",       inline=True)

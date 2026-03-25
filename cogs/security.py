@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """
 XERO Bot — Security System
 Anti-nuke, account age filter, link domain allowlist, role restore on rejoin.
@@ -75,7 +76,7 @@ class Security(commands.GroupCog, name="security"):
                 f"**Verify** this person and restore roles if it was a mistake.\n"
                 f"Use `/security restore-roles {user.id}` to restore."
             ),
-            color=XERO.DANGER if hasattr(XERO, 'DANGER') else discord.Color.red(),
+            color=XERO.DANGER if hasattr(XERO, 'DANGER') else XERO.PRIMARY,
             timestamp=discord.utils.utcnow()
         )
         embed.set_thumbnail(url=user.display_avatar.url)
@@ -102,6 +103,8 @@ class Security(commands.GroupCog, name="security"):
         def tog(val): return "✅ On" if val else "❌ Off"
 
         embed = discord.Embed(title="🔒  Security Configuration", color=XERO.PRIMARY)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="🚨 Anti-Nuke",       value=tog(settings.get("anti_nuke_enabled",0)),     inline=True)
         embed.add_field(name="👶 Account Age",      value=f"{settings.get('min_account_age_days',0)}d minimum", inline=True)
         embed.add_field(name="🔗 Link Filter",      value=tog(settings.get("link_filter_enabled",0)),   inline=True)

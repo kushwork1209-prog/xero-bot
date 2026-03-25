@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Server Management & Logging (14 commands)"""
 import discord
 from utils.guard import command_guard
@@ -18,7 +19,7 @@ class Server(commands.GroupCog, name="server"):
     async def icon(self, interaction: discord.Interaction):
         if not interaction.guild.icon:
             return await interaction.response.send_message(embed=error_embed("No Icon", "This server has no icon set."))
-        embed = comprehensive_embed(title=f"🖼️ {interaction.guild.name} — Icon", color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"🖼️ {interaction.guild.name} — Icon", color=XERO.PRIMARY,)
         embed.set_image(url=interaction.guild.icon.url)
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="Download PNG", url=f"{interaction.guild.icon.url}?size=4096&format=png", style=discord.ButtonStyle.link))
@@ -28,7 +29,7 @@ class Server(commands.GroupCog, name="server"):
     async def banner(self, interaction: discord.Interaction):
         if not interaction.guild.banner:
             return await interaction.response.send_message(embed=error_embed("No Banner", "This server has no banner. Requires Boost Level 2."))
-        embed = comprehensive_embed(title=f"🎨 {interaction.guild.name} — Banner", color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"🎨 {interaction.guild.name} — Banner", color=XERO.PRIMARY,)
         embed.set_image(url=interaction.guild.banner.url)
         await interaction.response.send_message(embed=embed)
 
@@ -40,7 +41,7 @@ class Server(commands.GroupCog, name="server"):
         bans = [entry async for entry in interaction.guild.bans(limit=20)]
         if not bans:
             return await interaction.followup.send(embed=info_embed("No Bans", "No users are currently banned."))
-        embed = comprehensive_embed(title=f"🚫 Banned Users ({len(bans)} shown)", color=discord.Color.red())
+        embed = comprehensive_embed(title=f"🚫 Banned Users ({len(bans)} shown)", color=XERO.PRIMARY,)
         for b in bans[:15]:
             embed.add_field(name=str(b.user), value=f"ID: `{b.user.id}`\nReason: {b.reason or 'No reason'}", inline=True)
         await interaction.followup.send(embed=embed)
@@ -52,7 +53,7 @@ class Server(commands.GroupCog, name="server"):
         if not invites:
             return await interaction.response.send_message(embed=info_embed("No Invites", "No active invites found."))
         invites.sort(key=lambda i: i.uses, reverse=True)
-        embed = comprehensive_embed(title=f"🔗 Server Invites ({len(invites)} total)", color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"🔗 Server Invites ({len(invites)} total)", color=XERO.PRIMARY,)
         for inv in invites[:10]:
             embed.add_field(
                 name=f"/{inv.code}",
@@ -80,7 +81,7 @@ class Server(commands.GroupCog, name="server"):
         stage = [c for c in interaction.guild.channels if isinstance(c, discord.StageChannel)]
         forum = [c for c in interaction.guild.channels if isinstance(c, discord.ForumChannel)]
         cats = interaction.guild.categories
-        embed = comprehensive_embed(title=f"📡 {interaction.guild.name} — Channels", color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"📡 {interaction.guild.name} — Channels", color=XERO.PRIMARY,)
         embed.add_field(name="💬 Text", value=str(len(text)), inline=True)
         embed.add_field(name="🔊 Voice", value=str(len(voice)), inline=True)
         embed.add_field(name="📁 Categories", value=str(len(cats)), inline=True)
@@ -98,7 +99,7 @@ class Server(commands.GroupCog, name="server"):
         offline = sum(1 for m in guild.members if m.status == discord.Status.offline)
         bots = sum(1 for m in guild.members if m.bot)
         humans = guild.member_count - bots
-        embed = comprehensive_embed(title=f"👥 {guild.name} — Members", color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"👥 {guild.name} — Members", color=XERO.PRIMARY,)
         embed.add_field(name="Total", value=f"**{guild.member_count:,}**", inline=True)
         embed.add_field(name="Humans", value=f"**{humans:,}**", inline=True)
         embed.add_field(name="Bots", value=f"**{bots:,}**", inline=True)
@@ -113,7 +114,7 @@ class Server(commands.GroupCog, name="server"):
     async def boosts(self, interaction: discord.Interaction):
         guild = interaction.guild
         boosters = guild.premium_subscribers
-        embed = comprehensive_embed(title=f"💎 {guild.name} — Boost Status", color=discord.Color.pink())
+        embed = comprehensive_embed(title=f"💎 {guild.name} — Boost Status", color=XERO.PRIMARY,)
         embed.add_field(name="Boost Level", value=f"**Level {guild.premium_tier}**", inline=True)
         embed.add_field(name="Total Boosts", value=f"**{guild.premium_subscription_count}**", inline=True)
         embed.add_field(name="Boosters", value=f"**{len(boosters)}**", inline=True)
@@ -140,7 +141,7 @@ class Server(commands.GroupCog, name="server"):
             entries.append(entry)
         if not entries:
             return await interaction.followup.send(embed=info_embed("Empty", "No audit log entries found."))
-        embed = comprehensive_embed(title="📋 Recent Audit Log", color=discord.Color.orange())
+        embed = comprehensive_embed(title="📋 Recent Audit Log", color=XERO.PRIMARY,)
         for e in entries:
             action_name = str(e.action).replace("AuditLogAction.", "").replace("_", " ").title()
             user_name = str(e.user) if e.user else "Unknown"

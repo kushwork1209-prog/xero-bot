@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """
 XERO Bot — Voice AI
 The most advanced feature XERO has. Bot joins your voice channel, listens,
@@ -495,6 +496,8 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
         listeners = [m for m in (vc.channel.members if vc and vc.channel else []) if not m.bot]
 
         embed = discord.Embed(title="🎙️  Voice AI — Active", color=XERO.SUCCESS)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name="📢 Channel",    value=f"**{ch_name}**",      inline=True)
         embed.add_field(name="💬 Exchanges",  value=str(lines),             inline=True)
         embed.add_field(name="👥 Listeners",  value=str(len(listeners)),    inline=True)

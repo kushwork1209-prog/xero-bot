@@ -53,7 +53,8 @@ class Database:
                     level_up_channel_id INTEGER,
                     unified_image_data TEXT,
                     embed_color TEXT DEFAULT '#5865F2',
-                    bot_nickname TEXT
+                    bot_nickname TEXT,
+                    config_id TEXT
                 )
             """)
 

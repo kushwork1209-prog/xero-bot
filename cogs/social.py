@@ -1,26 +1,27 @@
+from utils.embeds import brand_embed
+from utils.embeds import XERO
 """XERO Bot — Social with real GIFs + 12 actions"""
 import discord
 from utils.guard import command_guard
 from discord.ext import commands
 from discord import app_commands
 import logging, random, aiohttp
-from utils.embeds import XERO
 
 logger = logging.getLogger("XERO.Social")
 
 ACTION_DATA = {
-    "hug":{"emoji":"🤗","color":0xFF69B4,"lines":["hugged","gave the warmest hug to","wrapped arms around","squeezed tight"]},
-    "kiss":{"emoji":"💋","color":0xFF1493,"lines":["kissed","gave a sweet kiss to","planted one on"]},
-    "pat":{"emoji":"🥺","color":0xFFB6C1,"lines":["patted","gave headpats to","gently patted"]},
-    "slap":{"emoji":"👋","color":0xFF6347,"lines":["slapped","gave a big slap to","whacked"]},
-    "cuddle":{"emoji":"🥰","color":0xFFB6C1,"lines":["is cuddling with","snuggled up with","is cozy with"]},
-    "dance":{"emoji":"💃","color":0xDA70D6,"lines":["is dancing with","twirled with","busted a move with"]},
-    "highfive":{"emoji":"🙌","color":0x00FF94,"lines":["high-fived","celebrated with","slapped hands with"]},
-    "wave":{"emoji":"👋","color":0x87CEEB,"lines":["waved at","said hi to","greeted"]},
-    "bite":{"emoji":"😬","color":0xFF4500,"lines":["bit","took a nibble from","chomped on"]},
-    "poke":{"emoji":"👉","color":0xFFD700,"lines":["poked","jabbed","nudged"]},
-    "stare":{"emoji":"👀","color":0x9370DB,"lines":["is staring at","can't stop staring at","is eyeing"]},
-    "shoot":{"emoji":"🔫","color":0x808080,"lines":["pointed finger-guns at","went pew pew at"]},
+    "hug":{"emoji":"🤗","color":XERO.PRIMARY,"lines":["hugged","gave the warmest hug to","wrapped arms around","squeezed tight"]},
+    "kiss":{"emoji":"💋","color":XERO.PRIMARY,"lines":["kissed","gave a sweet kiss to","planted one on"]},
+    "pat":{"emoji":"🥺","color":XERO.PRIMARY,"lines":["patted","gave headpats to","gently patted"]},
+    "slap":{"emoji":"👋","color":XERO.PRIMARY,"lines":["slapped","gave a big slap to","whacked"]},
+    "cuddle":{"emoji":"🥰","color":XERO.PRIMARY,"lines":["is cuddling with","snuggled up with","is cozy with"]},
+    "dance":{"emoji":"💃","color":XERO.PRIMARY,"lines":["is dancing with","twirled with","busted a move with"]},
+    "highfive":{"emoji":"🙌","color":XERO.PRIMARY,"lines":["high-fived","celebrated with","slapped hands with"]},
+    "wave":{"emoji":"👋","color":XERO.PRIMARY,"lines":["waved at","said hi to","greeted"]},
+    "bite":{"emoji":"😬","color":XERO.PRIMARY,"lines":["bit","took a nibble from","chomped on"]},
+    "poke":{"emoji":"👉","color":XERO.PRIMARY,"lines":["poked","jabbed","nudged"]},
+    "stare":{"emoji":"👀","color":XERO.PRIMARY,"lines":["is staring at","can't stop staring at","is eyeing"]},
+    "shoot":{"emoji":"🔫","color":XERO.PRIMARY,"lines":["pointed finger-guns at","went pew pew at"]},
 }
 
 async def fetch_gif(action: str):
@@ -49,9 +50,11 @@ class Social(commands.GroupCog, name="social"):
     async def _act(self, interaction, action, user):
         if user==interaction.user: return await interaction.response.send_message(f"You can't {action} yourself!",ephemeral=True)
         await interaction.response.defer()
-        info=ACTION_DATA.get(action,{"emoji":"✨","color":0x7B2FFF,"lines":["did something to"]})
+        info=ACTION_DATA.get(action,{"emoji":"✨","color":XERO.PRIMARY,"lines":["did something to"]})
         verb=random.choice(info["lines"])
         embed=discord.Embed(description=f"{interaction.user.mention} **{verb}** {user.mention}! {info['emoji']}",color=discord.Color(info["color"]))
+        embed, file = await brand_embed(embed, interaction.guild, bot)
+        embed, file = await brand_embed(embed, interaction.guild, bot)
         gif=await fetch_gif(action)
         if gif: embed.set_image(url=gif)
         embed.set_footer(text="XERO Social • nekos.best")

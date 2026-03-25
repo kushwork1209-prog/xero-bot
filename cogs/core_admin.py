@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 from utils.guard import command_guard
 """
 XERO Bot — Core Admin + Support Tools
@@ -8,7 +9,7 @@ Management guild ONLY. Invisible everywhere else.
 
 Dashboard: /core dashboard
   8 panels — Stats · Servers · Blacklist · Analytics · Tools · Staff · Incidents · Health
-  Colors: Black #0A0A0A · White #F5F5F5 · Baby Blue #89CFF0
+  Colors: Black XERO.PRIMARY · White XERO.PRIMARY · Baby Blue XERO.PRIMARY
 """
 import discord, aiosqlite, asyncio, traceback, sys, logging, datetime, time, os
 from discord.ext import commands
@@ -18,12 +19,12 @@ from utils.embeds import success_embed, error_embed, XERO
 logger = logging.getLogger("XERO.CoreAdmin")
 
 # ── Palette ───────────────────────────────────────────────────────────────────
-D_BLACK = 0x0A0A0A
-D_BLUE  = 0x89CFF0
-D_STEEL = 0xB8D4E8
-D_DARK  = 0x1C1C1C
-D_RED   = 0xFF1744
-D_AMBER = 0xFFB800
+D_BLACK = XERO.PRIMARY
+D_BLUE  = XERO.PRIMARY
+D_STEEL = XERO.PRIMARY
+D_DARK  = XERO.PRIMARY
+D_RED   = XERO.PRIMARY
+D_AMBER = XERO.PRIMARY
 
 SEV = {"low": "🔵", "medium": "🟡", "high": "🟠", "critical": "🔴"}
 ROLE_ICONS = {"owner": "👑", "lead": "🔷", "developer": "💻", "support": "🛡️", "moderator": "⚖️"}
@@ -1117,6 +1118,8 @@ class _ServerDetailsModal(discord.ui.Modal, title="Server Deep Dive"):
         mp = g.me.guild_permissions
 
         e = discord.Embed(title=g.name, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         if g.icon: e.set_thumbnail(url=g.icon.url)
 
         e.add_field(name="Identity", value=(
@@ -1303,6 +1306,8 @@ class ManagementDashboard(discord.ui.View):
 # ══════════════════════════════════════════════════════════════════════════════
 # /core — 10 COMMANDS (dashboard + parameterised ops only)
 # ══════════════════════════════════════════════════════════════════════════════
+from utils.db_backup import auto_restore, find_backup_by_id, import_db
+
 class CoreAdmin(commands.GroupCog, name="core"):
     def __init__(self, bot): self.bot = bot
 
@@ -1339,6 +1344,8 @@ class CoreAdmin(commands.GroupCog, name="core"):
         def t(v): return "✅" if v else "❌"
         mp = g.me.guild_permissions
         e = discord.Embed(title=g.name, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        e, file = await brand_embed(e, guild, bot)
+        e, file = await brand_embed(e, guild, bot)
         if g.icon: e.set_thumbnail(url=g.icon.url)
         e.add_field(name="Identity", value=f"ID: `{g.id}`\nOwner: <@{g.owner_id}>\nCreated: <t:{int(g.created_at.timestamp())}:D>", inline=True)
         e.add_field(name="Size",     value=f"Members: **{g.member_count:,}**\nChannels: **{len(g.channels)}**\nRoles: **{len(g.roles)}**", inline=True)
@@ -1369,6 +1376,8 @@ class CoreAdmin(commands.GroupCog, name="core"):
             ephemeral=True
         )
         embed = discord.Embed(title=f"📢  {title}", description=message, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_author(name="XERO Bot  ·  Official Notice", icon_url=self.bot.user.display_avatar.url)
         embed.set_footer(text="XERO Bot  ·  Team Flame")
         sent = failed = 0
@@ -1402,6 +1411,8 @@ class CoreAdmin(commands.GroupCog, name="core"):
             ephemeral=True
         )
         embed = discord.Embed(title=f"📣  {title}", description=body, color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_author(name="XERO Bot  ·  Announcement", icon_url=self.bot.user.display_avatar.url)
         embed.set_footer(text="XERO Bot  ·  Team Flame")
         sent = failed = 0
@@ -1439,10 +1450,12 @@ class CoreAdmin(commands.GroupCog, name="core"):
             output = str(result) if result is not None else "✅ Done — no return value"
         except Exception:
             output = "❌ " + traceback.format_exc()[-1200:]
-        await interaction.followup.send(
-            embed=discord.Embed(title="⚡ Eval", description=f"```py\n{output[:1800]}\n```", color=discord.Color(D_BLUE)),
-            ephemeral=True
-        )
+        embed = discord.Embed(title="⚡ Eval", description=f"```py\n{output[:1800]}\n```", color=discord.Color(D_BLUE))
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if file:
+            await interaction.followup.send(embed=embed, file=file, ephemeral=True)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="sql", description="[OWNER] Run raw SQL on the XERO database.")
     @app_commands.describe(query="SQL to execute — SELECT, UPDATE, DELETE, etc.")
@@ -1465,10 +1478,12 @@ class CoreAdmin(commands.GroupCog, name="core"):
                     output = "✅ Executed — 0 rows returned"
         except Exception as e:
             output = f"❌ {e}"
-        await interaction.followup.send(
-            embed=discord.Embed(title="🗄️ SQL Result", description=f"```\n{output[:1800]}\n```", color=discord.Color(D_BLUE)),
-            ephemeral=True
-        )
+        embed = discord.Embed(title="🗄️ SQL Result", description=f"```\n{output[:1800]}\n```", color=discord.Color(D_BLUE))
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if file:
+            await interaction.followup.send(embed=embed, file=file, ephemeral=True)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
     @app_commands.command(name="reload", description="Reload a specific cog without restarting the bot.")
     @app_commands.describe(cog="Cog name e.g. economy, levels, tickets, ai")
@@ -1645,7 +1660,7 @@ class SupportTools(commands.GroupCog, name="support"):
         embed = discord.Embed(
             title=f"🔍  Diagnosis  ·  {g.name}",
             description=f"`{bar}` **{score}/100**",
-            color=discord.Color(0x2ECC71 if score >= 70 else (D_AMBER if score >= 40 else D_RED)),
+            color=discord.Color(XERO.PRIMARY if score >= 70 else (D_AMBER if score >= 40 else D_RED)),
             timestamp=discord.utils.utcnow()
         )
         if g.icon: embed.set_thumbnail(url=g.icon.url)
@@ -1811,7 +1826,7 @@ class SupportTools(commands.GroupCog, name="support"):
                 f"Text channels: **{ok_count}** clean  ·  **{len(text_issues)}** issues\n"
                 f"Voice issues: **{len(voice_issues)}**"
             ),
-            color=discord.Color(D_RED if text_issues else 0x2ECC71)
+            color=discord.Color(D_RED if text_issues else XERO.PRIMARY)
         )
 
         perm_grid = (
@@ -1926,6 +1941,343 @@ class SupportTools(commands.GroupCog, name="support"):
     @app_commands.command(name="reset-guild", description="Reset a server's XERO config to factory defaults. All user data preserved.")
     @app_commands.describe(guild_id="Server ID", confirm="Type CONFIRM to proceed")
     @is_management()
+    @app_commands.command(name="restore", description="[ADMIN] Force restore the database from a backup, optionally by config ID.")
+    @app_commands.describe(config_id="Optional: The unique ID of the backup to restore (e.g., 20240325_123456_abcdef12)")
+    @is_management()
+    @app_commands.command(name="list-backups", description="[ADMIN] List available database backups with their IDs.")
+    @is_management()
+    async def list_backups(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        if not self.bot.BACKUP_CHANNEL_ID:
+            return await interaction.followup.send(embed=error_embed("Backup Channel Not Set", "The backup channel ID is not configured."))
+
+        try:
+            channel = self.bot.get_channel(self.bot.BACKUP_CHANNEL_ID) or await self.bot.fetch_channel(self.bot.BACKUP_CHANNEL_ID)
+        except Exception as e:
+            logger.error(f"Cannot access backup channel {self.bot.BACKUP_CHANNEL_ID}: {e}")
+            return await interaction.followup.send(embed=error_embed("Error", "Could not access the backup channel."))
+
+        backups = []
+        async for msg in channel.history(limit=50): # Limit to recent 50 messages for efficiency
+            if msg.attachments:
+                for att in msg.attachments:
+                    if "xero_backup_" in att.filename and att.filename.endswith(".gz"):
+                        config_id = att.filename.replace("xero_backup_", "").replace(".gz", "")
+                        backups.append({
+                            "id": config_id,
+                            "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+                            "size": f"{att.size // 1024}KB",
+                            "message_url": msg.jump_url
+                        })
+            elif "📦 **XERO Auto-Backup**" in msg.content:
+                # Extract config_id from message content if attachment is not present
+                import re
+                match = re.search(r"ID: `([a-f0-9_]+)`", msg.content)
+                if match:
+                    config_id = match.group(1)
+                    backups.append({
+                        "id": config_id,
+                        "timestamp": msg.created_at.strftime("%Y-%m-%d %H:%M UTC"),
+                        "size": "N/A", # Size not available from message content
+                        "message_url": msg.jump_url
+                    })
+
+        if not backups:
+            return await interaction.followup.send(embed=error_embed("No Backups Found", "No database backups found in the backup channel."))
+
+        description = "\n".join([
+            f"**ID:** `{b['id']}` | **Time:** {b['timestamp']} | **Size:** {b['size']} | [View]({b['message_url']})"
+            for b in backups
+        ])
+        embed = success_embed("Available Backups", description)
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="broadcast", description="[ADMIN] Send a message to all or selected servers/channels.")
+    @app_commands.describe(
+        message="The message to broadcast.",
+        target_guilds="Optional: Comma-separated list of guild IDs to target. Leave empty for all guilds.",
+        target_channels="Optional: Comma-separated list of channel IDs to target within each guild. Leave empty for random channel."
+    )
+    @is_management()
+    async def broadcast(self, interaction: discord.Interaction, message: str, target_guilds: str = None, target_channels: str = None):
+        await interaction.response.defer(ephemeral=True)
+        
+        guild_ids = [int(g.strip()) for g in target_guilds.split(',') if g.strip()] if target_guilds else []
+        channel_ids = [int(c.strip()) for c in target_channels.split(',') if c.strip()] if target_channels else []
+
+        sent_count = 0
+        failed_guilds = []
+
+        for guild in self.bot.guilds:
+            if guild_ids and guild.id not in guild_ids:
+                continue
+
+            target_channel = None
+            if channel_ids:
+                for ch_id in channel_ids:
+                    ch = guild.get_channel(ch_id)
+                    if isinstance(ch, discord.TextChannel) and ch.permissions_for(guild.me).send_messages:
+                        target_channel = ch
+                        break
+            
+            if not target_channel:
+                # Try to find a suitable default channel if none specified or found
+                for ch in guild.text_channels:
+                    if ch.permissions_for(guild.me).send_messages:
+                        target_channel = ch
+                        break
+            
+            if target_channel:
+                try:
+                    embed = discord.Embed(description=message, color=XERO.PRIMARY)
+                    embed.set_footer(text=f"XERO Global Broadcast | Sent by {interaction.user.display_name}")
+                    await target_channel.send(embed=embed)
+                    sent_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to send broadcast to guild {guild.id} ({guild.name}): {e}")
+                    failed_guilds.append(f"{guild.name} (`{guild.id}`)")
+            else:
+                failed_guilds.append(f"{guild.name} (`{guild.id}`)")
+
+        if failed_guilds:
+            fail_msg = "\n".join(failed_guilds)
+            await interaction.followup.send(embed=error_embed("Broadcast Failed in Some Guilds", f"Successfully sent to **{sent_count}** guilds. Failed in the following guilds:\n{fail_msg}"))
+        else:
+            await interaction.followup.send(embed=success_embed("Broadcast Sent!", f"Successfully sent the broadcast message to **{sent_count}** guilds."))
+
+    async def restore_db(self, interaction: discord.Interaction, config_id: str = None):
+        await interaction.response.defer(ephemeral=True)
+        if config_id:
+            backup_msg = await find_backup_by_id(self.bot, config_id)
+            if not backup_msg:
+                return await interaction.followup.send(embed=error_embed("Backup Not Found", f"No backup found with ID `{config_id}`."))
+            att = next(
+                a for a in backup_msg.attachments
+                if config_id in a.filename
+            )
+            logger.info(f"Manual restore from: {att.filename} ({att.size // 1024}KB) sent {backup_msg.created_at}")
+            try:
+                import aiohttp
+                async with aiohttp.ClientSession() as s:
+                    async with s.get(att.url, timeout=aiohttp.ClientTimeout(total=30)) as r:
+                        backup_bytes = await r.read()
+                rows = await import_db(self.bot, backup_bytes)
+                await interaction.followup.send(embed=success_embed("Database Restored!", f"Successfully restored **{rows}** rows from backup ID `{config_id}`."))
+            except Exception as e:
+                logger.error(f"Manual restore failed for ID {config_id}: {e}")
+                await interaction.followup.send(embed=error_embed("Restore Failed", f"Failed to restore from backup ID `{config_id}`: {e}"))
+        else:
+            # Use auto_restore logic for latest and largest
+            logger.info("Manual restore triggered without specific ID. Attempting auto-restore (latest & largest).")
+            restored = await auto_restore(self.bot)
+            if restored:
+                await interaction.followup.send(embed=success_embed("Database Restored!", "Successfully restored the database from the latest and largest backup."))
+            else:
+                await interaction.followup.send(embed=error_embed("Restore Failed", "Failed to restore the database from backup. Check logs for details."))
+
+    @app_commands.command(name="get-guild-setting", description="[ADMIN] Get a specific setting for a guild.")
+    @app_commands.describe(guild_id="The ID of the guild.", setting_name="The name of the setting to retrieve.")
+    @is_management()
+    async def get_guild_setting(self, interaction: discord.Interaction, guild_id: str, setting_name: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            guild_id = int(guild_id)
+            settings = await self.bot.db.get_guild_settings(guild_id)
+            if setting_name in settings:
+                value = settings[setting_name]
+                await interaction.followup.send(embed=success_embed("Guild Setting", f"Setting `{setting_name}` for guild `{guild_id}` is: `{value}`"))
+            else:
+                await interaction.followup.send(embed=error_embed("Setting Not Found", f"Setting `{setting_name}` not found for guild `{guild_id}`."))
+        except ValueError:
+            await interaction.followup.send(embed=error_embed("Invalid Guild ID", "Please provide a valid integer for the guild ID."))
+        except Exception as e:
+            logger.error(f"Error getting guild setting: {e}")
+            await interaction.followup.send(embed=error_embed("Error", f"An error occurred: {e}"))
+
+    @app_commands.command(name="set-guild-setting", description="[ADMIN] Set a specific setting for a guild.")
+    @app_commands.describe(guild_id="The ID of the guild.", setting_name="The name of the setting to update.", setting_value="The new value for the setting.")
+    @is_management()
+    async def set_guild_setting(self, interaction: discord.Interaction, guild_id: str, setting_name: str, setting_value: str):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            guild_id = int(guild_id)
+            # Attempt to convert value to appropriate type if possible
+            if setting_value.lower() == "true":
+                parsed_value = True
+            elif setting_value.lower() == "false":
+                parsed_value = False
+            elif setting_value.isdigit():
+                parsed_value = int(setting_value)
+            else:
+                parsed_value = setting_value
+
+            await self.bot.db.update_guild_setting(guild_id, setting_name, parsed_value)
+            await interaction.followup.send(embed=success_embed("Guild Setting Updated", f"Setting `{setting_name}` for guild `{guild_id}` updated to `{parsed_value}`."))
+        except ValueError:
+            await interaction.followup.send(embed=error_embed("Invalid Guild ID", "Please provide a valid integer for the guild ID."))
+        except Exception as e:
+            logger.error(f"Error setting guild setting: {e}")
+            await interaction.followup.send(embed=error_embed("Error", f"An error occurred: {e}"))
+    @app_commands.command(name="user-data", description="[ADMIN] View all stored data for a specific user across all guilds.")
+    @app_commands.describe(user="The user to retrieve data for.")
+    @is_management()
+    async def user_data(self, interaction: discord.Interaction, user: discord.User):
+        await interaction.response.defer(ephemeral=True)
+        uid = user.id
+        embed = discord.Embed(title=f"User Data for {user.display_name} ({uid})")
+        embed.set_thumbnail(url=user.display_avatar.url)
+
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            db.row_factory = aiosqlite.Row
+
+            # Guild Settings (if user is bot owner/admin)
+            async with db.execute("SELECT guild_id, prefix, language, persona FROM guild_settings WHERE guild_id IN (SELECT guild_id FROM guild_settings WHERE bot_owner_id = ? OR bot_admin_ids LIKE ?)", (uid, f"%{uid}%")) as c:
+                guild_configs = await c.fetchall()
+                if guild_configs:
+                    embed.add_field(name="Guild Configurations (as owner/admin)", value="\n".join([f"- Guild `{g['guild_id']}`: Prefix `{g['prefix']}`, Lang `{g['language']}`" for g in guild_configs]), inline=False)
+
+            # Levels
+            async with db.execute("SELECT guild_id, xp, level, total_xp FROM levels WHERE user_id=?", (uid,)) as c:
+                levels_data = await c.fetchall()
+                if levels_data:
+                    embed.add_field(name="Levels", value="\n".join([f"- Guild `{l['guild_id']}`: Level `{l['level']}` ({l['xp']}/{l['total_xp']} XP)" for l in levels_data]), inline=False)
+
+            # Economy
+            async with db.execute("SELECT guild_id, wallet, bank, total_earned, total_spent FROM economy WHERE user_id=?", (uid,)) as c:
+                economy_data = await c.fetchall()
+                if economy_data:
+                    embed.add_field(name="Economy", value="\n".join([f"- Guild `{e['guild_id']}`: Wallet `${e['wallet']}`, Bank `${e['bank']}` (Earned `${e['total_earned']}`, Spent `${e['total_spent']}`)" for e in economy_data]), inline=False)
+
+            # Warnings
+            async with db.execute("SELECT guild_id, reason, mod_id, timestamp FROM warnings WHERE user_id=?", (uid,)) as c:
+                warnings_data = await c.fetchall()
+                if warnings_data:
+                    embed.add_field(name="Warnings", value="\n".join([f"- Guild `{w['guild_id']}`: `{w['reason']}` by `{w['mod_id']}` on {w['timestamp']}" for w in warnings_data]), inline=False)
+
+            # Mod Cases
+            async with db.execute("SELECT guild_id, action, reason, mod_id, timestamp FROM mod_cases WHERE user_id=?", (uid,)) as c:
+                mod_cases_data = await c.fetchall()
+                if mod_cases_data:
+                    embed.add_field(name="Mod Cases", value="\n".join([f"- Guild `{m['guild_id']}`: `{m['action']}` for `{m['reason']}` by `{m['mod_id']}` on {m['timestamp']}" for m in mod_cases_data]), inline=False)
+
+            # Tickets
+            async with db.execute("SELECT guild_id, ticket_id, status, topic, created_at FROM tickets WHERE user_id=?", (uid,)) as c:
+                tickets_data = await c.fetchall()
+                if tickets_data:
+                    embed.add_field(name="Tickets", value="\n".join([f"- Guild `{t['guild_id']}`: Ticket `{t['ticket_id']}` ({t['status']}) for `{t['topic']}` on {t['created_at']}" for t in tickets_data]), inline=False)
+
+            # Suggestions
+            async with db.execute("SELECT guild_id, suggestion_id, status, suggestion_text FROM suggestions WHERE user_id=?", (uid,)) as c:
+                suggestions_data = await c.fetchall()
+                if suggestions_data:
+                    embed.add_field(name="Suggestions", value="\n".join([f"- Guild `{s['guild_id']}`: Suggestion `{s['suggestion_id']}` ({s['status']}) `{s['suggestion_text'][:50]}...`" for s in suggestions_data]), inline=False)
+
+            # Member Profiles (AI)
+            async with db.execute("SELECT guild_id, skills, interests, personality FROM member_profiles WHERE user_id=?", (uid,)) as c:
+                profiles_data = await c.fetchall()
+                if profiles_data:
+                    embed.add_field(name="AI Profiles", value="\n".join([f"- Guild `{p['guild_id']}`: Skills: `{p['skills'][:50]}...`, Personality: `{p['personality'][:50]}...`" for p in profiles_data]), inline=False)
+
+            # User Stats
+            async with db.execute("SELECT guild_id, messages_sent, commands_used FROM user_stats WHERE user_id=?", (uid,)) as c:
+                user_stats_data = await c.fetchall()
+                if user_stats_data:
+                    embed.add_field(name="User Stats", value="\n".join([f"- Guild `{s['guild_id']}`: Messages: `{s['messages_sent']}`, Commands: `{s['commands_used']}`" for s in user_stats_data]), inline=False)
+
+            # Verifications
+            async with db.execute("SELECT guild_id, verified_at FROM user_verifications WHERE user_id=?", (uid,)) as c:
+                verifications_data = await c.fetchall()
+                if verifications_data:
+                    embed.add_field(name="Verifications", value="\n".join([f"- Guild `{v['guild_id']}`: Verified on {v['verified_at']}" for v in verifications_data]), inline=False)
+
+        if not embed.fields:
+            embed.description = "No data found for this user."
+
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="blacklist", description="[ADMIN] Manage global user and guild blacklists.")
+    @app_commands.describe(
+        action="The action to perform (add, remove, list).",
+        target_id="The ID of the user or guild to blacklist/unblacklist.",
+        target_type="Whether the target is a user or a guild.",
+        reason="The reason for blacklisting (required for add action)."
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="Add to Blacklist", value="add"),
+        app_commands.Choice(name="Remove from Blacklist", value="remove"),
+        app_commands.Choice(name="List Blacklists", value="list"),
+    ], target_type=[
+        app_commands.Choice(name="User", value="user"),
+        app_commands.Choice(name="Guild", value="guild"),
+    ])
+    @is_management()
+    async def blacklist(self, interaction: discord.Interaction, action: str, target_id: str = None, target_type: str = None, reason: str = None):
+        await interaction.response.defer(ephemeral=True)
+
+        async with aiosqlite.connect(self.bot.db.db_path) as db:
+            if action == "add":
+                if not target_id or not target_type or not reason:
+                    return await interaction.followup.send(embed=error_embed("Missing Parameters", "For 'add' action, target_id, target_type, and reason are required."))
+                try:
+                    tid = int(target_id)
+                except ValueError:
+                    return await interaction.followup.send(embed=error_embed("Invalid ID", "Target ID must be an integer."))
+
+                if target_type == "user":
+                    await db.execute("INSERT OR IGNORE INTO blacklisted_users (user_id, reason, blacklisted_at) VALUES (?, ?, ?)", (tid, reason, datetime.datetime.utcnow()))
+                    await interaction.followup.send(embed=success_embed("User Blacklisted", f"User `{tid}` has been blacklisted for: `{reason}`."))
+                elif target_type == "guild":
+                    await db.execute("INSERT OR IGNORE INTO blacklisted_guilds (guild_id, reason, blacklisted_at) VALUES (?, ?, ?)", (tid, reason, datetime.datetime.utcnow()))
+                    await interaction.followup.send(embed=success_embed("Guild Blacklisted", f"Guild `{tid}` has been blacklisted for: `{reason}`."))
+                else:
+                    return await interaction.followup.send(embed=error_embed("Invalid Target Type", "Target type must be 'user' or 'guild'."))
+                await db.commit()
+
+            elif action == "remove":
+                if not target_id or not target_type:
+                    return await interaction.followup.send(embed=error_embed("Missing Parameters", "For 'remove' action, target_id and target_type are required."))
+                try:
+                    tid = int(target_id)
+                except ValueError:
+                    return await interaction.followup.send(embed=error_embed("Invalid ID", "Target ID must be an integer."))
+
+                if target_type == "user":
+                    await db.execute("DELETE FROM blacklisted_users WHERE user_id=?", (tid,))
+                    await interaction.followup.send(embed=success_embed("User Unblacklisted", f"User `{tid}` has been removed from the blacklist."))
+                elif target_type == "guild":
+                    await db.execute("DELETE FROM blacklisted_guilds WHERE guild_id=?", (tid,))
+                    await interaction.followup.send(embed=success_embed("Guild Unblacklisted", f"Guild `{tid}` has been removed from the blacklist."))
+                else:
+                    return await interaction.followup.send(embed=error_embed("Invalid Target Type", "Target type must be 'user' or 'guild'."))
+                await db.commit()
+
+            elif action == "list":
+                user_blacklist = []
+                async with db.execute("SELECT user_id, reason, blacklisted_at FROM blacklisted_users") as c:
+                    user_blacklist = await c.fetchall()
+
+                guild_blacklist = []
+                async with db.execute("SELECT guild_id, reason, blacklisted_at FROM blacklisted_guilds") as c:
+                    guild_blacklist = await c.fetchall()
+
+                embed = discord.Embed(title="XERO Global Blacklist", color=XERO.PRIMARY)
+                if user_blacklist:
+                    user_list = "\n".join([f"- User `{u['user_id']}`: `{u['reason']}` ({u['blacklisted_at'][:10]})" for u in user_blacklist])
+                    embed.add_field(name="Blacklisted Users", value=user_list, inline=False)
+                else:
+                    embed.add_field(name="Blacklisted Users", value="No users currently blacklisted.", inline=False)
+
+                if guild_blacklist:
+                    guild_list = "\n".join([f"- Guild `{g['guild_id']}`: `{g['reason']}` ({g['blacklisted_at'][:10]})" for g in guild_blacklist])
+                    embed.add_field(name="Blacklisted Guilds", value=guild_list, inline=False)
+                else:
+                    embed.add_field(name="Blacklisted Guilds", value="No guilds currently blacklisted.", inline=False)
+                
+                await interaction.followup.send(embed=embed)
+
+            else:
+                await interaction.followup.send(embed=error_embed("Invalid Action", "Action must be 'add', 'remove', or 'list'."))
+
     async def reset_guild(self, interaction: discord.Interaction, guild_id: str, confirm: str):
         if confirm != "CONFIRM":
             return await interaction.response.send_message(

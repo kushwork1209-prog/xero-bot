@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — Music Player (12 commands)
 Optimized for Railway: Uses SoundCloud as primary search to bypass YouTube bot-blocking.
 No external API keys required.
@@ -216,7 +217,7 @@ class Music(commands.GroupCog, name="music"):
             embed = comprehensive_embed(
                 title="🎵 Now Playing",
                 description=f"**[{song['title']}]({song['webpage_url']})**",
-                color=discord.Color.purple(),
+                color=XERO.PRIMARY,
             )
             embed.add_field(name="Duration", value=f"`{_fmt_duration(song['duration'])}`", inline=True)
             embed.add_field(name="Source", value=song["uploader"] or "Unknown", inline=True)
@@ -263,7 +264,9 @@ class Music(commands.GroupCog, name="music"):
     @app_commands.command(name="queue", description="Show the current music queue.")
     async def queue_cmd(self, interaction: discord.Interaction):
         queue = self.get_queue(interaction.guild.id)
-        embed = discord.Embed(title="🎶 Music Queue", color=discord.Color.purple())
+        embed = discord.Embed(title="🎶 Music Queue", color=XERO.PRIMARY,)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         if queue.now_playing:
             embed.description = (
                 f"**Now Playing:** [{queue.now_playing['title']}]({queue.now_playing['webpage_url']})"
@@ -361,7 +364,7 @@ class Music(commands.GroupCog, name="music"):
         embed = comprehensive_embed(
             title="🎵 Now Playing",
             description=f"**[{song['title']}]({song['webpage_url']})**",
-            color=discord.Color.purple(),
+            color=XERO.PRIMARY,
         )
         embed.add_field(name="Duration", value=f"`{_fmt_duration(song['duration'])}`", inline=True)
         embed.add_field(name="Uploader", value=song.get("uploader", "Unknown"), inline=True)
@@ -499,7 +502,7 @@ class Music(commands.GroupCog, name="music"):
         embed = discord.Embed(
             title=f"🎵 {title.title()}",
             description=chunks[0],
-            color=discord.Color.purple()
+            color=XERO.PRIMARY,
         )
         if artist and artist != "unknown":
             embed.set_author(name=artist.title())

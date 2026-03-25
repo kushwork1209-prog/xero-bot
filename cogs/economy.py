@@ -1,3 +1,4 @@
+from utils.embeds import brand_embed
 """XERO Bot — /economy GroupCog"""
 import discord
 from discord.ext import commands
@@ -115,6 +116,8 @@ class Economy(commands.GroupCog, name="economy"):
         personality = self.bot.cogs.get("Personality")
         comment = await personality.get_slot_comment(won) if personality else ""
         embed=discord.Embed(title="🎰  Slot Machine",description=f"**[ {s1}  {s2}  {s3} ]**\n\n{res}" + (f"\n\n*{comment}*" if comment else ""),color=color)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.set_footer(text=FOOTER_ECO); await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="blackjack", description="Play blackjack against the dealer.")
@@ -141,6 +144,8 @@ class Economy(commands.GroupCog, name="economy"):
         elif pv==dv: res,color=f"Push! {pv} vs {dv}.",XERO.WARNING
         else: await self.bot.db.update_economy(interaction.user.id,interaction.guild.id,wallet_delta=-amount,spent_delta=amount); res,color=f"Dealer wins. {pv} vs {dv}. **-${amount:,}**.",XERO.ERROR
         embed=discord.Embed(title="🃏  Blackjack",color=color)
+        embed, file = await brand_embed(embed, guild, bot)
+        embed, file = await brand_embed(embed, guild, bot)
         embed.add_field(name=f"You ({pv})",value=fmt(p),inline=True); embed.add_field(name=f"Dealer ({dv})",value=fmt(d),inline=True)
         embed.add_field(name="Result",value=res,inline=False); embed.set_footer(text=FOOTER_ECO)
         await interaction.response.send_message(embed=embed)
