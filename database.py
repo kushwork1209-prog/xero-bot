@@ -1282,3 +1282,19 @@ class Database:
         if self._pool:
             return make_context(self._pool)
         return aiosqlite.connect(self.db_path)
+
+    async def update_global_setting(self, key: str, value):
+        """Applies a configuration setting to ALL servers currently in the database."""
+        async with self._db_context() as db:
+            # Update all existing rows
+            await db.execute(f"UPDATE guild_settings SET {key} = ?", (value,))
+            await db.commit()
+        
+        logger.info(f"🌐 Global Config: Set {key} = {value} for all servers.")
+        
+        # Trigger backup
+        from main import bot_instance
+        if bot_instance:
+            from utils.db_backup import send_backup
+            import asyncio
+            asyncio.create_task(send_backup(bot_instance, triggered_by=f"global_config_{key}"))

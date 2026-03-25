@@ -125,7 +125,6 @@ async def is_db_empty(bot: discord.Client) -> bool:
         async with bot.db._db_context() as db:
             async with db.execute("SELECT COUNT(*) FROM guild_settings") as c:
                 row = await c.fetchone()
-                # row[0] for SQLite, row['count'] or similar for PG. Adapter makes it look like tuple.
                 return row[0] == 0
     except Exception:
         return True
@@ -134,19 +133,18 @@ async def is_db_empty(bot: discord.Client) -> bool:
 async def auto_restore(bot: discord.Client) -> bool:
     """
     Called once on startup. If DB is empty AND BACKUP_CHANNEL_ID is set,
-    finds the most recent backup in that channel and restores automatically.
+    finds the LARGEST valid backup (>= 100KB) and restores automatically.
     """
     if not BACKUP_CHANNEL_ID:
         logger.info("BACKUP_CHANNEL_ID not set — skipping auto-restore check.")
         return False
-    # Force restore if DB is empty or only has a few guilds (likely fresh deploy)
-    # This ensures that even if a few guilds joined before restore, we still pull the backup.
+        
     is_empty = await is_db_empty(bot)
     if not is_empty:
         logger.info("✓ DB has existing data — no restore needed.")
         return False
 
-    logger.warning("⚠️  DB is empty — searching backup channel for latest backup...")
+    logger.warning("⚠️  DB is empty — searching backup channel for the largest valid backup...")
     try:
         channel = bot.get_channel(BACKUP_CHANNEL_ID)
         if not channel:
@@ -155,72 +153,48 @@ async def auto_restore(bot: discord.Client) -> bool:
         logger.error(f"Cannot access backup channel {BACKUP_CHANNEL_ID}: {e}")
         return False
 
-    latest_backup_msg = None
-    latest_backup_timestamp = datetime.min
-    largest_backup_size = 0
+    best_msg = None
+    max_size = 0
+    MIN_SIZE_BYTES = 100 * 1024  # 100KB
 
-    # Look through the last 100 messages for the LATEST and LARGEST valid backup
-    async for msg in channel.history(limit=100):
+    # Search through the last 200 messages for the LARGEST file above 100KB
+    async for msg in channel.history(limit=200):
         if msg.attachments:
             for att in msg.attachments:
+                # Must be a xero backup file
                 if att.filename.startswith("xero_backup_") and att.filename.endswith(".gz"):
-                    try:
-                        # Extract timestamp from filename (e.g., xero_backup_YYYYMMDD_HHMMSS_HEX.gz)
-                        # We need to parse the timestamp part before the hex ID
-                        timestamp_part = att.filename.split("_")[2] # YYYYMMDD
-                        time_part = att.filename.split("_")[3] # HHMMSS
-                        current_timestamp = datetime.strptime(f"{timestamp_part}_{time_part}", "%Y%m%d_%H%M%S")
-
-                        if current_timestamp > latest_backup_timestamp:
-                            latest_backup_timestamp = current_timestamp
-                            largest_backup_size = att.size
-                            latest_backup_msg = msg
-                        elif current_timestamp == latest_backup_timestamp and att.size > largest_backup_size:
-                            largest_backup_size = att.size
-                            latest_backup_msg = msg
-                    except (ValueError, IndexError):
-                        logger.warning(f"Could not parse timestamp from backup filename: {att.filename}")
+                    # CRITICAL: Skip any file below 100KB (avoid empty/corrupt backups)
+                    if att.size < MIN_SIZE_BYTES:
                         continue
-        elif "📦 **XERO Auto-Backup**" in msg.content:
-            # For older backups without attachments, or if attachment parsing failed, check message content
-            import re
-            match = re.search(r"`(\d{{8}}_\d{{6}})_([a-f0-9]+)`", msg.content) # Extract timestamp and ID
-            if match:
-                timestamp_str = match.group(1)
-                current_timestamp = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
-                
-                # If message content is newer and we don't have a better attachment-based backup
-                if current_timestamp > latest_backup_timestamp and not latest_backup_msg:
-                    latest_backup_timestamp = current_timestamp
-                    latest_backup_msg = msg
+                    
+                    # Track the absolute largest file found
+                    if att.size > max_size:
+                        max_size = att.size
+                        best_msg = msg
 
-    if not latest_backup_msg:
-        logger.warning("No valid backup found in backup channel. Starting fresh.")
+    if not best_msg:
+        logger.warning("❌ No valid backup found >= 100KB. Starting fresh.")
         return False
 
-    backup_msg = latest_backup_msg
-
-    # Now, get the actual attachment from the selected message
-    att = None
-    if backup_msg.attachments:
-        for a in backup_msg.attachments:
-            if a.filename.startswith("xero_backup_") and a.filename.endswith(".gz"):
-                # If we found a backup based on attachment, ensure it's the one we selected
-                if a.size == largest_backup_size and datetime.strptime(f"{a.filename.split('_')[2]}_{a.filename.split('_')[3]}", "%Y%m%d_%H%M%S") == latest_backup_timestamp:
-                    att = a
-                    break
-    
-    if not att:
-        logger.error(f"Could not find attachment for selected backup message: {backup_msg.jump_url}")
+    # Get the specific attachment that matched the max size
+    target_att = None
+    for a in best_msg.attachments:
+        if a.size == max_size:
+            target_att = a
+            break
+            
+    if not target_att:
         return False
-    logger.info(f"Restoring from: {att.filename} ({att.size // 1024}KB) sent {backup_msg.created_at}")
+
+    logger.info(f"💎 Restoring LARGEST backup: {target_att.filename} ({target_att.size // 1024}KB)")
     try:
         import aiohttp
         async with aiohttp.ClientSession() as s:
-            async with s.get(att.url, timeout=aiohttp.ClientTimeout(total=30)) as r:
+            async with s.get(target_att.url, timeout=aiohttp.ClientTimeout(total=60)) as r:
                 backup_bytes = await r.read()
+        
         rows = await import_db(bot, backup_bytes)
-        logger.info(f"✅ DB auto-restored! {rows} rows recovered.")
+        logger.info(f"✅ DB auto-restored! {rows} rows recovered from the largest backup.")
         return True
     except Exception as e:
         logger.error(f"Auto-restore failed: {e}")
@@ -244,23 +218,30 @@ async def send_backup(
 
     try:
         # SAFETY CHECK: Never back up an empty database if it's an auto-trigger.
-        # This prevents overwriting good backups with empty ones during a failed restore.
         if triggered_by in ("auto-1min", "startup_sync"):
-            from utils.db_backup import is_db_empty
             if await is_db_empty(bot):
                 logger.warning(f"⚠ Skipping {triggered_by} backup: Database is empty.")
                 return False
 
         backup_bytes = await export_db(bot)
+        
+        # Don't send backups that are too small (empty tables)
+        if len(backup_bytes) < (100 * 1024):
+            logger.warning(f"⚠ Backup too small ({len(backup_bytes)//1024}KB) — likely empty. Skipping.")
+            return False
+
         timestamp    = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        config_id    = f"{timestamp}_{os.urandom(4).hex()}" # Unique ID for this config
+        config_id    = f"{timestamp}_{os.urandom(4).hex()}"
         fname        = f"xero_backup_{config_id}.gz"
         file         = discord.File(io.BytesIO(backup_bytes), filename=fname)
+        
         buf = io.BytesIO(backup_bytes)
         with gzip.GzipFile(fileobj=buf, mode="rb") as gz:
             meta = json.loads(gz.read())
+            
         guilds = len(meta["tables"].get("guild_settings", []))
         total  = sum(len(v) for v in meta["tables"].values())
+        
         await channel.send(
             content=(
                 f"📦 **XERO Auto-Backup** | `{timestamp} UTC` | ID: `{config_id}` | trigger: `{triggered_by}`\n"
@@ -285,14 +266,11 @@ async def find_backup_by_id(bot: discord.Client, config_id: str) -> Optional[dis
         logger.error(f"Cannot access backup channel {BACKUP_CHANNEL_ID}: {e}")
         return None
 
-    async for msg in channel.history(limit=500): # Search more messages for specific ID
+    async for msg in channel.history(limit=500):
         if msg.attachments:
             for att in msg.attachments:
                 if config_id in att.filename:
                     return msg
-    return None
-    # Search the message content as well, for the new format
-    async for msg in channel.history(limit=500):
         if f"ID: `{config_id}`" in msg.content:
             return msg
             
