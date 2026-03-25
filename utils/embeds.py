@@ -316,3 +316,203 @@ def escalation_embed(
     embed.set_thumbnail(url=user.display_avatar.url)
     embed.set_footer(text="XERO Smart Moderation  •  Auto-Escalation")
     return embed
+
+
+def stock_embed(stocks: list) -> discord.Embed:
+    """Displays the XERO Stock Exchange — all tickers, prices, and 1-period change."""
+    embed = discord.Embed(
+        title="📈  XERO Stock Exchange",
+        description="Live prices updated every hour. Buy low, sell high.",
+        color=XERO.ECONOMY,
+        timestamp=discord.utils.utcnow(),
+    )
+    if not stocks:
+        embed.description = "No stocks available right now. Check back soon!"
+        embed.set_footer(text=FOOTER_ECO)
+        return embed
+
+    lines = []
+    for s in stocks:
+        symbol    = s["symbol"]
+        name      = s["name"]
+        price     = s["price"]
+        prev      = s.get("prev_price", price)
+        diff      = price - prev
+        pct       = (diff / max(prev, 1)) * 100
+        arrow     = "🟢 ▲" if diff >= 0 else "🔴 ▼"
+        sign      = "+" if diff >= 0 else ""
+        lines.append(
+            f"**{symbol}** — {name}\n"
+            f"  `${price:,}`  {arrow} {sign}{diff:,} ({sign}{pct:.1f}%)"
+        )
+
+    # Split into two columns of fields for readability
+    mid = (len(lines) + 1) // 2
+    embed.add_field(name="🏦  Tickers (1/2)", value="\n\n".join(lines[:mid]) or "—", inline=True)
+    embed.add_field(name="🏦  Tickers (2/2)", value="\n\n".join(lines[mid:]) or "—", inline=True)
+    embed.set_footer(text=FOOTER_ECO)
+    return embed
+
+
+def heist_embed(
+    leader: discord.Member,
+    bank: str,
+    participants: list,
+    potential: int,
+    success: bool = None,
+    actual_reward: int = None,
+) -> discord.Embed:
+    """
+    Heist embed — three states:
+      • Planning  (success=None)  — recruiting phase
+      • Success   (success=True)  — payout
+      • Failure   (success=False) — fine
+    """
+    crew_list = ", ".join(m.mention for m in participants) if participants else leader.mention
+
+    if success is None:
+        # ── Planning phase ──────────────────────────────────────────────────
+        embed = discord.Embed(
+            title=f"🏦  HEIST PLANNED  •  {bank}",
+            description=(
+                f"{leader.mention} is planning a heist on **{bank}**!\n\n"
+                f"Click **Join Heist** to join the crew.\n"
+                f"More crew = higher success chance.\n"
+                f"*Heist executes in **60 seconds**.*"
+            ),
+            color=XERO.WARNING,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name="💰  Potential Loot",  value=f"**${potential:,}**",          inline=True)
+        embed.add_field(name="👥  Crew",             value=crew_list,                       inline=True)
+        embed.add_field(name="📊  Base Success",     value="**30%** (+8% per extra member)", inline=True)
+        embed.set_thumbnail(url=leader.display_avatar.url)
+
+    elif success:
+        # ── Success ─────────────────────────────────────────────────────────
+        per_person = actual_reward // max(len(participants), 1)
+        embed = discord.Embed(
+            title=f"💰  HEIST SUCCESSFUL  •  {bank}",
+            description=(
+                f"The crew cracked **{bank}** and walked away clean!\n\n"
+                f"**Total stolen:** ${actual_reward:,}\n"
+                f"**Each member gets:** ${per_person:,}"
+            ),
+            color=XERO.SUCCESS,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name="👥  Crew",   value=crew_list,                  inline=False)
+        embed.add_field(name="🎯  Target", value=f"**{bank}**",              inline=True)
+        embed.add_field(name="💵  Payout", value=f"**${per_person:,}** each", inline=True)
+        embed.set_thumbnail(url=leader.display_avatar.url)
+
+    else:
+        # ── Failure ──────────────────────────────────────────────────────────
+        embed = discord.Embed(
+            title=f"🚨  HEIST FAILED  •  {bank}",
+            description=(
+                f"The crew got caught trying to rob **{bank}**!\n\n"
+                f"Security was too tight. Everyone pays a fine of **${actual_reward:,}**."
+            ),
+            color=XERO.ERROR,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(name="👥  Caught",  value=crew_list,                   inline=False)
+        embed.add_field(name="🏦  Target",  value=f"**{bank}**",               inline=True)
+        embed.add_field(name="💸  Fine",    value=f"**${actual_reward:,}** each", inline=True)
+        embed.set_thumbnail(url=leader.display_avatar.url)
+
+    embed.set_footer(text=FOOTER_ECO)
+    return embed
+
+
+def milestone_embed(guild: discord.Guild, member_count: int) -> discord.Embed:
+    """Celebration embed for server member milestones (100, 500, 1000, etc.)."""
+    # Pick a colour that escalates with size
+    if member_count >= 10_000:
+        color = XERO.GOLD
+        tier  = "🏆 LEGENDARY"
+    elif member_count >= 1_000:
+        color = XERO.SECONDARY
+        tier  = "💎 EPIC"
+    elif member_count >= 500:
+        color = XERO.PRIMARY
+        tier  = "🌟 AMAZING"
+    else:
+        color = XERO.SUCCESS
+        tier  = "🎉 MILESTONE"
+
+    embed = discord.Embed(
+        title=f"{tier}  •  {guild.name} reached {member_count:,} members!",
+        description=(
+            f"**{guild.name}** just hit **{member_count:,} members**! 🎊\n\n"
+            f"Thank you to every single person who joined and made this community what it is.\n"
+            f"Here's to the next milestone! 🚀"
+        ),
+        color=color,
+        timestamp=discord.utils.utcnow(),
+    )
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+    embed.add_field(name="👥  Members",  value=f"**{member_count:,}**", inline=True)
+    embed.add_field(name="🏠  Server",   value=guild.name,              inline=True)
+    embed.set_footer(text=FOOTER_MAIN)
+    return embed
+
+
+def health_embed(
+    guild: discord.Guild,
+    score: int,
+    grade: str,
+    analysis: str,
+    recommendations: list,
+) -> discord.Embed:
+    """
+    Server health report embed.
+    score         — 0-100 integer health score
+    grade         — letter grade string, e.g. "A", "B+", "C"
+    analysis      — AI-generated or rule-based analysis paragraph
+    recommendations — list of recommendation strings
+    """
+    # Color based on score
+    if score >= 80:
+        color = XERO.SUCCESS
+        status = "🟢 Excellent"
+    elif score >= 60:
+        color = XERO.PRIMARY
+        status = "🔵 Good"
+    elif score >= 40:
+        color = XERO.WARNING
+        status = "🟡 Needs Attention"
+    else:
+        color = XERO.ERROR
+        status = "🔴 Critical"
+
+    # Progress bar
+    filled = int(score / 5)
+    bar    = "█" * filled + "░" * (20 - filled)
+
+    embed = discord.Embed(
+        title=f"🏥  Server Health Report  •  {guild.name}",
+        description=analysis or "No analysis available.",
+        color=color,
+        timestamp=discord.utils.utcnow(),
+    )
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+
+    embed.add_field(name="📊  Health Score",  value=f"**{score}/100**  ({status})",  inline=True)
+    embed.add_field(name="🎓  Grade",          value=f"**{grade}**",                  inline=True)
+    embed.add_field(
+        name="📈  Score Bar",
+        value=f"`{bar}` {score}%",
+        inline=False,
+    )
+    if recommendations:
+        rec_text = "\n".join(f"• {r}" for r in recommendations[:8])  # cap at 8 to stay within field limit
+        embed.add_field(name="💡  Recommendations", value=rec_text, inline=False)
+    else:
+        embed.add_field(name="💡  Recommendations", value="No recommendations — server is in great shape!", inline=False)
+
+    embed.set_footer(text="XERO Smart Moderation  •  Server Health")
+    return embed
