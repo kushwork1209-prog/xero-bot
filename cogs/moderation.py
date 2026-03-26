@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Moderation (16 commands)"""
 import discord
 from utils.guard import command_guard
@@ -67,7 +66,7 @@ class Moderation(commands.GroupCog, name="mod"):
         embed = comprehensive_embed(
             title=f"⚠️ Warnings — {user.display_name}",
             description=f"**{len(warns)}** total warning(s)",
-            color=XERO.PRIMARY,
+            color=discord.Color.orange(),
             thumbnail_url=user.display_avatar.url
         )
         for i, w in enumerate(warns[:10], 1):
@@ -257,7 +256,7 @@ class Moderation(commands.GroupCog, name="mod"):
         embed = comprehensive_embed(
             title=f"📋 Mod History — {user.display_name}",
             description=f"**{len(cases)}** case(s) | **{len(warns)}** warning(s)",
-            color=XERO.PRIMARY,
+            color=discord.Color.orange(),
             thumbnail_url=user.display_avatar.url
         )
         if cases:
@@ -334,7 +333,7 @@ class Moderation(commands.GroupCog, name="mod"):
                 rows = [dict(r) for r in await c.fetchall()]
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Notes", f"No mod notes for {user.mention}."), ephemeral=True)
-        embed = comprehensive_embed(title=f"📝 Mod Notes — {user.display_name}", color=XERO.PRIMARY, thumbnail_url=user.display_avatar.url)
+        embed = comprehensive_embed(title=f"📝 Mod Notes — {user.display_name}", color=discord.Color.orange(), thumbnail_url=user.display_avatar.url)
         for r in rows:
             mod = interaction.guild.get_member(r["mod_id"])
             mod_name = mod.display_name if mod else f"ID:{r['mod_id']}"

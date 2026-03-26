@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """
 XERO Bot — Living Economy Advanced (14 commands)
 Streaks, heists, stock market, crafting, daily events.

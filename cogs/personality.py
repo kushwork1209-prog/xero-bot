@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """
 XERO Bot — Personality & Voice System
 XERO has a real character. It celebrates, reacts, gives witty responses,

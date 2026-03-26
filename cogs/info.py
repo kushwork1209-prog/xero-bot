@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """
 XERO Bot — /info Command Group
 All information commands in one clean, consistent, hyper-detailed group.
@@ -79,7 +78,7 @@ class Info(commands.GroupCog, name="info"):
 
         embed = discord.Embed(
             title=f"{'  '.join(badges)}" if badges else f"👤 {target.display_name}",
-            color=target.color if target.color.value else XERO.PRIMARY
+            color=target.color if target.color.value else discord.Color.blurple()
         )
         embed.set_author(name=f"{target} — Full Profile", icon_url=target.display_avatar.url)
         embed.set_thumbnail(url=target.display_avatar.url)
@@ -112,12 +111,10 @@ class Info(commands.GroupCog, name="info"):
             f"**Net Worth:** ${net_worth:,}"
         ), inline=True)
 
-        soft_warns = await self.bot.db.get_soft_warnings_count(interaction.guild.id, target.id)
         embed.add_field(name="📈 Activity", value=(
             f"**Commands Used:** {stats_data.get('commands_used', 0):,}\n"
             f"**Messages Sent:** {stats_data.get('messages_sent', 0):,}\n"
-            f"**Warnings:** {len(warnings)} (Formal)\n"
-            f"**Soft Warns:** {soft_warns} (AutoMod)\n"
+            f"**Warnings:** {len(warnings)}\n"
             f"**Mod Cases:** {len(cases)}"
         ), inline=True)
 
@@ -189,7 +186,7 @@ class Info(commands.GroupCog, name="info"):
         embed = discord.Embed(
             title=f"🏰 {g.name}",
             description=g.description or "*No description set*",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
         if g.icon:
             embed.set_thumbnail(url=g.icon.url)
@@ -272,7 +269,7 @@ class Info(commands.GroupCog, name="info"):
 
         embed = discord.Embed(
             title=f"🎭 {role.name}",
-            color=role.color if role.color.value else XERO.PRIMARY
+            color=role.color if role.color.value else discord.Color.blurple()
         )
 
         embed.add_field(name="📋 Details", value=(
@@ -323,7 +320,7 @@ class Info(commands.GroupCog, name="info"):
 
         embed = discord.Embed(
             title=f"📡 #{ch.name}",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
 
         # Channel type
@@ -404,7 +401,7 @@ class Info(commands.GroupCog, name="info"):
         embed = discord.Embed(
             title="🤖 XERO Bot — System Stats",
             description="Advanced AI-Powered Discord Bot by **Team Flame**\nAll premium features. Completely free.",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
         embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
@@ -456,7 +453,7 @@ class Info(commands.GroupCog, name="info"):
             return await interaction.response.send_message(embed=error_embed("Not Found", f"No custom emoji named `{emoji_name}` found in this server.\nUse `/info emojis` to see all emojis."), ephemeral=True)
         embed = discord.Embed(
             title=f"{found} :{found.name}:",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
         embed.set_thumbnail(url=str(found.url))
         embed.add_field(name="📋 Details", value=(
@@ -488,7 +485,7 @@ class Info(commands.GroupCog, name="info"):
         embed = comprehensive_embed(
             title=f"🔗 Invite: {code}",
             description=f"Destination: **{inv.guild.name if inv.guild else 'Unknown'}**",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
         if inv.guild and inv.guild.icon:
             embed.set_thumbnail(url=inv.guild.icon.url)
@@ -543,7 +540,7 @@ class Info(commands.GroupCog, name="info"):
 
         embed = discord.Embed(
             title=f"🔐 Permissions — {target.display_name} in #{ch.name}",
-            color=XERO.PRIMARY, if perms.administrator else XERO.PRIMARY
+            color=discord.Color.green() if perms.administrator else discord.Color.blurple()
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         if perms.administrator:
@@ -556,5 +553,5 @@ class Info(commands.GroupCog, name="info"):
         await interaction.response.send_message(embed=embed)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(Info(bot))

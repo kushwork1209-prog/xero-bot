@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Admin Dashboard (interactive panel)"""
 import discord
 from utils.guard import command_guard
@@ -37,7 +36,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/mod history`** — View user's full mod history",
             "**`/mod nick`** — Change/reset nickname",
             "**`/mod slowmode`** — Set channel slowmode",
-        ], XERO.PRIMARY)
+        ], discord.Color.red())
 
     @discord.ui.button(label="⚙️ Setup", style=discord.ButtonStyle.secondary, row=0)
     async def setup_btn(self, i, b):
@@ -56,7 +55,7 @@ class AdminDashboardView(discord.ui.View):
             f"**AI Responses:** {'✅ On' if settings.get('ai_enabled', 1) else '❌ Off'}",
             "",
             "Use **`/setup <option>`** to change any setting.",
-        ], XERO.PRIMARY)
+        ], discord.Color.blue())
 
     @discord.ui.button(label="🤖 AI Features", style=discord.ButtonStyle.blurple, row=0)
     async def ai_btn(self, i, b):
@@ -75,7 +74,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/ai fact-check`** — Verify claims with AI",
             "**`/ai roast`** — Playful roast generator",
             "**`/ai analyze-image`** — Vision AI image analysis",
-        ], XERO.PRIMARY)
+        ], discord.Color.purple())
 
     @discord.ui.button(label="💰 Economy", style=discord.ButtonStyle.success, row=0)
     async def eco_btn(self, i, b):
@@ -93,7 +92,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/shop`** — Browse items for sale",
             "**`/buy`** — Purchase shop items",
             "**`/rich`** — Server economy leaderboard",
-        ], XERO.PRIMARY)
+        ], discord.Color.gold())
 
     @discord.ui.button(label="🎉 Giveaways", style=discord.ButtonStyle.primary, row=1)
     async def gw_btn(self, i, b):
@@ -106,7 +105,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/giveaway edit-prize`** — Change the prize",
             "**`/giveaway winners`** — View giveaway info",
             "**`/giveaway delete`** — Delete all giveaway records",
-        ], XERO.PRIMARY)
+        ], discord.Color.gold())
 
     @discord.ui.button(label="🎫 Tickets", style=discord.ButtonStyle.secondary, row=1)
     async def ticket_btn(self, i, b):
@@ -117,7 +116,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/ticket add`** / **`/ticket remove`** — Add/remove users",
             "**`/ticket list`** — View all open tickets",
             "**`/ticket transcript`** — Export chat as text file",
-        ], XERO.PRIMARY)
+        ], discord.Color.blurple())
 
     @discord.ui.button(label="✅ Verification", style=discord.ButtonStyle.success, row=1)
     async def verify_btn(self, i, b):
@@ -128,7 +127,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/verify update-role`** — Change role assigned on verify",
             "**`/verify stats`** — View verification statistics",
             "**`/verify reset`** — Reset a user's verification",
-        ], XERO.PRIMARY)
+        ], discord.Color.green())
 
     @discord.ui.button(label="🎵 Music", style=discord.ButtonStyle.blurple, row=1)
     async def music_btn(self, i, b):
@@ -144,7 +143,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/music remove`** — Remove from queue",
             "",
             "*Requires: yt-dlp & FFmpeg installed*",
-        ], XERO.PRIMARY)
+        ], discord.Color.purple())
 
     @discord.ui.button(label="💾 Backup", style=discord.ButtonStyle.secondary, row=2)
     async def backup_btn(self, i, b):
@@ -154,7 +153,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/backup restore`** — Restore from backup by ID",
             "**`/backup delete`** — Delete a backup",
             "**`/backup export`** — Download as JSON file",
-        ], XERO.PRIMARY)
+        ], discord.Color.blurple())
 
     @discord.ui.button(label="🛡️ AutoMod", style=discord.ButtonStyle.danger, row=2)
     async def automod_btn(self, i, b):
@@ -167,7 +166,7 @@ class AdminDashboardView(discord.ui.View):
             "**`/automod add-filter`** — Add banned word",
             "**`/automod remove-filter`** — Remove banned word",
             "**`/automod list-filters`** — View full config",
-        ], XERO.PRIMARY)
+        ], discord.Color.orange())
 
 
 class BackView(discord.ui.View):
@@ -186,7 +185,7 @@ def _main_embed(guild):
     embed = discord.Embed(
         title=f"🎛️ XERO Control Panel — {guild.name}",
         description="Select a category below to explore commands and configuration.\nAll settings are live and persistent.",
-        color=XERO.PRIMARY,
+        color=discord.Color.blurple()
     )
     embed.add_field(name="📊 Server", value=f"**Members:** {guild.member_count:,}", inline=True)
     embed.add_field(name="📡 Channels", value=f"**Total:** {len(guild.channels)}", inline=True)

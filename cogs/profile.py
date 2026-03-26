@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Advanced Info & Profile Commands (12 commands)"""
 import discord
 from utils.guard import command_guard
@@ -42,7 +41,7 @@ class Profile(commands.GroupCog, name="profile"):
         if level >= 25: badges.append("⭐")
         embed = discord.Embed(
             title=f"{''.join(badges)} {target.display_name}'s Profile",
-            color=target.color if target.color.value else XERO.PRIMARY
+            color=target.color if target.color.value else discord.Color.blurple()
         )
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="📋 Account", value=(
@@ -95,7 +94,7 @@ class Profile(commands.GroupCog, name="profile"):
         embed = comprehensive_embed(
             title=f"🏆 {target.display_name}'s Achievements",
             description=f"**{len(unlocked)}/{len(all_achievements)}** unlocked",
-            color=XERO.PRIMARY,
+            color=discord.Color.gold(),
             thumbnail_url=target.display_avatar.url
         )
         if unlocked:
@@ -117,9 +116,7 @@ class Profile(commands.GroupCog, name="profile"):
 
         def winner(a, b): return "🏆" if a > b else ("🤝" if a == b else "")
 
-        embed = discord.Embed(title=f"⚔️ {user1.display_name} vs {u2.display_name}", color=XERO.PRIMARY,)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
+        embed = discord.Embed(title=f"⚔️ {user1.display_name} vs {u2.display_name}", color=discord.Color.blurple())
         embed.add_field(name=f"📊 Level", value=(
             f"{user1.display_name}: **{d1_lvl.get('level',0)}** {winner(d1_lvl.get('level',0), d2_lvl.get('level',0))}\n"
             f"{u2.display_name}: **{d2_lvl.get('level',0)}** {winner(d2_lvl.get('level',0), d1_lvl.get('level',0))}"
@@ -163,7 +160,7 @@ class ImageGen(commands.GroupCog, name="imagine"):
         embed = comprehensive_embed(
             title="🎨 AI Image Generated",
             description=f"**Prompt:** {prompt[:200]}",
-            color=XERO.PRIMARY,
+            color=discord.Color.purple()
         )
         embed.add_field(name="Model", value=model.replace("-", " ").title(), inline=True)
         embed.add_field(name="Dimensions", value=f"{width}×{height}", inline=True)
@@ -182,7 +179,7 @@ class ImageGen(commands.GroupCog, name="imagine"):
         import random
         encoded = urllib.parse.quote(prompt)
         seeds = [random.randint(1, 999999) for _ in range(3)]
-        embed = comprehensive_embed(title="🎨 Image Variations", description=f"**Prompt:** {prompt[:200]}", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="🎨 Image Variations", description=f"**Prompt:** {prompt[:200]}", color=discord.Color.purple())
         for i, seed in enumerate(seeds, 1):
             url = f"https://image.pollinations.ai/prompt/{encoded}?width=512&height=512&seed={seed}&model=flux&nologo=true"
             embed.add_field(name=f"Variation {i}", value=f"[View Image]({url}) | Seed: {seed}", inline=True)
@@ -210,7 +207,7 @@ class ImageGen(commands.GroupCog, name="imagine"):
         image_url = f"https://image.pollinations.ai/prompt/{encoded}?width=512&height=512&seed={seed}&model=flux&nologo=true"
         embed = comprehensive_embed(
             title=f"🎨 {target.display_name} — {style.title()}",
-            color=XERO.PRIMARY,
+            color=discord.Color.purple()
         )
         embed.set_image(url=image_url)
         embed.set_thumbnail(url=target.display_avatar.url)

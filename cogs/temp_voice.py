@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Temp Voice Channels (6 commands)
 Join a trigger channel → your own private voice channel is created.
 Leave → channel auto-deletes. Fully manageable.
@@ -121,7 +120,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
                 channels = [dict(r) for r in await c.fetchall()]
         if not channels:
             return await interaction.response.send_message(embed=info_embed("No Active Channels", "No temp voice channels are currently active."))
-        embed = comprehensive_embed(title=f"🎙️ Active Temp Channels ({len(channels)})", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title=f"🎙️ Active Temp Channels ({len(channels)})", color=discord.Color.blurple())
         for ch_data in channels:
             vc = interaction.guild.get_channel(ch_data["channel_id"])
             owner = interaction.guild.get_member(ch_data["owner_id"])

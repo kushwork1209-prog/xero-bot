@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Server Setup & Configuration (12 commands)"""
 import discord
 from discord.ext import commands
@@ -125,7 +124,7 @@ class Setup(commands.GroupCog, name="setup"):
         embed = comprehensive_embed(
             title=f"⚙️ Server Configuration — {interaction.guild.name}",
             description="Current XERO bot settings for this server.",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple(),
             thumbnail_url=interaction.guild.icon.url if interaction.guild.icon else None
         )
         embed.add_field(name="📢 Channels", value=(

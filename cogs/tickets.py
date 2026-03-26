@@ -1,26 +1,19 @@
-from utils.embeds import brand_embed
-from utils.embeds import XERO
-from utils.guard import command_guard
 """
 XERO Bot — Ticket System (Complete Rewrite)
-ZNYT-style category dropdowns, emoji-named channels, and staff intelligence briefs.
+Every action permanently logged. Full case log on close. AI summary. Paginated history.
 """
 import discord, aiosqlite, asyncio, io, logging, datetime
 from discord.ext import commands
 from discord import app_commands
+from utils.embeds import XERO, success_embed, error_embed, info_embed
 
 logger = logging.getLogger("XERO.Tickets")
 
-TC_OPEN    = XERO.PRIMARY
-TC_CLAIMED = XERO.PRIMARY
-TC_CLOSED  = XERO.PRIMARY
-TC_HISTORY = XERO.PRIMARY
+TC_OPEN    = 0x2B2D31
+TC_CLAIMED = 0x5865F2
+TC_CLOSED  = 0x1A1A1A
+TC_HISTORY = 0x23272A
 
-TICKET_CATEGORIES = {
-    "general": {"label": "General Support", "emoji": "🔧", "description": "Basic questions and help"},
-    "senior": {"label": "Senior Support", "emoji": "📋", "description": "Prize claims and partnership requests"},
-    "executive": {"label": "Executive Support", "emoji": "💼", "description": "Career opportunities and reports"},
-}
 
 async def _log_event(db_path, ticket_id, guild_id, user_id, event_type, detail=None):
     async with aiosqlite.connect(db_path) as db:
@@ -120,8 +113,6 @@ async def _close_flow(interaction, bot, reason="Resolved"):
 
     # Case log embed
     e = discord.Embed(title=f"📁  Case #{tid}  —  Closed", color=TC_CLOSED, timestamp=discord.utils.utcnow())
-    e, file = await brand_embed(e, guild, bot)
-    e, file = await brand_embed(e, guild, bot)
     o_str = f"{opener.mention} `{opener}` (`{ticket['user_id']}`)" if opener else f"`<@{ticket['user_id']}>`"
     c_str = f"{closer.mention} (`{closer}`)"
     e.add_field(name="👤  Opened By", value=o_str,                                inline=False)
@@ -159,7 +150,20 @@ async def _close_flow(interaction, bot, reason="Resolved"):
     except Exception as ex: logger.error(f"Delete: {ex}")
 
 
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# STAFF INTELLIGENCE BRIEF
+# Generated fresh when a ticket opens. Posted to channel, visible staff only.
+# Never stored in ticket history or /ticket history.
+# Pulls: account age, cross-server bans, all mod history, economy, XP, tickets
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int) -> discord.Embed:
+    """
+    Pulls every piece of data we have on this user across the entire XERO network
+    and generates a staff-only intelligence brief.
+    Nemotron reads it all and writes a natural-language overview.
+    """
     uid    = member.id
     gid    = guild.id
     db_path = bot.db.db_path
@@ -174,15 +178,16 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
             (gid, uid)
         ) as c: local_cases = [dict(r) for r in await c.fetchall()]
 
-        # Cross-server mod cases
+        # ★ Cross-server mod cases (ALL guilds in XERO network)
         async with db.execute(
             "SELECT guild_id, action, reason, timestamp FROM mod_cases WHERE user_id=? AND guild_id!=? ORDER BY case_id DESC LIMIT 20",
             (uid, gid)
         ) as c: global_cases = [dict(r) for r in await c.fetchall()]
 
+        # Cross-server bans specifically
         cross_bans = [c for c in global_cases if c["action"].lower() in ("ban","tempban")]
 
-        # Warnings
+        # Warnings in this server
         async with db.execute(
             "SELECT reason, timestamp FROM warnings WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 5",
             (gid, uid)
@@ -194,37 +199,104 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
                 blacklisted = await c.fetchone()
         except Exception: blacklisted = None
 
-        # Tickets
+        # Tickets in this server
         async with db.execute(
             "SELECT COUNT(*) as total, SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) as open_count FROM tickets WHERE guild_id=? AND user_id=?",
             (gid, uid)
         ) as c:
             tkt = dict(await c.fetchone())
 
+        # Economy
+        async with db.execute("SELECT wallet, bank, total_earned FROM economy WHERE guild_id=? AND user_id=?", (gid, uid)) as c:
+            eco = dict(await c.fetchone()) if (row := await c.fetchone()) else None
+        if eco is None:
+            try:
+                async with db.execute("SELECT wallet, bank, total_earned FROM economy WHERE guild_id=? AND user_id=?", (gid, uid)) as c:
+                    r = await c.fetchone()
+                    eco = dict(r) if r else {"wallet":0,"bank":0,"total_earned":0}
+            except Exception: eco = {"wallet":0,"bank":0,"total_earned":0}
+
         # XP / Level
         async with db.execute("SELECT level, total_xp FROM levels WHERE guild_id=? AND user_id=?", (gid, uid)) as c:
             lvl_row = await c.fetchone()
         lvl = dict(lvl_row) if lvl_row else {"level":0,"total_xp":0}
 
-        # Previous closed tickets
+        # Previous closed tickets (summary only)
         async with db.execute(
-            "SELECT ticket_id, topic, ai_summary, closed_at FROM tickets WHERE guild_id=? AND user_id=? AND status='closed' ORDER BY ticket_id DESC LIMIT 3",
+            "SELECT ticket_id, topic, ai_summary, closed_at FROM tickets WHERE guild_id=? AND user_id=? AND status=\'closed\' ORDER BY ticket_id DESC LIMIT 3",
             (gid, uid)
         ) as c: prev_tickets = [dict(r) for r in await c.fetchall()]
 
-    e = discord.Embed(title="🛡️  STAFF INTELLIGENCE BRIEF", color=XERO.PRIMARY, timestamp=discord.utils.utcnow())
-    e, file = await brand_embed(e, guild, bot)
-    e, file = await brand_embed(e, guild, bot)
-    e.set_author(name=f"{member} — {uid}", icon_url=member.display_avatar.url)
-    
-    e.add_field(name="⏳ Account Age", value=f"{age_days} days", inline=True)
-    e.add_field(name="📊 Server Activity", value=f"Level {lvl['level']} ({lvl['total_xp']:,} XP)", inline=True)
-    e.add_field(name="📂 Ticket History", value=f"{tkt['total']} total ({tkt['open_count']} open)", inline=True)
+        # User activity stats
+        async with db.execute("SELECT commands_used, messages_sent FROM user_stats WHERE guild_id=? AND user_id=?", (gid, uid)) as c:
+            stats = dict(await c.fetchone()) if (r2 := await c.fetchone()) else {"commands_used":0,"messages_sent":0}
 
+    # How many XERO servers this user appears in
+    xero_server_count = len(set(c["guild_id"] for c in global_cases))
+
+    # Build the raw data for AI
+    lines = [
+        f"User: {member.display_name} ({member}), ID: {uid}",
+        f"Account age: {age_days} days old",
+        f"Joined this server: {(discord.utils.utcnow() - member.joined_at).days if member.joined_at else '?'} days ago",
+        f"Server level: {lvl['level']}, XP: {lvl['total_xp']:,}",
+        f"Economy: ${eco['wallet']:,} wallet, ${eco['bank']:,} bank, ${eco['total_earned']:,} total earned",
+        f"Activity: {stats.get('commands_used',0):,} commands used, {stats.get('messages_sent',0):,} messages",
+        f"Tickets in this server: {tkt['total']} total, {tkt['open_count']} open",
+        f"Warnings in this server: {len(warns)}",
+    ]
     if local_cases:
-        case_list = "\n".join([f"• **{c['action'].upper()}** — {c['timestamp'][:10]} — *{c['reason'][:40]}*" for c in local_cases[:3]])
-        e.add_field(name="⚖️ Recent Mod Cases", value=case_list, inline=False)
-    
+        case_summary = ", ".join(f"{c['action']} ({c['timestamp'][:10]})" for c in local_cases[:5])
+        lines.append(f"Local mod actions: {case_summary}")
+    if cross_bans:
+        ban_details = []
+        for b in cross_bans[:5]:
+            s_name = bot.get_guild(b["guild_id"])
+            sname  = s_name.name if s_name else f"Server {b['guild_id']}"
+            ban_details.append(f"banned from {sname} on {b['timestamp'][:10]}")
+        lines.append(f"CROSS-SERVER BANS: {', '.join(ban_details)}")
+    if global_cases and not cross_bans:
+        lines.append(f"Cross-server mod history: {len(global_cases)} actions across {xero_server_count} other XERO servers")
+    if blacklisted:
+        lines.append(f"GLOBAL XERO BLACKLIST: YES — {blacklisted['reason']}")
+    if prev_tickets:
+        for pt in prev_tickets[:2]:
+            if pt.get("ai_summary"):
+                lines.append(f"Previous ticket #{pt['ticket_id']} ({pt.get('topic','?')}): {pt['ai_summary'][:100]}")
+
+    raw_data = "\n".join(lines)
+
+    # AI writes the brief
+    ai_brief = None
+    try:
+        prompt = (
+            f"You are writing a staff intelligence brief for a Discord support ticket. "
+            f"Write a concise 3-4 sentence overview of this user for the staff team to read before responding. "
+            f"Be direct and professional. Flag anything concerning clearly (bans, warnings, blacklist). "
+            f"If there are cross-server bans, that\'s the most important thing to lead with.\n\n"
+            f"Data:\n{raw_data}"
+        )
+        ai_brief = await bot.nvidia.ask(prompt)
+    except Exception as e:
+        logger.debug(f"Staff brief AI: {e}")
+
+    # Build the embed
+    risk = "🔴 HIGH" if (blacklisted or len(cross_bans) >= 2) else ("🟡 MEDIUM" if (cross_bans or len(warns) >= 3 or len(local_cases) >= 3) else "🟢 LOW")
+
+    e = discord.Embed(
+        title=f"👁  Staff Brief — {member.display_name}",
+        description=ai_brief or raw_data[:800],
+        color=0xFF1744 if "HIGH" in risk else (0xFFB800 if "MEDIUM" in risk else 0x2B2D31),
+        timestamp=discord.utils.utcnow()
+    )
+    e.set_thumbnail(url=member.display_avatar.url)
+    e.add_field(name="⚠️ Risk Level",       value=risk,                                          inline=True)
+    e.add_field(name="📅 Account Age",      value=f"{age_days} days",                            inline=True)
+    e.add_field(name="📊 Server Level",     value=str(lvl["level"]),                             inline=True)
+    e.add_field(name="💬 Messages",         value=f"{stats.get('messages_sent',0):,}",           inline=True)
+    e.add_field(name="⚠️ Local Warns",      value=str(len(warns)),                               inline=True)
+    e.add_field(name="🛡️ Local Cases",      value=str(len(local_cases)),                         inline=True)
+
     if cross_bans:
         ban_lines = []
         for b in cross_bans[:4]:
@@ -244,91 +316,66 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
     e.set_footer(text=f"Case #{ticket_id}  •  Staff Only — not visible to {member.display_name}  •  XERO Intelligence")
     return e
 
-class TicketCategorySelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label=v["label"], value=k, emoji=v["emoji"], description=v["description"])
-            for k, v in TICKET_CATEGORIES.items()
-        ]
-        super().__init__(placeholder="Choose a support category...", min_values=1, max_values=1, options=options, custom_id="xero_t_select")
+class TicketOpenView(discord.ui.View):
+    def __init__(self): super().__init__(timeout=None)
 
-    async def callback(self, interaction: discord.Interaction):
-        category_key = self.values[0]
-        category_info = TICKET_CATEGORIES[category_key]
-        
+    @discord.ui.button(label="Open a Ticket", style=discord.ButtonStyle.secondary, custom_id="xero_t_open_v2", emoji="🎫")
+    async def open_ticket(self, interaction, button):
         bot      = interaction.client
         guild    = interaction.guild
         settings = await bot.db.get_guild_settings(guild.id)
-        
         async with aiosqlite.connect(bot.db.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT channel_id FROM tickets WHERE guild_id=? AND user_id=? AND status='open'", (guild.id, interaction.user.id)) as c:
                 existing = await c.fetchone()
-        
         if existing:
             ch = guild.get_channel(existing["channel_id"])
             if ch: return await interaction.response.send_message(f"You already have an open ticket: {ch.mention}", ephemeral=True)
 
         cat  = guild.get_channel(settings.get("ticket_category_id") or 0)
         role = guild.get_role(settings.get("ticket_support_role_id") or 0)
-        
         ow   = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             interaction.user:   discord.PermissionOverwrite(view_channel=True, send_messages=True, attach_files=True, read_message_history=True),
             guild.me:           discord.PermissionOverwrite(view_channel=True, send_messages=True, manage_channels=True, manage_messages=True),
         }
         if role: ow[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-        
         try:
-            # ZNYT Style: emoji-name (🔧-john_doe)
-            clean_name = interaction.user.display_name[:18].lower().replace(' ','-')
-            channel_name = f"{category_info['emoji']}-{clean_name}"
-            
             ch = await guild.create_text_channel(
-                channel_name,
+                f"ticket-{interaction.user.display_name[:18].lower().replace(' ','-')}",
                 category=cat, overwrites=ow,
-                topic=f"{category_info['label']} — {interaction.user} — {discord.utils.utcnow().strftime('%Y-%m-%d')}"
+                topic=f"Support ticket — {interaction.user} — {discord.utils.utcnow().strftime('%Y-%m-%d')}"
             )
         except Exception as ex:
             return await interaction.response.send_message(f"❌ {ex}", ephemeral=True)
 
         async with aiosqlite.connect(bot.db.db_path) as db:
-            cur = await db.execute("INSERT INTO tickets (guild_id, channel_id, user_id, topic) VALUES (?,?,?,?)", (guild.id, ch.id, interaction.user.id, category_info['label']))
+            cur = await db.execute("INSERT INTO tickets (guild_id, channel_id, user_id) VALUES (?,?,?)", (guild.id, ch.id, interaction.user.id))
             tid = cur.lastrowid
             await db.commit()
 
-        await _log_event(bot.db.db_path, tid, guild.id, interaction.user.id, "opened", f"Opened {category_info['label']} ticket")
+        await _log_event(bot.db.db_path, tid, guild.id, interaction.user.id, "opened", f"Opened by {interaction.user}")
 
-        emb = discord.Embed(title=f"Ticket #{tid} — {category_info['label']}", description=f"Hello {interaction.user.mention}!\n\nYou have opened a **{category_info['label']}** ticket. Describe your issue clearly and staff will assist you shortly.", color=TC_OPEN, timestamp=discord.utils.utcnow())
-        emb, file = await brand_embed(emb, interaction.guild, bot)
-        emb, file = await brand_embed(emb, interaction.guild, bot)
+        emb = discord.Embed(title=f"Ticket #{tid}", description=f"Hello {interaction.user.mention}!\n\nDescribe your issue clearly and a staff member will assist you shortly.", color=TC_OPEN, timestamp=discord.utils.utcnow())
         emb.set_thumbnail(url=interaction.user.display_avatar.url)
         emb.set_footer(text=f"Case #{tid}  •  XERO Tickets")
-        
-        # Apply branding
-        emb, file = await brand_embed(emb, guild, bot)
-        
         ping = interaction.user.mention + (f" | {role.mention}" if role else "")
-        if file:
-            await ch.send(content=ping, embed=emb, view=TicketActionView(bot), file=file)
-        else:
-            await ch.send(content=ping, embed=emb, view=TicketActionView(bot))
+        await ch.send(content=ping, embed=emb, view=TicketActionView(bot))
 
-        # Staff Intelligence Brief
+        # ── Staff Intelligence Brief ──────────────────────────────────────
+        # Runs async after channel is created — staff see this at the top, opener cannot
         try:
             brief = await _build_staff_brief(bot, guild, interaction.user, tid)
+            # Send to staff — if there's a support role, mention them so they see it
+            # This is sent WITHOUT @mention so it appears centered/pinned at top
             brief_msg = await ch.send(embed=brief)
             try: await brief_msg.pin()
-            except Exception: pass
+            except Exception: pass  # no pin perms? just leave it at top
         except Exception as ex:
             logger.error(f"Staff brief: {ex}")
 
-        await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}", ephemeral=True)
+        await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}")
 
-class TicketOpenView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        self.add_item(TicketCategorySelect())
 
 class TicketActionView(discord.ui.View):
     def __init__(self, bot=None): super().__init__(timeout=None); self.bot = bot
@@ -336,10 +383,10 @@ class TicketActionView(discord.ui.View):
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.secondary, custom_id="xero_t_claim_v2", emoji="🙋")
     async def claim(self, interaction, button):
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.response.send_message("Staff only.", ephemeral=True)
+            return await interaction.response.send_message("Staff only.")
         bot    = interaction.client
         ticket = await _get_ticket(bot.db.db_path, interaction.channel.id)
-        if not ticket: return await interaction.response.send_message("Not a ticket.", ephemeral=True)
+        if not ticket: return await interaction.response.send_message("Not a ticket.")
         if ticket.get("claimed_by"):
             m = interaction.guild.get_member(ticket["claimed_by"])
             return await interaction.response.send_message(f"Already claimed by {m.mention if m else 'someone'}.", ephemeral=True)
@@ -352,10 +399,10 @@ class TicketActionView(discord.ui.View):
     @discord.ui.button(label="Unclaim", style=discord.ButtonStyle.secondary, custom_id="xero_t_unclaim_v2", emoji="🔓")
     async def unclaim(self, interaction, button):
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.response.send_message("Staff only.", ephemeral=True)
+            return await interaction.response.send_message("Staff only.")
         bot    = interaction.client
         ticket = await _get_ticket(bot.db.db_path, interaction.channel.id)
-        if not ticket: return await interaction.response.send_message("Not a ticket.", ephemeral=True)
+        if not ticket: return await interaction.response.send_message("Not a ticket.")
         async with aiosqlite.connect(bot.db.db_path) as db:
             await db.execute("UPDATE tickets SET claimed_by=NULL WHERE ticket_id=?", (ticket["ticket_id"],))
             await db.commit()
@@ -365,7 +412,7 @@ class TicketActionView(discord.ui.View):
     @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, custom_id="xero_t_close_v2", emoji="🔒")
     async def close(self, interaction, button):
         if not interaction.user.guild_permissions.manage_channels:
-            return await interaction.response.send_message("Staff only.", ephemeral=True)
+            return await interaction.response.send_message("Staff only.")
         await _close_flow(interaction, interaction.client)
 
 
@@ -403,8 +450,6 @@ class TicketHistoryView(discord.ui.View):
         timeline  = "\n".join(_fmt_event(ev, self.guild) for ev in staff_evs) if staff_evs else "*No staff events on record.*"
 
         e = discord.Embed(title=f"📁  Case #{t['ticket_id']}", color=TC_HISTORY, timestamp=discord.utils.utcnow())
-        e, file = await brand_embed(e, guild, bot)
-        e, file = await brand_embed(e, guild, bot)
         e.add_field(name="👤  Opened By",  value=o_str,                               inline=False)
         e.add_field(name="🔒  Closed By",  value=c_str,                               inline=True)
         e.add_field(name="⏱️  Duration",   value=duration,                            inline=True)
@@ -444,7 +489,7 @@ class Tickets(commands.GroupCog, name="ticket"):
         bot.add_view(TicketOpenView())
         bot.add_view(TicketActionView(bot))
 
-    @app_commands.command(name="setup", description="Set up the ZNYT-style ticket panel with category dropdown.")
+    @app_commands.command(name="setup", description="Set up the ticket panel. Posts the Open a Ticket button.")
     @app_commands.describe(channel="Where to post the panel", support_role="Role to ping", category="Category for ticket channels", log_channel="Where case logs are posted on close", message="Custom panel message")
     @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel,
@@ -453,28 +498,12 @@ class Tickets(commands.GroupCog, name="ticket"):
         if support_role: await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_support_role_id", support_role.id)
         if category:     await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_category_id", category.id)
         if log_channel:  await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_log_channel_id", log_channel.id)
-
-        txt = message or "Welcome to our assistance centre. If you need assistance within the server, please follow the guidelines below to choose the correct support category."
-        emb = discord.Embed(title="Assistance", description=txt, color=TC_OPEN)
-        emb, file = await brand_embed(emb, guild, bot)
-        emb, file = await brand_embed(emb, guild, bot)
-        
-        # ZNYT Style Layout
-        emb.add_field(name="General Support", value="Basic Questions", inline=False)
-        emb.add_field(name="Senior Support", value="Prize Claims\nPartnership Requests", inline=False)
-        emb.add_field(name="Executive Support", value="Career Opportunities\nReports & Appeals", inline=False)
-        
+        txt  = message or "Need help? Click the button below to open a support ticket."
+        emb  = discord.Embed(title="Support Tickets", description=txt, color=TC_OPEN)
         if interaction.guild.icon: emb.set_thumbnail(url=interaction.guild.icon.url)
-        
-        # Apply Branding
-        emb, file = await brand_embed(emb, interaction.guild, self.bot)
-        
-        if file:
-            await channel.send(embed=emb, view=TicketOpenView(), file=file)
-        else:
-            await channel.send(embed=emb, view=TicketOpenView())
-            
-        desc = f"ZNYT-style ticket panel posted in {channel.mention}."
+        emb.set_footer(text=f"{interaction.guild.name}  •  XERO Tickets")
+        await channel.send(embed=emb, view=TicketOpenView())
+        desc = f"Panel posted in {channel.mention}."
         if support_role: desc += f"\nSupport role: {support_role.mention}"
         if category:     desc += f"\nCategory: {category.mention}"
         if log_channel:  desc += f"\nCase logs → {log_channel.mention}"
@@ -539,8 +568,6 @@ class Tickets(commands.GroupCog, name="ticket"):
         if not tickets:
             return await interaction.response.send_message(embed=info_embed("No Open Tickets","All quiet."))
         e = discord.Embed(title=f"Open Tickets — {len(tickets)} active", color=TC_OPEN, timestamp=discord.utils.utcnow())
-        e, file = await brand_embed(e, guild, bot)
-        e, file = await brand_embed(e, guild, bot)
         for t in tickets[:10]:
             ch = interaction.guild.get_channel(t["channel_id"])
             opener  = interaction.guild.get_member(t["user_id"])
@@ -592,8 +619,6 @@ class Tickets(commands.GroupCog, name="ticket"):
             await db.commit()
         await _log_event(self.bot.db.db_path, row["ticket_id"], interaction.guild.id, interaction.user.id, "rating", f"{stars}/5 — {feedback[:80] if feedback else 'no comment'}")
         e = discord.Embed(description=f"{'⭐'*stars} — Thank you{(f': *{feedback}*') if feedback else '!'}", color=TC_CLAIMED)
-        e, file = await brand_embed(e, guild, bot)
-        e, file = await brand_embed(e, guild, bot)
         e.set_footer(text="XERO Tickets  •  Your feedback helps the team")
         await interaction.response.send_message(embed=e)
 

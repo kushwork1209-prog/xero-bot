@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Verification System (6 commands)"""
 import discord
 from discord.ext import commands
@@ -62,20 +61,12 @@ class Verification(commands.GroupCog, name="verify"):
             await db.commit()
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_role_id", role.id)
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_channel_id", channel.id)
-        embed = discord.Embed(title="✅ Verification Required", description=msg, color=XERO.PRIMARY,)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
+        embed = discord.Embed(title="✅ Verification Required", description=msg, color=discord.Color.green())
         embed.add_field(name="Instructions", value="1. Click **Verify** below\n2. You'll receive access instantly!", inline=False)
-        embed.set_footer(text="Verification")
+        embed.set_footer(text=f"{interaction.guild.name} | XERO Bot")
         if interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
-        
-        # Unified Branding
-        embed, file = await brand_embed(embed, interaction.guild, self.bot)
-        if file:
-            await channel.send(embed=embed, file=file, view=VerifyButton())
-        else:
-            await channel.send(embed=embed, view=VerifyButton())
+        await channel.send(embed=embed, view=VerifyButton())
         await interaction.response.send_message(embed=success_embed("Verification Setup Complete!", f"Verification panel posted in {channel.mention}.\n**Role:** {role.mention}"))
 
     @app_commands.command(name="config", description="View current verification configuration.")

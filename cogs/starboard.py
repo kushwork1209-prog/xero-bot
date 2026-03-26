@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Starboard (4 commands)"""
 import discord
 from discord.ext import commands

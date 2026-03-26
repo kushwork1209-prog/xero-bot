@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — /tools group (calc, timestamp, weather, define, color, emojis, snipe)"""
 import discord
 from discord.ext import commands
@@ -55,8 +54,6 @@ class Tools(commands.GroupCog, name="tools"):
             desc=c["weatherDesc"][0]["value"]; dl=desc.lower()
             emo="⛈️" if "thunder" in dl else "🌧️" if "rain" in dl else "🌨️" if "snow" in dl else "🌫️" if "fog" in dl else "☁️" if "cloud" in dl else "⛅" if "partly" in dl else "☀️"
             embed=discord.Embed(title=f"{emo} {area['areaName'][0]['value']}, {area['country'][0]['value']}",description=f"**{desc}**",color=XERO.INFO)
-            embed, file = await brand_embed(embed, guild, bot)
-            embed, file = await brand_embed(embed, guild, bot)
             embed.add_field(name="🌡️ Temp",      value=f"**{c['temp_C']}°C** / {c['temp_F']}°F\nFeels: {c['FeelsLikeC']}°C",inline=True)
             embed.add_field(name="💧 Humidity",  value=f"**{c['humidity']}%**",inline=True)
             embed.add_field(name="💨 Wind",       value=f"**{c['windspeedKmph']} km/h {c['winddir16Point']}**",inline=True)
@@ -103,7 +100,7 @@ class Tools(commands.GroupCog, name="tools"):
             await interaction.followup.send(embed=error_embed("Error",f"Could not define **{word}**."))
 
     @app_commands.command(name="color", description="Preview a hex color — RGB, HSL, decimal, complementary, brightness analysis.")
-    @app_commands.describe(hex_code="Hex color e.g. FF5733 or XERO.PRIMARY")
+    @app_commands.describe(hex_code="Hex color e.g. FF5733 or #1A2B3C")
     async def color(self, interaction: discord.Interaction, hex_code: str):
         try:
             clean=hex_code.lstrip("#").upper()
@@ -119,8 +116,6 @@ class Tools(commands.GroupCog, name="tools"):
                 else: h=60*((r_-g_)/delta+4)
             comp=f"{255-r:02X}{255-g:02X}{255-b:02X}"
             embed=discord.Embed(title=f"🎨 Color: #{clean}",color=discord.Color(int(clean,16)))
-            embed, file = await brand_embed(embed, guild, bot)
-            embed, file = await brand_embed(embed, guild, bot)
             embed.add_field(name="HEX",value=f"`#{clean}`",inline=True)
             embed.add_field(name="RGB",value=f"`rgb({r},{g},{b})`",inline=True)
             embed.add_field(name="HSL",value=f"`hsl({int(h)}°,{int(s*100)}%,{int(l*100)}%)`",inline=True)
@@ -147,8 +142,6 @@ class Tools(commands.GroupCog, name="tools"):
         cached=SNIPE_CACHE.get(interaction.channel.id)
         if not cached: return await interaction.response.send_message(embed=info_embed("Nothing to Snipe","No recently deleted messages here."),ephemeral=True)
         embed=discord.Embed(title="🔫 Sniped Message",description=cached["content"][:2000] or "*[No text content]*",color=XERO.WARNING)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
         embed.set_author(name=cached["author"],icon_url=cached.get("avatar") or discord.Embed.Empty)
         embed.set_footer(text=f"Deleted at {cached['timestamp'].strftime('%H:%M:%S, %B %d %Y')}")
         if cached.get("image"): embed.set_image(url=cached["image"])

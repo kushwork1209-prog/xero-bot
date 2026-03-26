@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Counting Game (5 commands) + Confessions (4 commands)"""
 import discord
 from discord.ext import commands
@@ -31,7 +30,7 @@ class Counting(commands.GroupCog, name="counting"):
         await channel.send(embed=discord.Embed(
             title="Counting Game Started!",
             description="Start counting from **1**! Type numbers in order. No two in a row!",
-            color=XERO.PRIMARY,
+            color=discord.Color.green()
         ))
         await interaction.response.send_message(embed=embed)
 
@@ -43,7 +42,7 @@ class Counting(commands.GroupCog, name="counting"):
                 configs = [dict(r) for r in await c.fetchall()]
         if not configs:
             return await interaction.response.send_message(embed=info_embed("Not Set Up", "Use `/counting setup` first."))
-        embed = comprehensive_embed(title="Counting Stats", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="Counting Stats", color=discord.Color.blue())
         for cfg in configs:
             ch = interaction.guild.get_channel(cfg["channel_id"])
             last_user = interaction.guild.get_member(cfg["last_user_id"]) if cfg.get("last_user_id") else None
@@ -94,7 +93,7 @@ class Counting(commands.GroupCog, name="counting"):
                 configs = [dict(r) for r in await c.fetchall()]
         if not configs:
             return await interaction.response.send_message(embed=info_embed("No Data", "No counting data yet."))
-        embed = comprehensive_embed(title="Counting High Scores", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="Counting High Scores", color=discord.Color.gold())
         for cfg in configs:
             ch = interaction.guild.get_channel(cfg["channel_id"])
             embed.add_field(name=f"#{ch.name if ch else 'Unknown'}",
@@ -123,9 +122,7 @@ class Confessions(commands.GroupCog, name="confess"):
                                   (interaction.guild.id, interaction.user.id, message)) as c:
                 confession_id = c.lastrowid
             await db.commit()
-        embed = discord.Embed(title=f"Anonymous Confession #{confession_id}", description=message, color=XERO.PRIMARY,)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
+        embed = discord.Embed(title=f"Anonymous Confession #{confession_id}", description=message, color=discord.Color.purple())
         embed.set_footer(text=f"Confession #{confession_id} | XERO Anonymous System")
         await channel.send(embed=embed)
         await interaction.response.send_message(

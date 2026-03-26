@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Custom Commands System (6 commands)
 Admins create their own slash-style commands with text/embed responses.
 Members trigger them with /cmd <name>.
@@ -13,10 +12,10 @@ from utils.embeds import success_embed, error_embed, info_embed, comprehensive_e
 logger = logging.getLogger("XERO.CustomCommands")
 
 COLOR_MAP = {
-    "blue": XERO.PRIMARY, "red": XERO.PRIMARY,
-    "green": XERO.PRIMARY, "gold": XERO.PRIMARY,
-    "purple": XERO.PRIMARY, "orange": XERO.PRIMARY,
-    "teal": XERO.PRIMARY, "pink": XERO.PRIMARY,
+    "blue": discord.Color.blue(), "red": discord.Color.red(),
+    "green": discord.Color.green(), "gold": discord.Color.gold(),
+    "purple": discord.Color.purple(), "orange": discord.Color.orange(),
+    "teal": discord.Color.teal(), "pink": discord.Color.pink(),
 }
 
 
@@ -92,10 +91,8 @@ class CustomCommands(commands.GroupCog, name="cmd"):
         cmd = dict(cmd)
         response_text = cmd["response"].replace("{user}", interaction.user.mention)
         if cmd.get("embed_title"):
-            color = COLOR_MAP.get(cmd.get("embed_color", "blue"), XERO.PRIMARY)
+            color = COLOR_MAP.get(cmd.get("embed_color", "blue"), discord.Color.blue())
             embed = discord.Embed(title=cmd["embed_title"], description=response_text, color=color)
-            embed, file = await brand_embed(embed, guild, bot)
-            embed, file = await brand_embed(embed, guild, bot)
             embed.set_footer(text=f"Custom Command: {name} | XERO Bot")
             await interaction.response.send_message(embed=embed)
         else:
@@ -170,7 +167,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
         embed = comprehensive_embed(
             title=f"⚡ Custom Commands ({len(cmds)})",
             description="Use `/cmd use name:<command>` to trigger any of these.",
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
         for cmd in cmds[:20]:
             role = interaction.guild.get_role(cmd["role_id"]) if cmd.get("role_id") else None

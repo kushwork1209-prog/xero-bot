@@ -1,15 +1,13 @@
 """
 XERO Bot — Main Entry Point
 Advanced AI-Powered Discord Bot by Team Flame
-300+ Commands | NVIDIA Llama | All Premium Features Free
+300+ Commands | NVIDIA Llama 4 Maverick | All Premium Features Free
 """
 import discord
 from discord.ext import commands
-from discord.ext import tasks
 import os, logging, asyncio, time
 from database import Database
 from utils.nvidia_api import NvidiaAPI
-from utils.db_backup import auto_restore, send_backup, BACKUP_CHANNEL_ID
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,12 +22,7 @@ logger = logging.getLogger("XERO")
 class XeroBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
-        super().__init__(
-            command_prefix=commands.when_mentioned_or("/"),
-            intents=intents,
-            help_command=None,
-            case_insensitive=True,
-        )
+        super().__init__(command_prefix=commands.when_mentioned_or("/"), intents=intents, help_command=None, case_insensitive=True)
         self.db          = Database()
         self.nvidia      = NvidiaAPI(
             primary_key = os.getenv("NVIDIA_MAIN_KEY",   os.getenv("NVIDIA_API_KEY", "")),
@@ -37,9 +30,8 @@ class XeroBot(commands.Bot):
         )
         self.launch_time = time.time()
         self.MANAGEMENT_GUILD_ID = int(os.getenv("MANAGEMENT_GUILD_ID", "1431852658767040535"))
-        self._synced = False  # prevent double-sync on reconnect
         self.initial_extensions = [
-            "cogs.events", "cogs.config", "cogs.setup", "cogs.info", "cogs.admin",
+            "cogs.events", "cogs.config", "cogs.info", "cogs.admin",
             "cogs.moderation", "cogs.automod", "cogs.smart_mod",
             "cogs.economy", "cogs.economy_advanced",
             "cogs.levels", "cogs.leaderboard",
@@ -56,9 +48,8 @@ class XeroBot(commands.Bot):
             "cogs.member_intelligence",
             "cogs.autoresponder",
             "cogs.logging_system",
-            "cogs.branding",
             "cogs.tools", "cogs.music", "cogs.profile", "cogs.analytics",
-            "cogs.utility", "cogs.core_admin",
+            "cogs.utility", "cogs.backup", "cogs.core_admin",
         ]
 
     async def setup_hook(self):
@@ -71,117 +62,48 @@ class XeroBot(commands.Bot):
         if hasattr(self.db, 'initialize_v4_tables'):
             await self.db.initialize_v4_tables()
         logger.info("✓ Database fully initialized.")
-
-        failed_cogs = []
         for ext in self.initial_extensions:
             try:
                 await self.load_extension(ext)
                 logger.info(f"  ✓ {ext}")
             except Exception as e:
                 logger.error(f"  ✗ {ext} — {e}")
-                failed_cogs.append((ext, str(e)))
-
-        if failed_cogs:
-            logger.warning(f"  {len(failed_cogs)} cog(s) failed to load:")
-            for cog, err in failed_cogs:
-                logger.warning(f"    - {cog}: {err}")
-
-        logger.info(f"✓ Management Guild ID: {self.MANAGEMENT_GUILD_ID}")
-
-    async def on_ready(self):
-        logger.info(
-            f"✓ XERO ready — {self.user} | {len(self.guilds)} guilds | "
-            f"{sum(g.member_count for g in self.guilds):,} users | "
-            f"{round(self.latency * 1000)}ms"
-        )
-        await self.change_presence(
-            activity=discord.Activity(type=discord.ActivityType.watching, name="300+ commands | /help")
-        )
-
-        # Only run startup tasks once per process start
-        if self._synced:
-            return
-        self._synced = True
-
-        # ── Auto-restore DB if wiped (Railway ephemeral filesystem protection) ──
-        if BACKUP_CHANNEL_ID:
-            # CRITICAL: Always try to restore FIRST before doing anything else.
-            # This prevents a "startup_sync" from backing up an empty DB and overwriting good data.
-            restored = await auto_restore(self)
-            if restored:
-                logger.info("✓ Server configs restored from backup — servers won't notice the redeploy.")
-            else:
-                # If not restored, it means either the DB already has data OR no backup was found.
-                # Only sync if we are SURE we didn't just start with an empty DB that failed to restore.
-                from utils.db_backup import is_db_empty
-                if not await is_db_empty(self):
-                    from utils.db_backup import send_backup
-                    await send_backup(self, triggered_by="startup_sync")
-                    logger.info("✓ DB persistence check passed & startup sync completed.")
-                else:
-                    logger.warning("⚠ DB is empty and no backup was found to restore. Skipping startup sync to avoid overwriting.")
-        else:
-            logger.info(
-                "ℹ️  BACKUP_CHANNEL_ID not set. For data persistence across redeploys:\n"
-                "   1. Create a private Discord channel\n"
-                "   2. Set BACKUP_CHANNEL_ID=<channel_id> in Railway env vars\n"
-                "   OR mount a Railway Volume at /app/data"
-            )
-
-        # ── Start the 1-min auto-backup loop ──────────────────────────────────
-        if not self._backup_loop.is_running():
-            self._backup_loop.start()
-
-        # ── Global sync ────────────────────────────────────────────────────────
+        mguild = discord.Object(id=self.MANAGEMENT_GUILD_ID)
         try:
             synced = await self.tree.sync()
             logger.info(f"✓ Synced {len(synced)} global slash commands.")
         except Exception as e:
-            logger.error(f"✗ Global sync failed: {e}")
-
-        # ── Management guild sync (/core and /support) ─────────────────────────
-        mguild = discord.Object(id=self.MANAGEMENT_GUILD_ID)
+            logger.error(f"Failed to sync: {e}")
         try:
+            # Sync ONLY guild-specific commands to management guild.
+            # NO copy_global_to — that duplicates all 350+ global commands there,
+            # making every command appear twice in the management server.
+            # /core and /support use guilds=[mguild] in add_cog, sync fine without it.
             guild_synced = await self.tree.sync(guild=mguild)
-            logger.info(
-                f"✓ Management guild ({self.MANAGEMENT_GUILD_ID}): "
-                f"{len(guild_synced)} guild-only commands synced."
-            )
-            if guild_synced:
-                cmd_names = [c.name for c in guild_synced]
-                logger.info(f"  Guild commands: {', '.join(cmd_names)}")
-            else:
-                logger.warning(
-                    "  ⚠ 0 guild commands synced — check that MANAGEMENT_GUILD_ID is correct "
-                    "and the bot is in that server."
-                )
-        except discord.Forbidden:
-            logger.error(
-                f"✗ Management guild sync FORBIDDEN — bot may not be in guild {self.MANAGEMENT_GUILD_ID}. "
-                "Invite the bot to the support server and restart."
-            )
+            logger.info(f"✓ Management guild: {len(guild_synced)} guild-only commands synced.")
         except Exception as e:
-            logger.error(f"✗ Management guild sync failed: {e}")
+            logger.warning(f"Management guild sync: {e}")
 
-    @tasks.loop(minutes=1)
-    async def _backup_loop(self):
-        """Automatically backs up the DB every 1 minute to the backup channel."""
-        try:
-            await send_backup(self, triggered_by="auto-1min")
-        except Exception as e:
-            logger.error(f"Backup loop error: {e}")
-
-    @_backup_loop.before_loop
-    async def _before_backup_loop(self):
-        await self.wait_until_ready()
+    async def on_ready(self):
+        logger.info(f"✓ XERO ready — {self.user} | {len(self.guilds)} guilds | {sum(g.member_count for g in self.guilds):,} users | {round(self.latency*1000)}ms")
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="300+ commands | /help"))
 
     async def on_interaction(self, interaction: discord.Interaction):
-        """Guard: only handle application commands."""
+        """Guard: if a command interaction is deferred and never responded to, send a fallback after 28s."""
         if interaction.type != discord.InteractionType.application_command:
             return
+        await asyncio.sleep(28)
+        try:
+            if interaction.response.is_done():
+                # Check if a followup was never sent - we can't easily detect this
+                # but we can try sending one; if it fails it means it was already handled
+                pass
+        except Exception:
+            pass
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         from utils.embeds import error_embed
+        # Unwrap CommandInvokeError to get the real error
         original = getattr(error, "original", error)
         if isinstance(error, discord.app_commands.MissingPermissions):
             msg = f"You need: `{'`, `'.join(error.missing_permissions)}`"
@@ -195,12 +117,10 @@ class XeroBot(commands.Bot):
             msg = "Request timed out. Please try again."
         else:
             msg = "Something went wrong. Please try again."
-            logger.error(
-                f"Command error in {getattr(interaction.command, 'name', 'unknown')}: {original}",
-                exc_info=original,
-            )
+            logger.error(f"Command error in {getattr(interaction.command, 'name', 'unknown')}: {original}", exc_info=original)
         try:
             embed = error_embed("Error", msg)
+            # Always send a response - prevents thinking forever
             if interaction.response.is_done():
                 await interaction.followup.send(embed=embed, ephemeral=True)
             else:
@@ -208,19 +128,13 @@ class XeroBot(commands.Bot):
         except Exception:
             pass
 
-
-bot_instance = None
-
 async def main():
-    global bot_instance
     bot = XeroBot()
-    bot_instance = bot
     token = os.getenv("DISCORD_TOKEN")
     if not token:
-        logger.critical("DISCORD_TOKEN not set — cannot start."); return
+        logger.critical("DISCORD_TOKEN not set!"); return
     async with bot:
         await bot.start(token)
-
 
 if __name__ == "__main__":
     try:

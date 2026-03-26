@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Reaction Roles (Persistent Button Panels) — 6 commands"""
 import discord
 from discord.ext import commands
@@ -126,24 +125,16 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         if not roles_data:
             return await interaction.response.send_message(embed=error_embed("No Roles", "Add roles first with `/reactionroles add-role`."), ephemeral=True)
         ch = interaction.guild.get_channel(panel["channel_id"]) or interaction.channel
-        embed = discord.Embed(title=panel["title"], description=panel["description"], color=XERO.PRIMARY,)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed.set_footer(text="Click a button to get/remove the role")
+        embed = discord.Embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
+        embed.set_footer(text="Click a button to get/remove the role | XERO Reaction Roles")
         role_list = []
         for r in roles_data:
             role = interaction.guild.get_role(r["role_id"])
             if role:
                 role_list.append(f"{r.get('emoji', '•')} {role.mention} — {r['label']}")
         embed.add_field(name="Available Roles", value="\n".join(role_list) if role_list else "None", inline=False)
-        
-        # Unified Branding
-        embed, file = await brand_embed(embed, interaction.guild, self.bot)
         view = RolePanelView(roles_data)
-        if file:
-            msg = await ch.send(embed=embed, view=view, file=file)
-        else:
-            msg = await ch.send(embed=embed, view=view)
+        msg = await ch.send(embed=embed, view=view)
         async with aiosqlite.connect(self.bot.db.db_path) as db:
             await db.execute("UPDATE reaction_role_panels SET message_id=? WHERE id=?", (msg.id, panel_id))
             await db.commit()
@@ -158,7 +149,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
                 panels = [dict(r) for r in await c.fetchall()]
         if not panels:
             return await interaction.response.send_message(embed=info_embed("No Panels", "No reaction role panels found. Create one with `/reactionroles create-panel`."))
-        embed = comprehensive_embed(title="🎭 Reaction Role Panels", description=f"**{len(panels)}** panel(s)", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="🎭 Reaction Role Panels", description=f"**{len(panels)}** panel(s)", color=discord.Color.blurple())
         for p in panels:
             roles_data = json.loads(p["roles_data"])
             ch = interaction.guild.get_channel(p["channel_id"])

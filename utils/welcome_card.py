@@ -13,7 +13,7 @@ os.makedirs(WELCOME_DIR, exist_ok=True)
 
 CARD_W, CARD_H = 1024, 320
 
-DB_PATH = os.getenv("DB_PATH", "data/xero.db")
+DB_PATH = os.getenv("DB_PATH", "xero_bot.db")
 
 FONT_PATHS = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -45,36 +45,24 @@ async def _save_to_db(guild_id: int, image_bytes: bytes):
     """Save image as base64 in DB."""
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     async with aiosqlite.connect(DB_PATH) as db:
-        try:
-            await db.execute(
-                "UPDATE guild_settings SET welcome_card_image_data=? WHERE guild_id=?",
-                (b64, guild_id)
-            )
-            await db.commit()
-        except Exception as e:
-            logger.debug(f"Failed to save welcome card to DB for guild {guild_id}: {e}")
+        await db.execute(
+            "UPDATE guild_settings SET welcome_card_image_data=? WHERE guild_id=?",
+            (b64, guild_id)
+        )
+        await db.commit()
 
 
 async def _load_from_db(guild_id: int) -> bytes | None:
-    """Load image bytes from DB. Priority: unified_image_data -> welcome_card_image_data."""
+    """Load image bytes from DB."""
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            db.row_factory = aiosqlite.Row
-            try:
-                async with db.execute(
-                    "SELECT unified_image_data, welcome_card_image_data FROM guild_settings WHERE guild_id=?",
-                    (guild_id,)
-                ) as c:
-                    row = await c.fetchone()
-                    if row:
-                        # Priority 1: Unified Branding Image
-                        if row["unified_image_data"]:
-                            return base64.b64decode(row["unified_image_data"])
-                        # Priority 2: Legacy Welcome Card Image
-                        if row["welcome_card_image_data"]:
-                            return base64.b64decode(row["welcome_card_image_data"])
-            except Exception:
-                pass
+            async with db.execute(
+                "SELECT welcome_card_image_data FROM guild_settings WHERE guild_id=?",
+                (guild_id,)
+            ) as c:
+                row = await c.fetchone()
+                if row and row[0]:
+                    return base64.b64decode(row[0])
     except Exception as e:
         logger.debug(f"DB image load: {e}")
     return None

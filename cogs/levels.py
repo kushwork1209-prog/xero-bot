@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Levels & XP System (8 commands)"""
 import discord
 from utils.guard import command_guard
@@ -44,32 +43,20 @@ class Levels(commands.GroupCog, name="levels"):
             if role:
                 xp_gap = sum(int(100*(l+1)**2.2) for l in range(level, next_reward["level"]))
                 embed.add_field(name="🎁 Next Reward", value=f"{role.mention} at **Level {next_reward['level']}**\n~{xp_gap:,} XP away", inline=True)
-        
-        # Unified Branding
-        embed, file = await brand_embed(embed, interaction.guild, self.bot)
-        if file:
-            await interaction.followup.send(embed=embed, file=file)
-        else:
-            await interaction.followup.send(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="leaderboard", description="View the server XP leaderboard.")
     async def leaderboard(self, interaction: discord.Interaction):
         lb = await self.bot.db.get_level_leaderboard(interaction.guild.id, 10)
         if not lb:
             return await interaction.response.send_message(embed=info_embed("Empty", "No level data yet. Start chatting to earn XP!"))
-        embed = comprehensive_embed(title="📊 XP Leaderboard", description="Top 10 members by total XP", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="📊 XP Leaderboard", description="Top 10 members by total XP", color=discord.Color.purple())
         medals = ["🥇", "🥈", "🥉"] + [f"**#{i}**" for i in range(4, 11)]
         for i, row in enumerate(lb):
             user = interaction.guild.get_member(row["user_id"])
             name = user.display_name if user else f"User {row['user_id']}"
             embed.add_field(name=f"{medals[i]} {name}", value=f"Level **{row['level']}** — {row['total_xp']:,} XP", inline=True)
-        
-        # Unified Branding
-        embed, file = await brand_embed(embed, interaction.guild, self.bot)
-        if file:
-            await interaction.response.send_message(embed=embed, file=file)
-        else:
-            await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="set-xp", description="[Admin] Set a user's XP and level.")
     @app_commands.describe(user="User to modify", xp="XP amount", level="Level to set")
@@ -116,18 +103,12 @@ class Levels(commands.GroupCog, name="levels"):
         rewards = await self.bot.db.get_level_rewards(interaction.guild.id)
         if not rewards:
             return await interaction.response.send_message(embed=info_embed("No Rewards", "No level rewards configured. Admins can add them with `/levels reward-add`."))
-        embed = comprehensive_embed(title="🎁 Level Rewards", description="Earn these roles by leveling up!", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="🎁 Level Rewards", description="Earn these roles by leveling up!", color=discord.Color.purple())
         for r in rewards:
             role = interaction.guild.get_role(r["role_id"])
             role_mention = role.mention if role else f"Deleted Role ({r['role_id']})"
             embed.add_field(name=f"Level {r['level']}", value=role_mention, inline=True)
-            
-        # Unified Branding
-        embed, file = await brand_embed(embed, interaction.guild, self.bot)
-        if file:
-            await interaction.response.send_message(embed=embed, file=file)
-        else:
-            await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
 
     @app_commands.command(name="voice-xp", description="Configure voice XP — earn XP while in voice channels.")

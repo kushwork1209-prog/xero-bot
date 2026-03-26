@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Role Management (12 commands)"""
 import discord
 from discord.ext import commands
@@ -46,7 +45,7 @@ class Roles(commands.GroupCog, name="role"):
     @app_commands.describe(role="Role to inspect")
     async def info(self, interaction: discord.Interaction, role: discord.Role):
         perms = [p.replace("_", " ").title() for p, v in role.permissions if v and p not in ("view_channel", "read_message_history")]
-        embed = comprehensive_embed(title=f"🎭 {role.name}", color=role.color if role.color.value else XERO.PRIMARY)
+        embed = comprehensive_embed(title=f"🎭 {role.name}", color=role.color if role.color.value else discord.Color.blurple())
         embed.add_field(name="🆔 ID", value=f"`{role.id}`", inline=True)
         embed.add_field(name="🎨 Color", value=str(role.color), inline=True)
         embed.add_field(name="📍 Position", value=str(role.position), inline=True)
@@ -69,20 +68,20 @@ class Roles(commands.GroupCog, name="role"):
         embed = comprehensive_embed(
             title=f"👥 Members with {role.name}",
             description=f"**{len(members):,}** member(s)\n\n" + " ".join(mentions) + (f"\n\n*...and {len(members)-30} more*" if len(members) > 30 else ""),
-            color=role.color if role.color.value else XERO.PRIMARY
+            color=role.color if role.color.value else discord.Color.blurple()
         )
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="create", description="Create a new role with custom settings.")
-    @app_commands.describe(name="Role name", color="Hex color e.g. XERO.PRIMARY", hoist="Show separately in member list", mentionable="Allow @mentioning the role")
+    @app_commands.describe(name="Role name", color="Hex color e.g. #FF5733", hoist="Show separately in member list", mentionable="Allow @mentioning the role")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def create(self, interaction: discord.Interaction, name: str, color: str = None, hoist: bool = False, mentionable: bool = False):
-        parsed_color = XERO.PRIMARY
+        parsed_color = discord.Color.default()
         if color:
             try:
                 parsed_color = discord.Color(int(color.lstrip("#"), 16))
             except ValueError:
-                return await interaction.response.send_message(embed=error_embed("Invalid Color", "Use a valid hex color like `XERO.PRIMARY`."), ephemeral=True)
+                return await interaction.response.send_message(embed=error_embed("Invalid Color", "Use a valid hex color like `#FF5733`."), ephemeral=True)
         role = await interaction.guild.create_role(name=name, color=parsed_color, hoist=hoist, mentionable=mentionable, reason=f"Created by {interaction.user}")
         embed = success_embed("Role Created!", f"{role.mention} has been created.\n**Color:** {parsed_color}\n**Hoisted:** {hoist} | **Mentionable:** {mentionable}")
         await interaction.response.send_message(embed=embed)
@@ -98,7 +97,7 @@ class Roles(commands.GroupCog, name="role"):
         await interaction.response.send_message(embed=success_embed("Role Deleted", f"**{name}** has been permanently deleted.\n**Reason:** {reason}"))
 
     @app_commands.command(name="color", description="Change the color of an existing role.")
-    @app_commands.describe(role="Role to recolor", color="New hex color e.g. XERO.PRIMARY")
+    @app_commands.describe(role="Role to recolor", color="New hex color e.g. #FF5733")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def color(self, interaction: discord.Interaction, role: discord.Role, color: str):
         if not self._can_manage_role(interaction, role):
@@ -106,7 +105,7 @@ class Roles(commands.GroupCog, name="role"):
         try:
             new_color = discord.Color(int(color.lstrip("#"), 16))
         except ValueError:
-            return await interaction.response.send_message(embed=error_embed("Invalid Color", "Use hex format like `XERO.PRIMARY`."), ephemeral=True)
+            return await interaction.response.send_message(embed=error_embed("Invalid Color", "Use hex format like `#FF5733`."), ephemeral=True)
         await role.edit(color=new_color, reason=f"Color changed by {interaction.user}")
         await interaction.response.send_message(embed=success_embed("Role Recolored", f"{role.mention} color changed to `{color}`."))
 
@@ -127,7 +126,7 @@ class Roles(commands.GroupCog, name="role"):
         embed = comprehensive_embed(
             title=f"🎭 Server Roles ({len(roles)} total)",
             description="\n".join(lines) + (f"\n*...and {len(roles)-25} more*" if len(roles) > 25 else ""),
-            color=XERO.PRIMARY,
+            color=discord.Color.blurple()
         )
         await interaction.response.send_message(embed=embed)
 
@@ -169,7 +168,7 @@ class Roles(commands.GroupCog, name="role"):
         bot_roles = [r for r in interaction.guild.roles if r.managed]
         if not bot_roles:
             return await interaction.response.send_message(embed=info_embed("No Bot Roles", "No managed/bot roles found."))
-        embed = comprehensive_embed(title="🤖 Bot/Integration Roles", color=XERO.PRIMARY,)
+        embed = comprehensive_embed(title="🤖 Bot/Integration Roles", color=discord.Color.blurple())
         for r in bot_roles:
             embed.add_field(name=r.name, value=f"ID: `{r.id}` | Members: {len(r.members)}", inline=True)
         await interaction.response.send_message(embed=embed)

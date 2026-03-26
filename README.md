@@ -40,4 +40,3 @@ NVIDIA_AUDIO_KEY=
 
 Run `/help` in Discord for the full command list.
 Management staff: `/core dashboard` in the management server.
- 

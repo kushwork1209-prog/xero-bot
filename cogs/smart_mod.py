@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """
 XERO Bot — Smart Moderation (8 commands)
 Raid detection, auto-escalation, mass-join protection, server health AI analysis.

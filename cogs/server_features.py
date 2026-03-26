@@ -1,5 +1,3 @@
-from utils.embeds import brand_embed
-from utils.embeds import XERO
 """
 XERO Bot — Server Features
 Auto-updating stats channels, bump reminder, message logger, weekly reward, double XP.
@@ -94,6 +92,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
                 if not guild: continue
                 ch = guild.get_channel(channel_id)
                 if not ch: continue
+                from utils.embeds import XERO
                 embed = discord.Embed(
                     title="⬆️  Time to Bump!",
                     description=(
@@ -351,8 +350,6 @@ class ServerFeatures(commands.GroupCog, name="features"):
             await db.commit()
 
         embed = discord.Embed(title="🗓️  Weekly Reward Claimed!", color=XERO.GOLD)
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
         embed.add_field(name="💰 Reward",      value=f"**${total:,}**",        inline=True)
         embed.add_field(name="⚡ Multiplier",  value=f"**{mult:.2f}×**",        inline=True)
