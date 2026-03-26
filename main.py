@@ -30,6 +30,7 @@ class XeroBot(commands.Bot):
         )
         self.launch_time = time.time()
         self.MANAGEMENT_GUILD_ID = int(os.getenv("MANAGEMENT_GUILD_ID", "1431852658767040535"))
+        self._backup_loop_started = False
         self.initial_extensions = [
             "cogs.events", "cogs.config", "cogs.info", "cogs.admin",
             "cogs.moderation", "cogs.automod", "cogs.smart_mod",
@@ -84,9 +85,31 @@ class XeroBot(commands.Bot):
         except Exception as e:
             logger.warning(f"Management guild sync: {e}")
 
+    async def _backup_loop(self):
+        """Auto-backup DB to Discord channel every 10 minutes."""
+        from utils.db_backup import backup_now
+        while True:
+            try:
+                await asyncio.sleep(600)  # 10 minutes
+                await backup_now(self)
+            except Exception as _e:
+                logger.warning(f"Backup loop: {_e}")
+
     async def on_ready(self):
         logger.info(f"✓ XERO ready — {self.user} | {len(self.guilds)} guilds | {sum(g.member_count for g in self.guilds):,} users | {round(self.latency*1000)}ms")
         await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="300+ commands | /help"))
+
+        # ── DB Channel Backup ──────────────────────────────────────────────
+        try:
+            from utils.db_backup import restore_latest, backup_now
+            restored = await restore_latest(self)
+            if restored:
+                logger.info("✓ DB restored from Discord backup channel")
+            if not self._backup_loop_started:
+                self._backup_loop_started = True
+                asyncio.create_task(self._backup_loop())
+        except Exception as _be:
+            logger.warning(f"Backup startup: {_be}")
 
     async def on_interaction(self, interaction: discord.Interaction):
         """Guard: if a command interaction is deferred and never responded to, send a fallback after 28s."""

@@ -1,4 +1,3 @@
-from utils.embeds import brand_embed
 """XERO Bot — Unified Branding & Customization"""
 import discord
 from discord.ext import commands
@@ -7,7 +6,7 @@ import aiosqlite
 import io
 import base64
 import logging
-from utils.embeds import success_embed, error_embed, info_embed
+from utils.embeds import success_embed, error_embed, info_embed, brand_embed
 
 logger = logging.getLogger("XERO.Branding")
 
@@ -68,8 +67,6 @@ class Branding(commands.GroupCog, name="branding"):
         
         color = discord.Color(int(hex_code, 16))
         embed = discord.Embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color, timestamp=discord.utils.utcnow())
-        embed, file = await brand_embed(embed, guild, bot)
-        embed, file = await brand_embed(embed, guild, bot)
         embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
         await interaction.response.send_message(embed=embed)
 

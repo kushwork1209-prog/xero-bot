@@ -1077,10 +1077,55 @@ class Database:
                 "welcome_card_overlay TEXT DEFAULT 'gradient'",
                 "welcome_card_font_size INTEGER DEFAULT 52",
                 "welcome_card_image_data TEXT",
+                # Backup channel (Discord channel that stores JSON backups)
+                "db_backup_channel_id INTEGER",
+                # Verification v2
+                "verify_method TEXT DEFAULT 'button'",
+                "verify_kick_unverified INTEGER DEFAULT 0",
+                "verify_kick_after_hours INTEGER DEFAULT 24",
             ]
             for col in new_v4_cols:
                 try: await db.execute(f"ALTER TABLE guild_settings ADD COLUMN {col}")
                 except Exception: pass
+
+            # Enhanced verification config table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS verify_config_v2 (
+                    guild_id INTEGER PRIMARY KEY,
+                    method TEXT DEFAULT 'button',
+                    verified_role_id INTEGER,
+                    unverified_role_id INTEGER,
+                    channel_id INTEGER,
+                    log_channel_id INTEGER,
+                    dm_on_verify INTEGER DEFAULT 1,
+                    kick_unverified INTEGER DEFAULT 0,
+                    kick_after_hours INTEGER DEFAULT 24,
+                    require_roblox INTEGER DEFAULT 0,
+                    require_spotify INTEGER DEFAULT 0,
+                    custom_field_label TEXT,
+                    custom_field_required INTEGER DEFAULT 0,
+                    panel_title TEXT DEFAULT 'Verification Required',
+                    panel_description TEXT,
+                    panel_color TEXT DEFAULT '00D4FF',
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS verified_members (
+                    user_id INTEGER NOT NULL,
+                    guild_id INTEGER NOT NULL,
+                    method TEXT DEFAULT 'button',
+                    roblox_username TEXT,
+                    spotify_username TEXT,
+                    custom_field_value TEXT,
+                    ip_hash TEXT,
+                    verified_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    verified_by INTEGER,
+                    PRIMARY KEY (user_id, guild_id)
+                )
+            """)
+
             await db.commit()
         logger.info("\u2713 XERO v4 tables ready.")
 

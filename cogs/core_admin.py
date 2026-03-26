@@ -1559,6 +1559,69 @@ class CoreAdmin(commands.GroupCog, name="core"):
 # ══════════════════════════════════════════════════════════════════════════════
 # /support — 8 COMMANDS (deep diagnostic tools, all require parameters)
 # ══════════════════════════════════════════════════════════════════════════════
+    @app_commands.command(name="backup-now", description="Force an immediate full DB backup to BACKUP_CHANNEL_ID.")
+    @is_management()
+    async def backup_now_cmd(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            embed=discord.Embed(description="💾 Creating backup...", color=discord.Color(0x00D4FF)),
+            ephemeral=True
+        )
+        try:
+            from utils.db_backup import backup_now
+            ok = await backup_now(self.bot)
+        except Exception as e:
+            ok = False
+        await interaction.followup.send(
+            embed=discord.Embed(
+                description="✅ Backup saved to backup channel." if ok
+                else "❌ Failed. Check `BACKUP_CHANNEL_ID` env var is set and bot can post in that channel.",
+                color=discord.Color(0x00FF94 if ok else 0xFF1744)
+            ), ephemeral=True
+        )
+
+    @app_commands.command(name="restore-backup", description="Force restore DB from the latest backup in BACKUP_CHANNEL_ID.")
+    @is_management()
+    async def restore_backup(self, interaction: discord.Interaction):
+        await interaction.response.send_message(
+            embed=discord.Embed(description="🔄 Scanning backup channel for latest file...", color=discord.Color(0x00D4FF)),
+            ephemeral=True
+        )
+        try:
+            from utils.db_backup import restore_latest
+            ok = await restore_latest(self.bot)
+        except Exception as e:
+            ok = False
+        await interaction.followup.send(
+            embed=discord.Embed(
+                description="✅ Restored successfully from latest backup." if ok
+                else "❌ No valid backup found. Ensure `BACKUP_CHANNEL_ID` is set and the channel has backup files.",
+                color=discord.Color(0x00FF94 if ok else 0xFF1744)
+            ), ephemeral=True
+        )
+
+    @app_commands.command(name="bot-info", description="Technical info about this XERO instance.")
+    @is_management()
+    async def bot_info(self, interaction: discord.Interaction):
+        cogs = list(self.bot.extensions.keys())
+        upt  = int(time.time() - self.bot.start_time) if hasattr(self.bot, "start_time") else 0
+        h, rem = divmod(upt, 3600); m_, s_ = divmod(rem, 60)
+        import os
+        backup_ch = os.getenv("BACKUP_CHANNEL_ID", "Not set")
+        e = discord.Embed(title="XERO Instance Info", color=discord.Color(D_BLUE), timestamp=discord.utils.utcnow())
+        e.add_field(name="Bot ID",       value=f"`{self.bot.user.id}`",                  inline=True)
+        e.add_field(name="Uptime",       value=f"`{h}h {m_}m {s_}s`",                   inline=True)
+        e.add_field(name="Ping",         value=f"`{round(self.bot.latency*1000)}ms`",    inline=True)
+        e.add_field(name="Python",       value=f"`{sys.version[:10]}`",                  inline=True)
+        e.add_field(name="discord.py",   value=f"`{discord.__version__}`",               inline=True)
+        e.add_field(name="Cogs",         value=f"`{len(cogs)}`",                         inline=True)
+        e.add_field(name="Mgmt Guild",   value=f"`{self.bot.MANAGEMENT_GUILD_ID}`",      inline=True)
+        e.add_field(name="Backup Ch",    value=f"`{backup_ch}`",                         inline=True)
+        e.add_field(name="DB Path",      value=f"`{self.bot.db.db_path}`",               inline=True)
+        e.add_field(name="Loaded Cogs",  value="```\n" + "  ".join(c.replace("cogs.","") for c in cogs)[:500] + "\n```", inline=False)
+        await interaction.response.send_message(embed=e, ephemeral=True)
+
+
+
 class SupportTools(commands.GroupCog, name="support"):
     def __init__(self, bot): self.bot = bot
 

@@ -360,3 +360,9 @@ def health_embed(
         embed.add_field(name="💡  Recommendations", value=rec_text, inline=False)
     embed.set_footer(text="XERO Smart Moderation  •  AI-Powered Server Analysis")
     return embed
+
+
+async def brand_embed(embed: "discord.Embed", guild=None, bot=None):
+    """Stub for server branding — returns embed unchanged for now."""
+    import discord
+    return embed, None

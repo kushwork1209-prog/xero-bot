@@ -1,277 +1,269 @@
 """
-XERO Bot — Automatic Database Backup & Restore
-===============================================
-Protects against Railway's ephemeral filesystem wiping all server configs.
+XERO Bot — Discord Channel Database Backup System
 
-How it works:
-  • Every 1 minute: compress all DB tables → send as .gz file to BACKUP_CHANNEL_ID
-  • On startup: if DB is empty → download latest backup → restore all rows automatically
-  • Users never notice. Configs survive any number of redeploys.
+Uses BACKUP_CHANNEL_ID env var (set in Railway variables).
+Fetches ALL data: guild settings, user levels, economy, mod cases,
+warnings, tickets, profiles, images — everything.
 
-Setup (one-time):
-  1. Create a private Discord channel visible only to XERO Bot
-  2. Copy the channel ID into Railway env vars as BACKUP_CHANNEL_ID
-  3. Done — backups run automatically
-
-For even better persistence (recommended):
-  • Add a Railway Volume mounted at /app/data — data will never be wiped at all
+On startup:
+  1. Scans channel history for JSON attachments
+  2. Picks the LARGEST valid file (most complete backup)
+  3. Applies it to the DB
+  4. Then backs up every 10 minutes automatically
 """
-
-import discord
-import aiosqlite
-import asyncio
-import logging
-import json
-import gzip
-import io
-import os
-from typing import Optional
-from datetime import datetime
+import discord, aiosqlite, asyncio, json, logging, io, datetime, os, base64
 
 logger = logging.getLogger("XERO.Backup")
+MIN_SIZE = 5 * 1024  # 5KB minimum to be a real backup
 
-BACKUP_CHANNEL_ID = int(os.getenv("BACKUP_CHANNEL_ID", "0"))
-DB_PATH           = os.getenv("DB_PATH", "data/xero.db")
 
-BACKUP_TABLES = [
+# ── Tables to back up ────────────────────────────────────────────────────────
+
+FULL_TABLES = [
+    # Config
     "guild_settings",
+    "verification_config",
+    "verify_config_v2",
+    "automod_config",
+    "level_rewards",
+    "autoresponder_rules",
+    "sticky_messages",
+    "highlights",
+    "custom_commands",
+    "tag_storage",
+    "reaction_role_panels",
+    "reaction_role_entries",
+    "starboard_config",
+    "counting_config",
+    "confession_config",
+    "temp_voice_config",
+    "birthday_config",
+    "suggestion_config",
+    "ticket_config",
+    "announcement_channels",
+    "security_config",
+    "bot_staff",
+    "bot_incidents",
+    "blacklisted_users",
+    "blacklisted_guilds",
+    # User data
     "levels",
     "economy",
-    "economy_streaks",
+    "economy_shop",
+    "economy_inventory",
     "warnings",
     "mod_cases",
-    "birthdays",
-    "level_rewards",
-    "reaction_role_panels",
-    "starboard_config",
-    "starboard_messages",
-    "verification_config",
-    "tickets",
-    "temp_voice_config",
-    "autoresponder_rules",
-    "custom_commands",
-    "reputation",
-    "marriages",
-    "stocks",
-    "stock_portfolio",
+    "user_verifications",
+    "verified_members",
     "user_stats",
+    "member_profiles",
+    "skill_observations",
+    "birthdays",
+    "marriages",
+    "reputation",
+    "streaks",
+    "giveaways",
+    "giveaway_participants",
+    "tickets",
+    "ticket_events",
+    "reminders",
     "afk_users",
-    "suggestions",
-    "member_roles",
-    "economy_transactions",
-    "personality_log",
-    "counting_config",
+    "server_backups",
+    "counting_scores",
 ]
 
 
-async def export_db(bot: discord.Client) -> bytes:
-    """Export all critical tables as gzip-compressed JSON. Typically 50–500KB."""
-    data: dict[str, list] = {}
-    for table in BACKUP_TABLES:
-        try:
-            async with bot.db._db_context() as db:
-                db.row_factory = aiosqlite.Row
+async def _dump_all(db_path: str) -> dict:
+    """Dump every table into a dict. Skips missing tables gracefully."""
+    out = {}
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        for table in FULL_TABLES:
+            try:
                 async with db.execute(f"SELECT * FROM {table}") as c:
                     rows = await c.fetchall()
-                    data[table] = [dict(r) for r in rows]
+                    out[table] = [dict(r) for r in rows]
+            except Exception:
+                out[table] = []
+
+        # Also grab any tables we might have missed
+        try:
+            async with db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ) as c:
+                all_tables = [r[0] for r in await c.fetchall()]
+            for t in all_tables:
+                if t not in out:
+                    try:
+                        async with db.execute(f"SELECT * FROM {t} LIMIT 500") as c:
+                            rows = await c.fetchall()
+                            out[t] = [dict(r) for r in rows]
+                    except Exception:
+                        out[t] = []
         except Exception:
             pass
-    payload = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "tables":    data,
-        "version":   "xero_v4",
-        "row_counts": {t: len(v) for t, v in data.items()},
-    }
-    json_bytes = json.dumps(payload, default=str).encode("utf-8")
-    buf = io.BytesIO()
-    with gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6) as gz:
-        gz.write(json_bytes)
-    return buf.getvalue()
+
+    return out
 
 
-async def import_db(bot: discord.Client, backup_bytes: bytes) -> int:
-    """Restore all tables from a gzip-compressed JSON backup. Returns row count."""
-    buf = io.BytesIO(backup_bytes)
-    with gzip.GzipFile(fileobj=buf, mode="rb") as gz:
-        payload = json.loads(gz.read().decode("utf-8"))
-    tables    = payload.get("tables", {})
-    total_rows = 0
-    async with bot.db._db_context() as db:
-        for table, rows in tables.items():
+async def _apply_all(db_path: str, data: dict):
+    """Restore all tables from backup dict."""
+    restored = 0
+    async with aiosqlite.connect(db_path) as db:
+        for table, rows in data.items():
             if not rows:
                 continue
             for row in rows:
-                cols         = list(row.keys())
-                placeholders = ", ".join("?" for _ in cols)
-                col_str      = ", ".join(cols)
-                values       = [row[c] for c in cols]
                 try:
-                    # Using INSERT OR REPLACE for SQLite, or ON CONFLICT for PG (handled by adapter)
+                    cols    = list(row.keys())
+                    vals    = list(row.values())
+                    ph      = ", ".join("?" * len(cols))
+                    col_str = ", ".join(f'"{c}"' for c in cols)
                     await db.execute(
-                        f"INSERT OR REPLACE INTO {table} ({col_str}) VALUES ({placeholders})",
-                        values,
+                        f'INSERT OR REPLACE INTO "{table}" ({col_str}) VALUES ({ph})',
+                        vals
                     )
-                    total_rows += 1
+                    restored += 1
                 except Exception:
                     pass
         await db.commit()
-    logger.info(f"✓ DB restored: {len(tables)} tables, {total_rows} rows")
-    return total_rows
+    logger.info(f"✅ Restored {restored:,} rows across {len(data)} tables")
 
 
-async def is_db_empty(bot: discord.Client) -> bool:
-    """True if guild_settings has no rows — fresh or wiped DB."""
-    try:
-        async with bot.db._db_context() as db:
-            async with db.execute("SELECT COUNT(*) FROM guild_settings") as c:
-                row = await c.fetchone()
-                return row[0] == 0
-    except Exception:
-        return True
+def _get_backup_channel_id() -> int | None:
+    """Read BACKUP_CHANNEL_ID from env."""
+    val = os.getenv("BACKUP_CHANNEL_ID", "").strip()
+    if val:
+        try:
+            return int(val)
+        except ValueError:
+            logger.warning(f"BACKUP_CHANNEL_ID is not a valid integer: {val!r}")
+    return None
 
 
-async def auto_restore(bot: discord.Client) -> bool:
-    """
-    Called once on startup. If DB is empty AND BACKUP_CHANNEL_ID is set,
-    finds the LARGEST valid backup (>= 100KB) and restores automatically.
-    """
-    if not BACKUP_CHANNEL_ID:
-        logger.info("BACKUP_CHANNEL_ID not set — skipping auto-restore check.")
-        return False
-        
-    is_empty = await is_db_empty(bot)
-    if not is_empty:
-        logger.info("✓ DB has existing data — no restore needed.")
+async def backup_now(bot) -> bool:
+    """Create a backup and post it to the backup channel."""
+    ch_id = _get_backup_channel_id()
+    if not ch_id:
         return False
 
-    logger.warning("⚠️  DB is empty — searching backup channel for the largest valid backup...")
-    try:
-        channel = bot.get_channel(BACKUP_CHANNEL_ID)
-        if not channel:
-            channel = await bot.fetch_channel(BACKUP_CHANNEL_ID)
-    except Exception as e:
-        logger.error(f"Cannot access backup channel {BACKUP_CHANNEL_ID}: {e}")
-        return False
-
-    best_msg = None
-    max_size = 0
-    MIN_SIZE_BYTES = 100 * 1024  # 100KB
-
-    # Search through the last 200 messages for the LARGEST file above 100KB
-    async for msg in channel.history(limit=200):
-        if msg.attachments:
-            for att in msg.attachments:
-                # Must be a xero backup file
-                if att.filename.startswith("xero_backup_") and att.filename.endswith(".gz"):
-                    # CRITICAL: Skip any file below 100KB (avoid empty/corrupt backups)
-                    if att.size < MIN_SIZE_BYTES:
-                        continue
-                    
-                    # Track the absolute largest file found
-                    if att.size > max_size:
-                        max_size = att.size
-                        best_msg = msg
-
-    if not best_msg:
-        logger.warning("❌ No valid backup found >= 100KB. Starting fresh.")
-        return False
-
-    # Get the specific attachment that matched the max size
-    target_att = None
-    for a in best_msg.attachments:
-        if a.size == max_size:
-            target_att = a
-            break
-            
-    if not target_att:
-        return False
-
-    logger.info(f"💎 Restoring LARGEST backup: {target_att.filename} ({target_att.size // 1024}KB)")
-    try:
-        import aiohttp
-        async with aiohttp.ClientSession() as s:
-            async with s.get(target_att.url, timeout=aiohttp.ClientTimeout(total=60)) as r:
-                backup_bytes = await r.read()
-        
-        rows = await import_db(bot, backup_bytes)
-        logger.info(f"✅ DB auto-restored! {rows} rows recovered from the largest backup.")
-        return True
-    except Exception as e:
-        logger.error(f"Auto-restore failed: {e}")
-        return False
-
-
-async def send_backup(
-    bot: discord.Client,
-    triggered_by: str = "auto",
-) -> bool:
-    """Send a compressed DB backup to the backup channel."""
-    if not BACKUP_CHANNEL_ID:
-        return False
-    try:
-        channel = bot.get_channel(BACKUP_CHANNEL_ID)
-        if not channel:
-            channel = await bot.fetch_channel(BACKUP_CHANNEL_ID)
-    except Exception as e:
-        logger.error(f"Backup channel not found: {e}")
-        return False
-
-    try:
-        # SAFETY CHECK: Never back up an empty database if it's an auto-trigger.
-        if triggered_by in ("auto-1min", "startup_sync"):
-            if await is_db_empty(bot):
-                logger.warning(f"⚠ Skipping {triggered_by} backup: Database is empty.")
-                return False
-
-        backup_bytes = await export_db(bot)
-        
-        # Don't send backups that are too small (empty tables)
-        if len(backup_bytes) < (100 * 1024):
-            logger.warning(f"⚠ Backup too small ({len(backup_bytes)//1024}KB) — likely empty. Skipping.")
+    channel = bot.get_channel(ch_id)
+    if not channel:
+        try:
+            channel = await bot.fetch_channel(ch_id)
+        except Exception as e:
+            logger.warning(f"Cannot access backup channel {ch_id}: {e}")
             return False
 
-        timestamp    = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        config_id    = f"{timestamp}_{os.urandom(4).hex()}"
-        fname        = f"xero_backup_{config_id}.gz"
-        file         = discord.File(io.BytesIO(backup_bytes), filename=fname)
-        
-        buf = io.BytesIO(backup_bytes)
-        with gzip.GzipFile(fileobj=buf, mode="rb") as gz:
-            meta = json.loads(gz.read())
-            
-        guilds = len(meta["tables"].get("guild_settings", []))
-        total  = sum(len(v) for v in meta["tables"].values())
-        
-        await channel.send(
-            content=(
-                f"📦 **XERO Auto-Backup** | `{timestamp} UTC` | ID: `{config_id}` | trigger: `{triggered_by}`\n"
-                f"**{guilds}** servers • **{total}** rows • `{len(backup_bytes)//1024}KB`"
-            ),
-            file=file,
+    try:
+        data    = await _dump_all(bot.db.db_path)
+        total_rows = sum(len(v) for v in data.values())
+
+        payload = {
+            "xero_backup": True,
+            "version": 3,
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "guilds": len(bot.guilds),
+            "total_rows": total_rows,
+            "tables": len(data),
+            "data": data,
+        }
+
+        raw     = json.dumps(payload, default=str)
+        content = raw.encode("utf-8")
+
+        if len(content) < MIN_SIZE:
+            logger.warning(f"Backup too small ({len(content)}B) — skipping")
+            return False
+
+        ts    = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        fname = f"xero_backup_{ts}.json"
+        fobj  = discord.File(io.BytesIO(content), filename=fname)
+
+        size_kb = len(content) / 1024
+        embed = discord.Embed(
+            title="💾  XERO Auto-Backup",
+            color=0x00D4FF,
+            timestamp=discord.utils.utcnow()
         )
-        logger.info(f"✅ Backup: {fname} | {guilds} guilds | {total} rows | {len(backup_bytes)//1024}KB")
+        embed.add_field(name="Size",       value=f"`{size_kb:.1f} KB`",        inline=True)
+        embed.add_field(name="Tables",     value=f"`{payload['tables']}`",      inline=True)
+        embed.add_field(name="Rows",       value=f"`{total_rows:,}`",           inline=True)
+        embed.add_field(name="Servers",    value=f"`{payload['guilds']}`",      inline=True)
+        embed.add_field(name="Timestamp",  value=f"<t:{int(datetime.datetime.utcnow().timestamp())}:F>", inline=True)
+        embed.set_footer(text="XERO DB Backup  ·  Do not delete files in this channel")
+
+        await channel.send(embed=embed, file=fobj)
+        logger.info(f"✅ Backup posted to #{channel.name} — {size_kb:.1f} KB, {total_rows:,} rows")
         return True
+
     except Exception as e:
-        logger.error(f"Backup send failed: {e}")
+        logger.error(f"Backup failed: {e}")
         return False
 
 
-async def find_backup_by_id(bot: discord.Client, config_id: str) -> Optional[discord.Message]:
-    """Finds a backup message by its config_id."""
-    if not BACKUP_CHANNEL_ID:
-        return None
-    try:
-        channel = bot.get_channel(BACKUP_CHANNEL_ID) or await bot.fetch_channel(BACKUP_CHANNEL_ID)
-    except Exception as e:
-        logger.error(f"Cannot access backup channel {BACKUP_CHANNEL_ID}: {e}")
-        return None
+async def restore_latest(bot) -> bool:
+    """
+    Scan backup channel for JSON files.
+    Picks the LARGEST valid one (most complete backup).
+    Restores it.
+    """
+    ch_id = _get_backup_channel_id()
+    if not ch_id:
+        logger.info("No BACKUP_CHANNEL_ID set — skipping restore")
+        return False
 
-    async for msg in channel.history(limit=500):
-        if msg.attachments:
-            for att in msg.attachments:
-                if config_id in att.filename:
-                    return msg
-        if f"ID: `{config_id}`" in msg.content:
-            return msg
-            
-    return None
+    channel = bot.get_channel(ch_id)
+    if not channel:
+        try:
+            channel = await bot.fetch_channel(ch_id)
+        except Exception as e:
+            logger.warning(f"Cannot access backup channel {ch_id}: {e}")
+            return False
+
+    logger.info(f"Scanning #{channel.name} for backups...")
+
+    best_data    = None
+    best_size    = 0
+    best_fname   = None
+    best_rows    = 0
+
+    try:
+        import aiohttp
+        async for message in channel.history(limit=500):
+            for att in message.attachments:
+                if not att.filename.endswith(".json"):
+                    continue
+                if att.size < MIN_SIZE:
+                    continue
+                if att.size < best_size:
+                    continue  # Already found something bigger
+                try:
+                    async with aiohttp.ClientSession() as s:
+                        async with s.get(att.url, timeout=aiohttp.ClientTimeout(total=20)) as r:
+                            if r.status != 200:
+                                continue
+                            raw    = await r.read()
+                            parsed = json.loads(raw)
+                            if not (parsed.get("xero_backup") and parsed.get("data")):
+                                continue
+                            rows = parsed.get("total_rows", sum(len(v) for v in parsed["data"].values()))
+                            if att.size > best_size or rows > best_rows:
+                                best_data  = parsed["data"]
+                                best_size  = att.size
+                                best_fname = att.filename
+                                best_rows  = rows
+                except Exception as e:
+                    logger.debug(f"Could not read {att.filename}: {e}")
+
+        if best_data:
+            logger.info(f"Restoring from {best_fname} ({best_size/1024:.1f} KB, {best_rows:,} rows)")
+            await _apply_all(bot.db.db_path, best_data)
+            return True
+        else:
+            logger.info("No valid backups found — starting fresh")
+            return False
+
+    except Exception as e:
+        logger.error(f"Restore scan failed: {e}")
+        return False
