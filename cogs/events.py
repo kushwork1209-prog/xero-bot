@@ -734,6 +734,12 @@ class Events(commands.Cog):
             try: await self._run_aimod(message, settings)
             except Exception as e: logger.error(f"AI AutoMod: {e}")
 
+        # ── Rule-based AutoMod ─────────────────────────────────────────────
+        try:
+            await self._run_automod(message)
+        except Exception as _ame:
+            logger.debug(f"AutoMod error: {_ame}")
+
         # ── Link filter ────────────────────────────────────────────────────
         if settings.get("link_filter_enabled", 0) and message.content:
             import re as _re
@@ -965,6 +971,164 @@ class Events(commands.Cog):
                     except Exception: pass
 
     # ── AI AutoMod logic ───────────────────────────────────────────────────
+    async def _run_automod(self, message: discord.Message):
+        """
+        Full rule-based AutoMod. Called on every message.
+        Reads config from automod_config table.
+        Enforces: spam, caps, mentions, emojis, word filter, invite links.
+        """
+        import time as _time, unicodedata as _ud, re as _re, aiosqlite
+
+        guild  = message.guild
+        author = message.author
+        content = message.content or ""
+
+        # Skip bots and mods
+        if author.bot: return
+        if author.guild_permissions.manage_messages: return
+
+        # Load config
+        try:
+            async with aiosqlite.connect(self.bot.db.db_path) as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT * FROM automod_config WHERE guild_id=?", (guild.id,)
+                ) as cur:
+                    row = await cur.fetchone()
+                if not row or not row["enabled"]:
+                    return
+                cfg = dict(row)
+                async with db.execute(
+                    "SELECT value FROM automod_filters WHERE guild_id=?", (guild.id,)
+                ) as cur:
+                    bad_words = {r[0] for r in await cur.fetchall()}
+        except Exception:
+            return
+
+        action    = cfg.get("action", "delete")
+        log_ch_id = cfg.get("log_channel_id")
+        reason    = None
+
+        # ── Anti-spam ─────────────────────────────────────────────────────
+        if cfg.get("anti_spam") and content:
+            threshold = int(cfg.get("spam_threshold") or 5)
+            key = (guild.id, author.id)
+            now = _time.monotonic()
+            bucket = _SPAM_BUCKETS.setdefault(key, [])
+            bucket[:] = [t for t in bucket if now - t < 5.0]
+            bucket.append(now)
+            if len(bucket) >= threshold:
+                _SPAM_BUCKETS[key] = []
+                reason = f"Spam ({threshold}+ messages in 5 seconds)"
+
+        # ── Anti-caps ─────────────────────────────────────────────────────
+        if not reason and cfg.get("anti_caps") and len(content) >= 8:
+            letters = [ch for ch in content if ch.isalpha()]
+            if letters and sum(1 for ch in letters if ch.isupper()) / len(letters) >= 0.75:
+                reason = "Excessive caps"
+
+        # ── Mention spam ──────────────────────────────────────────────────
+        if not reason:
+            max_m = int(cfg.get("max_mentions") or 5)
+            total_mentions = len(message.mentions) + len(message.role_mentions)
+            if total_mentions >= max_m:
+                reason = f"Mention spam ({total_mentions} mentions)"
+
+        # ── Emoji spam ────────────────────────────────────────────────────
+        if not reason and content:
+            emoji_count = content.count("<:") + content.count("<a:") + sum(
+                1 for ch in content
+                if _ud.category(ch) == "So" or ch in "🎉🎊🎈🥳🔥💯"
+            )
+            if emoji_count >= 8:
+                reason = f"Emoji spam ({emoji_count} emojis)"
+
+        # ── Invite links ──────────────────────────────────────────────────
+        if not reason and content:
+            if _re.search(r"discord\.gg/|discord\.com/invite/", content, _re.I):
+                reason = "Discord invite link"
+
+        # ── Word filter ───────────────────────────────────────────────────
+        if not reason and bad_words and content:
+            lower = content.lower()
+            for word in bad_words:
+                if word and word in lower:
+                    reason = "Filtered word"
+                    break
+
+        # ── Anti-links (if configured) ────────────────────────────────────
+        if not reason and cfg.get("anti_links") and content:
+            urls = _re.findall(r"https?://([^\s/]+)", content)
+            if urls:
+                try:
+                    async with aiosqlite.connect(self.bot.db.db_path) as db:
+                        async with db.execute(
+                            "SELECT domain FROM allowed_domains WHERE guild_id=?", (guild.id,)
+                        ) as cur:
+                            allowed = {r[0] for r in await cur.fetchall()}
+                except Exception:
+                    allowed = set()
+                always_ok = {"discord.com","discord.gg","tenor.com","giphy.com",
+                             "cdn.discordapp.com","media.discordapp.net","i.imgur.com"}
+                allowed |= always_ok
+                blocked = [u for u in urls if not any(d in u for d in allowed)]
+                if blocked:
+                    reason = f"Blocked link"
+
+        if not reason:
+            return
+
+        # ── Execute action ────────────────────────────────────────────────
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        if action in ("warn", "timeout", "kick"):
+            try:
+                await message.channel.send(
+                    f"⚠️ {author.mention} — **{reason}**.",
+                    delete_after=7
+                )
+            except Exception:
+                pass
+
+        if action == "timeout":
+            try:
+                import datetime as _dt
+                until = discord.utils.utcnow() + _dt.timedelta(minutes=5)
+                await author.timeout(until, reason=f"AutoMod: {reason}")
+            except Exception:
+                pass
+        elif action == "kick":
+            try:
+                await author.kick(reason=f"AutoMod: {reason}")
+            except Exception:
+                pass
+
+        # ── Log ───────────────────────────────────────────────────────────
+        if log_ch_id:
+            log_ch = guild.get_channel(log_ch_id)
+            if log_ch:
+                try:
+                    from utils.embeds import XERO
+                    e = discord.Embed(
+                        title="🛡️  AutoMod Action",
+                        color=discord.Color(0xFFB800),
+                        timestamp=discord.utils.utcnow()
+                    )
+                    e.set_author(name=str(author), icon_url=author.display_avatar.url)
+                    e.add_field(name="User",    value=f"{author.mention} `{author.id}`", inline=True)
+                    e.add_field(name="Channel", value=message.channel.mention,            inline=True)
+                    e.add_field(name="Rule",    value=reason,                             inline=True)
+                    e.add_field(name="Action",  value=action.title(),                     inline=True)
+                    if content:
+                        e.add_field(name="Message", value=f"```{content[:300]}```", inline=False)
+                    e.set_footer(text="XERO AutoMod")
+                    await log_ch.send(embed=e)
+                except Exception:
+                    pass
+
     async def _run_aimod(self, message: discord.Message, settings: dict):
         threshold = float(settings.get("aimod_threshold") or 0.7)
         action    = settings.get("aimod_action") or "delete"
