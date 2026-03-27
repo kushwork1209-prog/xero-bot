@@ -9,6 +9,7 @@ from discord.ext import commands, tasks
 import logging, random, re, datetime, aiosqlite, urllib.parse
 
 logger = logging.getLogger("XERO.Events")
+_SPAM_BUCKETS: dict = {}  # {(guild_id, user_id): [timestamps]}
 
 # Per-guild AI conversation memory  guild_id -> [{role,content}]
 AI_MEMORY: dict = {}
@@ -257,7 +258,12 @@ class Events(commands.Cog):
             except Exception as e:
                 logger.error(f"Role restore on join: {e}")
 
-        # Raid detection
+        # Raid detection (XERO Security)
+        security = self.bot.cogs.get("Security")
+        if security:
+            try: await security.check_raid(member)
+            except Exception as _se: logger.debug(f"Raid check: {_se}")
+        # SmartMod check
         smart = self.bot.cogs.get("SmartMod")
         if smart: await smart.handle_member_join_check(member)
 
@@ -445,7 +451,7 @@ class Events(commands.Cog):
                 if entry.user and not entry.user.bot:
                     security = self.bot.cogs.get("Security")
                     if security:
-                        await security.check_nuke_action(guild, entry.user, "channel_delete")
+                        await security.track_nuke_action(guild, entry.user, "channel_delete")
         except Exception as e:
             logger.debug(f"Anti-nuke channel delete: {e}")
 
@@ -458,7 +464,7 @@ class Events(commands.Cog):
                 if entry.user and not entry.user.bot:
                     security = self.bot.cogs.get("Security")
                     if security:
-                        await security.check_nuke_action(guild, entry.user, "role_delete")
+                        await security.track_nuke_action(guild, entry.user, "role_delete")
         except Exception as e:
             logger.debug(f"Anti-nuke role delete: {e}")
 
@@ -470,7 +476,7 @@ class Events(commands.Cog):
                 if entry.user and not entry.user.bot and entry.user.id != self.bot.user.id:
                     security = self.bot.cogs.get("Security")
                     if security:
-                        await security.check_nuke_action(guild, entry.user, "mass_ban")
+                        await security.track_nuke_action(guild, entry.user, "mass_ban")
         except Exception as e:
             logger.debug(f"Anti-nuke ban: {e}")
 
