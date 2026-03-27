@@ -50,7 +50,8 @@ class XeroBot(commands.Bot):
             "cogs.autoresponder",
             "cogs.logging_system",
             "cogs.tools", "cogs.music", "cogs.profile", "cogs.analytics",
-            "cogs.utility", "cogs.backup", "cogs.core_admin",
+            "cogs.utility", "cogs.backup", "cogs.branding", "cogs.setup",
+            "cogs.core_admin",
         ]
 
     async def setup_hook(self):
@@ -70,18 +71,21 @@ class XeroBot(commands.Bot):
             except Exception as e:
                 logger.error(f"  ✗ {ext} — {e}")
         mguild = discord.Object(id=self.MANAGEMENT_GUILD_ID)
+        # ── Command sync ──────────────────────────────────────────────────
+        # Sync global commands
         try:
             synced = await self.tree.sync()
             logger.info(f"✓ Synced {len(synced)} global slash commands.")
+        except discord.HTTPException as e:
+            logger.error(f"Global sync failed: {e}")
         except Exception as e:
-            logger.error(f"Failed to sync: {e}")
+            logger.error(f"Global sync error: {e}")
+        # Sync management guild commands (/core + /support)
         try:
-            # Sync ONLY guild-specific commands to management guild.
-            # NO copy_global_to — that duplicates all 350+ global commands there,
-            # making every command appear twice in the management server.
-            # /core and /support use guilds=[mguild] in add_cog, sync fine without it.
             guild_synced = await self.tree.sync(guild=mguild)
-            logger.info(f"✓ Management guild: {len(guild_synced)} guild-only commands synced.")
+            logger.info(f"✓ Management guild: {len(guild_synced)} guild commands synced.")
+        except discord.Forbidden:
+            logger.warning(f"Management guild sync forbidden — bot not in guild {self.MANAGEMENT_GUILD_ID}?")
         except Exception as e:
             logger.warning(f"Management guild sync: {e}")
 

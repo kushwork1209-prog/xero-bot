@@ -1574,7 +1574,7 @@ class CoreAdmin(commands.GroupCog, name="core"):
         await interaction.followup.send(
             embed=discord.Embed(
                 description="✅ Backup saved to backup channel." if ok
-                else "❌ Failed. Check `BACKUP_CHANNEL_ID` env var is set and bot can post in that channel.",
+                else "❌ Failed — check BACKUP_CHANNEL_ID env var and bot permissions in that channel.",
                 color=discord.Color(0x00FF94 if ok else 0xFF1744)
             ), ephemeral=True
         )
