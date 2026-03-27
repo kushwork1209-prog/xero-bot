@@ -313,6 +313,11 @@ class TicketCategorySelect(discord.ui.Select):
         # Apply branding
         emb, file = await brand_embed(emb, guild, bot)
         
+        # Ensure unified image is applied if available
+        unified_image_url = settings.get("unified_image_url")
+        if unified_image_url and not emb.image:
+            emb.set_image(url=unified_image_url)
+        
         ping = interaction.user.mention + (f" | {role.mention}" if role else "")
         if file:
             await ch.send(content=ping, embed=emb, view=TicketActionView(bot), file=file)

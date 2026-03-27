@@ -300,9 +300,15 @@ class Events(commands.Cog):
                     custom_img = settings.get("welcome_custom_image")
                     
                     if use_brand:
+                        from utils.embeds import brand_embed
                         embed, file = await brand_embed(embed, member.guild, self.bot)
                     elif custom_img:
                         embed.set_image(url=custom_img)
+                    
+                    # Ensure unified image is applied if available
+                    unified_image_url = settings.get("unified_image_url")
+                    if unified_image_url and not embed.image:
+                        embed.set_image(url=unified_image_url)
                     
                     if file:
                         await ch.send(embed=embed, file=file)

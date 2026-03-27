@@ -69,7 +69,9 @@ class Leaderboard(commands.GroupCog, name="leaderboard"):
                 embed.add_field(name="📍 Your Position", value=f"**#{caller_pos}** overall — keep chatting to climb!", inline=False)
 
         embed.set_footer(text=f"XERO Levels  •  Earn XP by chatting + using commands")
-        await interaction.followup.send(embed=embed)
+        from utils.embeds import brand_embed
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        await interaction.followup.send(embed=embed, file=file)
 
     @app_commands.command(name="economy", description="Server wealth leaderboard — wallet, bank, net worth for the top 15 richest members.")
     @command_guard

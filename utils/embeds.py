@@ -107,7 +107,12 @@ async def brand_embed(embed: discord.Embed, guild: discord.Guild, bot) -> Tuple[
     
     # 3. Unified Image Integration
     file = None
-    if settings.get("unified_image_data"):
+    # Check for URL first (new system)
+    unified_image_url = settings.get("unified_image_url")
+    if unified_image_url:
+        embed.set_image(url=unified_image_url)
+    # Fallback to base64 (old system)
+    elif settings.get("unified_image_data"):
         try:
             image_data = base64.b64decode(settings["unified_image_data"])
             file = discord.File(io.BytesIO(image_data), filename="xero_brand.png")
