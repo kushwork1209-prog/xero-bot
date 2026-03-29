@@ -18,7 +18,7 @@ class Starboard(commands.GroupCog, name="starboard"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel, threshold: int = 3):
         threshold = max(1, min(50, threshold))
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO starboard_config (guild_id, channel_id, threshold, enabled) VALUES (?,?,?,1)",
                 (interaction.guild.id, channel.id, threshold)
@@ -34,7 +34,7 @@ class Starboard(commands.GroupCog, name="starboard"):
     @app_commands.describe(enabled="Enable or disable")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle(self, interaction: discord.Interaction, enabled: bool):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE starboard_config SET enabled=? WHERE guild_id=?", (1 if enabled else 0, interaction.guild.id))
             await db.commit()
         status = "enabled" if enabled else "disabled"
@@ -45,14 +45,14 @@ class Starboard(commands.GroupCog, name="starboard"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def threshold(self, interaction: discord.Interaction, threshold: int):
         threshold = max(1, min(50, threshold))
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE starboard_config SET threshold=? WHERE guild_id=?", (threshold, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Threshold Updated", f"Now requires **{threshold}** ⭐ reactions to get starred."))
 
     @app_commands.command(name="config", description="View the current starboard configuration.")
     async def config(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM starboard_config WHERE guild_id=?", (interaction.guild.id,)) as c:
                 config = await c.fetchone()

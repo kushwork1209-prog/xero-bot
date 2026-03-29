@@ -54,7 +54,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
     async def _restore_panels(self):
         await self.bot.wait_until_ready()
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute("SELECT * FROM reaction_role_panels") as c:
                     panels = [dict(r) for r in await c.fetchall()]
@@ -72,7 +72,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
     async def create_panel(self, interaction: discord.Interaction, title: str, description: str = "Click a button to get or remove a role!", channel: discord.TextChannel = None):
         ch = channel or interaction.channel
         # Store in DB as pending (no roles yet)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute(
                 "INSERT INTO reaction_role_panels (guild_id, channel_id, title, description, roles_data) VALUES (?,?,?,?,?)",
                 (interaction.guild.id, ch.id, title, description, json.dumps([]))
@@ -94,7 +94,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
     ])
     @app_commands.checks.has_permissions(manage_roles=True)
     async def add_role(self, interaction: discord.Interaction, panel_id: int, role: discord.Role, label: str, emoji: str = None, style: str = "blurple"):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM reaction_role_panels WHERE id=? AND guild_id=?", (panel_id, interaction.guild.id)) as c:
                 panel = await c.fetchone()
@@ -105,7 +105,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         if len(roles_data) >= 25:
             return await interaction.response.send_message(embed=error_embed("Panel Full", "Maximum 25 role buttons per panel."), ephemeral=True)
         roles_data.append({"role_id": role.id, "label": label, "emoji": emoji, "style": style})
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE reaction_role_panels SET roles_data=? WHERE id=?", (json.dumps(roles_data), panel_id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Role Added!", f"{role.mention} added to panel **#{panel_id}** with label **{label}**."))
@@ -114,7 +114,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
     @app_commands.describe(panel_id="Panel ID to publish")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def publish(self, interaction: discord.Interaction, panel_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM reaction_role_panels WHERE id=? AND guild_id=?", (panel_id, interaction.guild.id)) as c:
                 panel = await c.fetchone()
@@ -125,17 +125,24 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
         if not roles_data:
             return await interaction.response.send_message(embed=error_embed("No Roles", "Add roles first with `/reactionroles add-role`."), ephemeral=True)
         ch = interaction.guild.get_channel(panel["channel_id"]) or interaction.channel
-        embed = discord.Embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
-        embed.set_footer(text="Click a button to get/remove the role | XERO Reaction Roles")
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title=panel["title"], description=panel["description"], color=discord.Color.blurple())
+        embed.set_footer(text="Click a button to get/remove the role")
         role_list = []
         for r in roles_data:
             role = interaction.guild.get_role(r["role_id"])
             if role:
                 role_list.append(f"{r.get('emoji', '•')} {role.mention} — {r['label']}")
         embed.add_field(name="Available Roles", value="\n".join(role_list) if role_list else "None", inline=False)
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
         view = RolePanelView(roles_data)
-        msg = await ch.send(embed=embed, view=view)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        if file:
+            msg = await ch.send(embed=embed, view=view, file=file)
+        else:
+            msg = await ch.send(embed=embed, view=view)
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE reaction_role_panels SET message_id=? WHERE id=?", (msg.id, panel_id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Panel Published!", f"Reaction roles panel **#{panel_id}** is now live in {ch.mention}!"))
@@ -143,7 +150,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
     @app_commands.command(name="list-panels", description="View all reaction role panels in this server.")
     @app_commands.checks.has_permissions(manage_roles=True)
     async def list_panels(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM reaction_role_panels WHERE guild_id=?", (interaction.guild.id,)) as c:
                 panels = [dict(r) for r in await c.fetchall()]
@@ -164,7 +171,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
     @app_commands.describe(panel_id="Panel ID to delete")
     @app_commands.checks.has_permissions(administrator=True)
     async def delete_panel(self, interaction: discord.Interaction, panel_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT channel_id, message_id FROM reaction_role_panels WHERE id=? AND guild_id=?", (panel_id, interaction.guild.id)) as c:
                 panel = await c.fetchone()
         if panel:
@@ -175,7 +182,7 @@ class ReactionRoles(commands.GroupCog, name="reactionroles"):
                     await msg.delete()
                 except Exception:
                     pass
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM reaction_role_panels WHERE id=? AND guild_id=?", (panel_id, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Panel Deleted", f"Reaction roles panel **#{panel_id}** has been deleted."))

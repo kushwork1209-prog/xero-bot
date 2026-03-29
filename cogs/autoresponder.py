@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, asyncio, aiosqlite, re
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO
+from utils.embeds import success_embed, error_embed, info_embed, XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.AutoResponder")
 
@@ -22,7 +22,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
         self.bot = bot
 
     async def _ensure_tables(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS autoresponders (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +78,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
         await self._ensure_tables()
 
         # ── Auto-responders ────────────────────────────────────────────────
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM autoresponders WHERE guild_id=?",
@@ -127,7 +127,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
                         response = ai_response or response
 
                     await message.channel.send(response)
-                    async with aiosqlite.connect(self.bot.db.db_path) as db:
+                    async with self.bot.db._db_context() as db:
                         await db.execute("UPDATE autoresponders SET uses=uses+1 WHERE id=?", (t["id"],))
                         await db.commit()
                 except Exception as e:
@@ -142,7 +142,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
 
     async def _check_sticky(self, message: discord.Message):
         cid = message.channel.id
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute(
                 "SELECT * FROM sticky_messages WHERE channel_id=? AND enabled=1",
                 (cid,)
@@ -164,13 +164,13 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
         try:
             if embed_title:
                 color_int = int(color.lstrip("#"), 16) if color else 0x00D4FF
-                embed = discord.Embed(title=embed_title, description=content, color=discord.Color(color_int))
+                embed = comprehensive_embed(title=embed_title, description=content, color=discord.Color(color_int))
                 embed.set_footer(text="📌 Sticky Message  •  XERO Bot")
                 new_msg = await message.channel.send(embed=embed)
             else:
                 new_msg = await message.channel.send(f"📌 **Sticky:** {content}")
 
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 await db.execute(
                     "UPDATE sticky_messages SET last_message_id=? WHERE channel_id=?",
                     (new_msg.id, cid)
@@ -185,7 +185,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
         if not content_lower: return
 
         # Load highlights for this guild
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute(
                 "SELECT user_id, keyword FROM highlights WHERE guild_id=?",
                 (gid,)
@@ -244,7 +244,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
     async def add(self, interaction: discord.Interaction, trigger: str, response: str,
                   match_type: str = "contains", use_ai: bool = False, case_sensitive: bool = False):
         await self._ensure_tables()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             try:
                 await db.execute(
                     "INSERT INTO autoresponders (guild_id,trigger,response,match_type,use_ai,case_sensitive,created_by) VALUES (?,?,?,?,?,?,?)",
@@ -270,7 +270,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
     @app_commands.command(name="list", description="View all auto-responders with usage stats.")
     async def list(self, interaction: discord.Interaction):
         await self._ensure_tables()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM autoresponders WHERE guild_id=? ORDER BY uses DESC",
@@ -298,7 +298,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
     @app_commands.checks.has_permissions(manage_messages=True)
     async def remove(self, interaction: discord.Interaction, trigger: str):
         await self._ensure_tables()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "DELETE FROM autoresponders WHERE guild_id=? AND LOWER(trigger)=LOWER(?)",
                 (interaction.guild.id, trigger)
@@ -311,7 +311,7 @@ class AutoResponder(commands.GroupCog, name="autoresponder"):
     @app_commands.describe(message="The message to test against all auto-responders")
     async def test(self, interaction: discord.Interaction, message: str):
         await self._ensure_tables()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM autoresponders WHERE guild_id=?", (interaction.guild.id,)) as c:
                 triggers = [dict(r) for r in await c.fetchall()]
@@ -337,7 +337,7 @@ class StickyMessages(commands.GroupCog, name="sticky"):
         self.bot = bot
 
     async def _ensure(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS sticky_messages (
                     channel_id INTEGER PRIMARY KEY,
@@ -357,7 +357,7 @@ class StickyMessages(commands.GroupCog, name="sticky"):
     async def set(self, interaction: discord.Interaction, content: str, embed_title: str = None, channel: discord.TextChannel = None):
         await self._ensure()
         ch = channel or interaction.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 INSERT OR REPLACE INTO sticky_messages (channel_id, guild_id, content, embed_title, enabled)
                 VALUES (?,?,?,?,1)
@@ -366,13 +366,13 @@ class StickyMessages(commands.GroupCog, name="sticky"):
 
         # Send immediately
         if embed_title:
-            embed = discord.Embed(title=embed_title, description=content, color=XERO.PRIMARY)
+            embed = comprehensive_embed(title=embed_title, description=content, color=XERO.PRIMARY)
             embed.set_footer(text="📌 Sticky Message  •  XERO Bot")
             msg = await ch.send(embed=embed)
         else:
             msg = await ch.send(f"📌 **Sticky:** {content}")
 
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE sticky_messages SET last_message_id=? WHERE channel_id=?", (msg.id, ch.id))
             await db.commit()
 
@@ -384,7 +384,7 @@ class StickyMessages(commands.GroupCog, name="sticky"):
     async def remove(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
         await self._ensure()
         ch = channel or interaction.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT last_message_id FROM sticky_messages WHERE channel_id=?", (ch.id,)) as c:
                 row = await c.fetchone()
             if row and row[0]:
@@ -400,7 +400,7 @@ class StickyMessages(commands.GroupCog, name="sticky"):
     @app_commands.command(name="list", description="View all sticky messages in this server.")
     async def list(self, interaction: discord.Interaction):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT channel_id, content, enabled FROM sticky_messages WHERE guild_id=?", (interaction.guild.id,)) as c:
                 rows = await c.fetchall()
         if not rows:
@@ -418,7 +418,7 @@ class Highlights(commands.GroupCog, name="highlight"):
         self.bot = bot
 
     async def _ensure(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS highlights (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -435,7 +435,7 @@ class Highlights(commands.GroupCog, name="highlight"):
     async def add(self, interaction: discord.Interaction, keyword: str):
         await self._ensure()
         keyword = keyword.lower().strip()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT COUNT(*) FROM highlights WHERE user_id=? AND guild_id=?", (interaction.user.id, interaction.guild.id)) as c:
                 count = (await c.fetchone())[0]
             if count >= 10:
@@ -451,7 +451,7 @@ class Highlights(commands.GroupCog, name="highlight"):
     @app_commands.describe(keyword="Keyword to remove")
     async def remove(self, interaction: discord.Interaction, keyword: str):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM highlights WHERE user_id=? AND guild_id=? AND LOWER(keyword)=LOWER(?)", (interaction.user.id,interaction.guild.id,keyword))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Highlight Removed", f"No longer watching `{keyword}`."))
@@ -459,19 +459,19 @@ class Highlights(commands.GroupCog, name="highlight"):
     @app_commands.command(name="list", description="See all your highlight keywords in this server.")
     async def list(self, interaction: discord.Interaction):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT keyword FROM highlights WHERE user_id=? AND guild_id=? ORDER BY keyword", (interaction.user.id,interaction.guild.id)) as c:
                 rows = [r[0] for r in await c.fetchall()]
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Highlights", "You're not watching any keywords. Use `/highlight add` to add one."))
-        embed = discord.Embed(title="🔔  Your Highlights", description="\n".join(f"• `{kw}`" for kw in rows), color=XERO.PRIMARY)
+        embed = comprehensive_embed(title="🔔  Your Highlights", description="\n".join(f"• `{kw}`" for kw in rows), color=XERO.PRIMARY)
         embed.set_footer(text=f"{len(rows)}/10 keywords  •  XERO Highlights")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="clear", description="Remove all your highlights in this server.")
     async def clear(self, interaction: discord.Interaction):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM highlights WHERE user_id=? AND guild_id=?", (interaction.user.id,interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Highlights Cleared", "All your highlights for this server removed."))
@@ -482,7 +482,7 @@ class Tags(commands.GroupCog, name="tag"):
         self.bot = bot
 
     async def _ensure(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -503,7 +503,7 @@ class Tags(commands.GroupCog, name="tag"):
     async def create(self, interaction: discord.Interaction, name: str, content: str, embed_title: str = None):
         await self._ensure()
         name = name.lower().replace(" ","-")
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             try:
                 await db.execute("INSERT INTO tags (guild_id,name,content,embed_title,created_by) VALUES (?,?,?,?,?)", (interaction.guild.id,name,content,embed_title,interaction.user.id))
                 await db.commit()
@@ -515,26 +515,26 @@ class Tags(commands.GroupCog, name="tag"):
     @app_commands.describe(name="Tag name to show")
     async def show(self, interaction: discord.Interaction, name: str):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT * FROM tags WHERE guild_id=? AND LOWER(name)=LOWER(?)", (interaction.guild.id, name)) as c:
                 tag = await c.fetchone()
         if not tag:
             return await interaction.response.send_message(embed=error_embed("Tag Not Found", f"No tag `{name}`. Use `/tag list` to see all tags."), ephemeral=True)
         # tag = (id, guild_id, name, content, embed_title, uses, created_by)
         if tag[4]:  # embed_title
-            embed = discord.Embed(title=tag[4], description=tag[3], color=XERO.PRIMARY)
+            embed = comprehensive_embed(title=tag[4], description=tag[3], color=XERO.PRIMARY)
             embed.set_footer(text=f"Tag: {tag[2]}  •  {tag[5]} uses  •  XERO Bot")
             await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message(tag[3])
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE tags SET uses=uses+1 WHERE id=?", (tag[0],))
             await db.commit()
 
     @app_commands.command(name="list", description="View all tags in this server with usage stats.")
     async def list(self, interaction: discord.Interaction):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT name, uses FROM tags WHERE guild_id=? ORDER BY uses DESC", (interaction.guild.id,)) as c:
                 rows = await c.fetchall()
         if not rows:
@@ -549,7 +549,7 @@ class Tags(commands.GroupCog, name="tag"):
     @app_commands.checks.has_permissions(manage_messages=True)
     async def delete(self, interaction: discord.Interaction, name: str):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM tags WHERE guild_id=? AND LOWER(name)=LOWER(?)", (interaction.guild.id, name))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Tag Deleted", f"Tag `{name}` permanently deleted."))
@@ -559,7 +559,7 @@ class Tags(commands.GroupCog, name="tag"):
     @app_commands.checks.has_permissions(manage_messages=True)
     async def edit(self, interaction: discord.Interaction, name: str, content: str, embed_title: str = None):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE tags SET content=?, embed_title=? WHERE guild_id=? AND LOWER(name)=LOWER(?)", (content, embed_title, interaction.guild.id, name))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Tag Updated", f"Tag `{name}` has been updated."))

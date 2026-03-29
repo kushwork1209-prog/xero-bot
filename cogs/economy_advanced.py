@@ -426,7 +426,7 @@ class EconomyAdvanced(commands.Cog):
     @app_commands.command(name="craft", description="Combine two shop items to craft a more valuable item.")
     @app_commands.describe(item1="First item name", item2="Second item name")
     async def craft(self, interaction: discord.Interaction, item1: str, item2: str):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             # Find matching recipe (order-independent)
             async with db.execute("""
@@ -445,7 +445,7 @@ class EconomyAdvanced(commands.Cog):
 
         recipe = dict(recipe)
         # Check user owns both items
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             for item_name in [item1, item2]:
                 async with db.execute(
                     "SELECT quantity FROM economy_inventory WHERE user_id=? AND guild_id=? AND LOWER(item_name)=LOWER(?) AND quantity>0",
@@ -483,7 +483,7 @@ class EconomyAdvanced(commands.Cog):
     @app_commands.describe(result="Item produced", ingredient1="First ingredient", ingredient2="Second ingredient", bonus_value="Bonus $ value added to wallet on craft")
     @app_commands.checks.has_permissions(administrator=True)
     async def craft_add(self, interaction: discord.Interaction, result: str, ingredient1: str, ingredient2: str, bonus_value: int = 0):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT INTO craft_recipes (guild_id, result_item, ingredient1, ingredient2, result_value) VALUES (?,?,?,?,?)",
                 (interaction.guild.id, result, ingredient1, ingredient2, bonus_value)

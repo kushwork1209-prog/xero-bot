@@ -12,13 +12,13 @@ STATUS_EMOJIS={"pending":"🔵","approved":"✅","denied":"❌","implemented":"�
 def sug_embed(sid,title,desc,author,avatar,status,up,down,note=None):
     color=STATUS_COLORS.get(status,XERO.PRIMARY); total=up+down; pct=int(up/total*100) if total else 50
     bar="█"*int(pct/5)+"░"*(20-int(pct/5))
-    embed=discord.Embed(title=f"💡  #{sid}  •  {title}",description=desc,color=color)
+    embed=comprehensive_embed(title=f"💡  #{sid}  •  {title}",description=desc,color=color)
     embed.set_author(name=f"Suggested by {author}",icon_url=avatar or discord.Embed.Empty)
     embed.add_field(name="Status",value=f"{STATUS_EMOJIS.get(status,'🔵')} **{status.capitalize()}**",inline=True)
     embed.add_field(name="👍 Up",value=str(up),inline=True); embed.add_field(name="👎 Down",value=str(down),inline=True)
     embed.add_field(name=f"Approval ({pct}%)",value=f"`{bar}`",inline=False)
     if note: embed.add_field(name="📋 Staff Note",value=note,inline=False)
-    embed.set_footer(text="XERO Suggestions • Vote with the buttons!"); return embed
+    embed.set_footer(text="Vote with the buttons!"); return embed
 
 class VoteView(discord.ui.View):
     def __init__(self,bot,sid):
@@ -28,7 +28,7 @@ class VoteView(discord.ui.View):
     @discord.ui.button(emoji="👎",label="Downvote",style=discord.ButtonStyle.danger,custom_id="sug_down")
     async def downvote(self,interaction,button): await self._vote(interaction,"down")
     async def _vote(self,interaction,vtype):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory=aiosqlite.Row
             async with db.execute("SELECT vote FROM suggestion_votes WHERE suggestion_id=? AND user_id=?",(self.sid,interaction.user.id)) as c: existing=await c.fetchone()
             if existing:
@@ -56,7 +56,7 @@ class Suggestions(commands.GroupCog, name="suggest"):
     def __init__(self,bot): self.bot=bot
 
     async def _ensure(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("CREATE TABLE IF NOT EXISTS suggestion_votes (suggestion_id INTEGER NOT NULL,user_id INTEGER NOT NULL,vote TEXT NOT NULL,PRIMARY KEY(suggestion_id,user_id))")
             for col in ["upvotes INTEGER DEFAULT 0","downvotes INTEGER DEFAULT 0","title TEXT DEFAULT 'Suggestion'","author_name TEXT","author_avatar TEXT"]:
                 try: await db.execute(f"ALTER TABLE suggestions ADD COLUMN {col}")
@@ -73,29 +73,37 @@ class Suggestions(commands.GroupCog, name="suggest"):
         if not channel_id: return await interaction.response.send_message(embed=error_embed("Not Configured","Admins: run `/suggest setup` first."),ephemeral=True)
         channel=interaction.guild.get_channel(channel_id)
         if not channel: return await interaction.response.send_message(embed=error_embed("Bad Channel","Suggestion channel missing. Contact an admin."),ephemeral=True)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("INSERT INTO suggestions (guild_id,user_id,channel_id,title,description,author_name,author_avatar) VALUES (?,?,?,?,?,?,?)",(interaction.guild.id,interaction.user.id,channel_id,title[:100],description[:1000],interaction.user.display_name,str(interaction.user.display_avatar.url))) as c: sid=c.lastrowid
             await db.commit()
+        from utils.embeds import brand_embed, comprehensive_embed
         embed=sug_embed(sid,title,description,interaction.user.display_name,str(interaction.user.display_avatar.url),"pending",0,0)
-        view=VoteView(self.bot,sid); msg=await channel.send(embed=embed,view=view)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        view=VoteView(self.bot,sid)
+        if file:
+            msg=await channel.send(embed=embed,view=view,file=file)
+        else:
+            msg=await channel.send(embed=embed,view=view)
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE suggestions SET message_id=? WHERE id=?",(msg.id,sid)); await db.commit()
         await interaction.response.send_message(embed=success_embed("Submitted!",f"Suggestion **#{sid}** posted in {channel.mention} for voting!"),ephemeral=True)
 
     async def _set_status(self,interaction,sid,status,note=None):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory=aiosqlite.Row
             async with db.execute("SELECT * FROM suggestions WHERE id=? AND guild_id=?",(sid,interaction.guild.id)) as c: s=await c.fetchone()
         if not s: return await interaction.response.send_message(embed=error_embed("Not Found",f"Suggestion #{sid} not found."),ephemeral=True)
         s=dict(s)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE suggestions SET status=?,staff_response=?,reviewed_by=? WHERE id=?",(status,note,interaction.user.id,sid)); await db.commit()
         channel=interaction.guild.get_channel(s["channel_id"])
         if channel and s.get("message_id"):
             try:
                 msg=await channel.fetch_message(s["message_id"])
-                async with aiosqlite.connect(self.bot.db.db_path) as db:
+                async with self.bot.db._db_context() as db:
                     db.row_factory=aiosqlite.Row
                     async with db.execute("SELECT * FROM suggestions WHERE id=?",(sid,)) as c: upd=dict(await c.fetchone())
                 embed=sug_embed(sid,upd.get("title","Suggestion"),upd["description"],upd.get("author_name","Unknown"),upd.get("author_avatar"),status,upd.get("upvotes",0),upd.get("downvotes",0),note)
@@ -128,7 +136,7 @@ class Suggestions(commands.GroupCog, name="suggest"):
     @app_commands.describe(status="Filter by status")
     async def list(self,interaction:discord.Interaction,status:str="all"):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory=aiosqlite.Row
             if status=="all":
                 async with db.execute("SELECT * FROM suggestions WHERE guild_id=? ORDER BY id DESC LIMIT 15",(interaction.guild.id,)) as c: rows=[dict(r) for r in await c.fetchall()]
@@ -146,7 +154,7 @@ class Suggestions(commands.GroupCog, name="suggest"):
     @app_commands.checks.has_permissions(administrator=True)
     async def setup(self,interaction:discord.Interaction,channel:discord.TextChannel):
         await self._ensure()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("INSERT OR IGNORE INTO guild_settings (guild_id) VALUES (?)",(interaction.guild.id,))
             await db.execute("UPDATE guild_settings SET suggestion_channel_id=? WHERE guild_id=?",(channel.id,interaction.guild.id)); await db.commit()
         await interaction.response.send_message(embed=success_embed("Configured!",f"Suggestions → {channel.mention} with live voting."))

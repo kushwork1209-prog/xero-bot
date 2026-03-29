@@ -7,7 +7,7 @@ import logging
 import datetime
 import random
 import aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, giveaway_embed
+from utils.embeds import success_embed, error_embed, info_embed, giveaway_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Giveaway")
 
@@ -23,7 +23,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @tasks.loop(minutes=1)
     async def process_giveaways(self):
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM giveaways WHERE ended=0 AND paused=0 AND end_time <= datetime('now')"
@@ -40,7 +40,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         await self.bot.wait_until_ready()
 
     async def _end_giveaway(self, giveaway_id: int, announce=True):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM giveaways WHERE giveaway_id=?", (giveaway_id,)) as c:
                 gw = await c.fetchone()
@@ -61,12 +61,12 @@ class Giveaway(commands.GroupCog, name="giveaway"):
             if channel:
                 if winners:
                     winner_mentions = " ".join(f"<@{w}>" for w in winners)
-                    embed = discord.Embed(title="🎉 Giveaway Ended!", color=discord.Color.gold())
+                    embed = comprehensive_embed(title="🎉 Giveaway Ended!", color=discord.Color.gold())
                     embed.add_field(name="🏆 Prize", value=gw["prize"], inline=False)
                     embed.add_field(name="🎊 Winners", value=winner_mentions, inline=False)
                     embed.add_field(name="👥 Total Entries", value=str(len(participants)), inline=True)
                 else:
-                    embed = discord.Embed(title="🎉 Giveaway Ended", description="No one entered the giveaway!", color=discord.Color.red())
+                    embed = comprehensive_embed(title="🎉 Giveaway Ended", description="No one entered the giveaway!", color=discord.Color.red())
                     embed.add_field(name="Prize", value=gw["prize"], inline=False)
                 try:
                     await channel.send(embed=embed)
@@ -88,7 +88,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         end_ts  = int((discord.utils.utcnow() + datetime.timedelta(minutes=max(1,duration_minutes))).timestamp())
         w_count = max(1, winners)
         sql = "INSERT INTO giveaways (guild_id,channel_id,prize,winners_count,end_time,host_id) VALUES (?,?,?,?,datetime(?,'unixepoch'),?)"
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             try: await db.execute("ALTER TABLE giveaways ADD COLUMN required_role_id INTEGER")
             except Exception: pass
             try: await db.execute("ALTER TABLE giveaways ADD COLUMN bonus_role_id INTEGER")
@@ -100,25 +100,32 @@ class Giveaway(commands.GroupCog, name="giveaway"):
         req = []
         if required_role: req.append("Must have " + required_role.mention)
         if bonus_role:    req.append(bonus_role.mention + " gets 2x entries")
-        embed = discord.Embed(title="🎉  GIVEAWAY!", description="## " + prize, color=0xFFD700)
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title="🎉  GIVEAWAY!", description="## " + prize, color=0xFFD700)
         embed.add_field(name="🏆 Winners",  value=str(w_count),                  inline=True)
         embed.add_field(name="⏰ Ends",      value="<t:" + str(end_ts) + ":R>",  inline=True)
         embed.add_field(name="📢 Host",     value=interaction.user.mention,       inline=True)
         if req: embed.add_field(name="📋 Requirements", value="\n".join(req),   inline=False)
-        embed.set_footer(text="ID: " + str(gw_id) + "  •  React 🎉 to enter!")
-        msg = await ch.send(content=ping_role.mention if ping_role else None, embed=embed)
+        embed.set_footer(text=f"ID: {gw_id}  •  React 🎉 to enter!")
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if file:
+            msg = await ch.send(content=ping_role.mention if ping_role else None, embed=embed, file=file)
+        else:
+            msg = await ch.send(content=ping_role.mention if ping_role else None, embed=embed)
         await msg.add_reaction("🎉")
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE giveaways SET message_id=? WHERE giveaway_id=?",(msg.id,gw_id))
             await db.commit()
-        await interaction.followup.send(embed=discord.Embed(description="✅ Giveaway started in " + ch.mention,color=0x00FF94),ephemeral=True)
+        await interaction.followup.send(embed=comprehensive_embed(description="✅ Giveaway started in " + ch.mention,color=0x00FF94),ephemeral=True)
 
     @app_commands.command(name="end", description="Immediately end a giveaway and pick winners.")
     @app_commands.describe(giveaway_id="ID of the giveaway to end")
     @app_commands.checks.has_permissions(manage_messages=True)
     @command_guard
     async def end(self, interaction: discord.Interaction, giveaway_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM giveaways WHERE giveaway_id=? AND guild_id=?", (giveaway_id, interaction.guild.id)) as c:
                 gw = await c.fetchone()
@@ -136,7 +143,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @app_commands.describe(giveaway_id="ID of the ended giveaway to reroll")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def reroll(self, interaction: discord.Interaction, giveaway_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM giveaways WHERE giveaway_id=? AND guild_id=?", (giveaway_id, interaction.guild.id)) as c:
                 gw = await c.fetchone()
@@ -157,7 +164,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
 
     @app_commands.command(name="list", description="View all active giveaways in this server.")
     async def list_giveaways(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM giveaways WHERE guild_id=? AND ended=0 ORDER BY end_time ASC", (interaction.guild.id,)) as c:
                 giveaways = [dict(r) for r in await c.fetchall()]
@@ -178,7 +185,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @app_commands.describe(giveaway_id="ID of the giveaway to cancel")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def cancel(self, interaction: discord.Interaction, giveaway_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM giveaway_participants WHERE giveaway_id=?", (giveaway_id,))
             await db.execute("DELETE FROM giveaways WHERE giveaway_id=? AND guild_id=?", (giveaway_id, interaction.guild.id))
             await db.commit()
@@ -188,7 +195,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @app_commands.describe(giveaway_id="Giveaway ID", new_prize="New prize description")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def edit_prize(self, interaction: discord.Interaction, giveaway_id: int, new_prize: str):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE giveaways SET prize=? WHERE giveaway_id=? AND guild_id=?", (new_prize, giveaway_id, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Prize Updated!", f"Giveaway **#{giveaway_id}** prize changed to **{new_prize}**."))
@@ -196,7 +203,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @app_commands.command(name="winners", description="View past winners of a giveaway.")
     @app_commands.describe(giveaway_id="ID of the giveaway")
     async def winners(self, interaction: discord.Interaction, giveaway_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM giveaways WHERE giveaway_id=? AND guild_id=?", (giveaway_id, interaction.guild.id)) as c:
                 gw = await c.fetchone()
@@ -210,7 +217,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     @app_commands.describe(giveaway_id="Giveaway ID to delete")
     @app_commands.checks.has_permissions(administrator=True)
     async def delete(self, interaction: discord.Interaction, giveaway_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM giveaway_participants WHERE giveaway_id=?", (giveaway_id,))
             await db.execute("DELETE FROM giveaways WHERE giveaway_id=? AND guild_id=?", (giveaway_id, interaction.guild.id))
             await db.commit()

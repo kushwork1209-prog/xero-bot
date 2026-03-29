@@ -21,7 +21,7 @@ class Birthday(commands.GroupCog, name="birthday"):
             return await interaction.response.send_message(embed=error_embed("Invalid Date", "Please enter a valid day (1-31) and month (1-12)."), ephemeral=True)
         if year and not (1900 <= year <= datetime.date.today().year):
             return await interaction.response.send_message(embed=error_embed("Invalid Year", "Please enter a valid birth year."), ephemeral=True)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO birthdays (user_id, guild_id, day, month, year, announced_year) VALUES (?,?,?,?,?,0)",
                 (interaction.user.id, interaction.guild.id, day, month, year)
@@ -34,7 +34,7 @@ class Birthday(commands.GroupCog, name="birthday"):
 
     @app_commands.command(name="remove", description="Remove your birthday from the server.")
     async def remove(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM birthdays WHERE user_id=? AND guild_id=?", (interaction.user.id, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Birthday Removed", "Your birthday has been removed from this server."))
@@ -43,7 +43,7 @@ class Birthday(commands.GroupCog, name="birthday"):
     @app_commands.describe(user="User to check birthday for")
     async def view(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM birthdays WHERE user_id=? AND guild_id=?", (target.id, interaction.guild.id)) as c:
                 bday = await c.fetchone()
@@ -70,7 +70,7 @@ class Birthday(commands.GroupCog, name="birthday"):
     @app_commands.command(name="list", description="View all upcoming birthdays in this server.")
     async def list(self, interaction: discord.Interaction):
         today = datetime.date.today()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM birthdays WHERE guild_id=?", (interaction.guild.id,)) as c:
                 birthdays = [dict(r) for r in await c.fetchall()]
@@ -133,7 +133,7 @@ class Birthday(commands.GroupCog, name="birthday"):
     @app_commands.command(name="today", description="See which members have a birthday today!")
     async def today(self, interaction: discord.Interaction):
         today = datetime.date.today()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM birthdays WHERE guild_id=? AND month=? AND day=?",

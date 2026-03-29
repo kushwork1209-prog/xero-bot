@@ -24,7 +24,7 @@ from utils.guard import command_guard
 from discord.ext import commands, tasks
 from discord import app_commands
 import logging, datetime, aiosqlite
-from utils.embeds import XERO
+from utils.embeds import XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Logging")
 
@@ -117,7 +117,7 @@ class AdvancedLogger(commands.Cog):
         except Exception as e: logger.debug(f"Log: {e}")
 
     def _e(self, t, title):
-        return discord.Embed(title=title, color=discord.Color(C.get(t,0x00D4FF)), timestamp=discord.utils.utcnow())
+        return comprehensive_embed(title=title, color=discord.Color(C.get(t,0x00D4FF)), timestamp=discord.utils.utcnow())
 
     def _f(self, embed, *parts):
         embed.set_footer(text="  •  ".join(str(p) for p in parts if p))
@@ -151,6 +151,15 @@ class AdvancedLogger(commands.Cog):
     async def on_message_edit(self, before, after):
         if before.author.bot or not before.guild: return
         if before.content == after.content: return
+        
+        # Ignore check
+        async with self.bot.db._db_context() as db:
+            async with db.execute("SELECT 1 FROM log_ignored_channels WHERE guild_id=? AND channel_id=?", (before.guild.id, before.channel.id)) as c:
+                if await c.fetchone(): return
+            for r in before.author.roles:
+                async with db.execute("SELECT 1 FROM log_ignored_roles WHERE guild_id=? AND role_id=?", (before.guild.id, r.id)) as c:
+                    if await c.fetchone(): return
+
         gid, uid = before.guild.id, before.author.id
         now = datetime.datetime.now()
         if gid not in self._msg_pattern: self._msg_pattern[gid] = {}
@@ -174,6 +183,15 @@ class AdvancedLogger(commands.Cog):
     @commands.Cog.listener()
     async def on_message_delete(self, message):
         if message.author.bot or not message.guild: return
+        
+        # Ignore check
+        async with self.bot.db._db_context() as db:
+            async with db.execute("SELECT 1 FROM log_ignored_channels WHERE guild_id=? AND channel_id=?", (message.guild.id, message.channel.id)) as c:
+                if await c.fetchone(): return
+            for r in message.author.roles:
+                async with db.execute("SELECT 1 FROM log_ignored_roles WHERE guild_id=? AND role_id=?", (message.guild.id, r.id)) as c:
+                    if await c.fetchone(): return
+
         deleter_str = "*Unknown — may be self-deleted*"
         sus_flag    = False
         try:
@@ -735,11 +753,11 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
     """
     uid     = user.id
     gid     = guild.id
-    db_path = bot.db.db_path
+    db_obj = bot.db
     pages   = []
     age_days = (discord.utils.utcnow() - user.created_at).days
 
-    async with aiosqlite.connect(db_path) as db:
+    async with db_obj._db_context() as db:
         db.row_factory = aiosqlite.Row
 
         # ── Mod cases ────────────────────────────────────────────────────
@@ -856,7 +874,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
     if mod_cases:
         for chunk_start in range(0, len(mod_cases), 10):
             chunk = mod_cases[chunk_start:chunk_start+10]
-            e = discord.Embed(title=f"🛡️  Mod Cases — {user.display_name}", color=C_MOD, timestamp=discord.utils.utcnow())
+            e = comprehensive_embed(title=f"🛡️  Mod Cases — {user.display_name}", color=C_MOD, timestamp=discord.utils.utcnow())
             for case in chunk:
                 mod = guild.get_member(case["mod_id"])
                 mod_str = mod.display_name if mod else f"ID:{case['mod_id']}"
@@ -870,7 +888,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
 
     # ── PAGE: Warnings ────────────────────────────────────────────────────
     if warnings:
-        e = discord.Embed(title=f"⚠️  Warnings — {user.display_name}", color=C_WARN, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"⚠️  Warnings — {user.display_name}", color=C_WARN, timestamp=discord.utils.utcnow())
         e.description = f"**{len(warnings)}** warning(s) in this server"
         for w in warnings[:12]:
             mod = guild.get_member(w["mod_id"])
@@ -883,7 +901,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
     if tickets:
         for chunk_start in range(0, len(tickets), 5):
             chunk = tickets[chunk_start:chunk_start+5]
-            e = discord.Embed(title=f"🎫  Tickets — {user.display_name}", color=C_TICKET, timestamp=discord.utils.utcnow())
+            e = comprehensive_embed(title=f"🎫  Tickets — {user.display_name}", color=C_TICKET, timestamp=discord.utils.utcnow())
             for t in chunk:
                 status_icon = "🟢" if t["status"] == "open" else "⚫"
                 summary_short = (t.get("ai_summary") or "No summary")[:80]
@@ -899,7 +917,7 @@ async def _collect_user_logs(bot, guild, user: discord.User, include_global: boo
 
     # ── PAGE: Economy ─────────────────────────────────────────────────────
     if eco:
-        e = discord.Embed(title=f"💰  Economy — {user.display_name}", color=C_ECO, timestamp=discord.utils.utcnow())
+        e = comprehensive_embed(title=f"💰  Economy — {user.display_name}", color=C_ECO, timestamp=discord.utils.utcnow())
         e.add_field(name="👛 Wallet",       value=f"${eco.get('wallet',0):,}",        inline=True)
         e.add_field(name="🏦 Bank",         value=f"${eco.get('bank',0):,}",          inline=True)
         e.add_field(name="📈 Total Earned", value=f"${eco.get('total_earned',0):,}",  inline=True)
@@ -983,44 +1001,43 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         await interaction.response.defer(ephemeral=True)
         pages = await _collect_user_logs(self.bot, interaction.guild, user)
         if not pages:
-            return await interaction.followup.send(embed=discord.Embed(description=f"No XERO records found for {user.mention}.", color=0x2B2D31))
+            return await interaction.followup.send(embed=comprehensive_embed(description=f"No XERO records found for {user.mention}.", color=0x2B2D31))
         view  = UserLogView(pages, user)
         await interaction.followup.send(embed=pages[0].embed, view=view)
 
-    @app_commands.command(name="setup", description="Configure logging. Set one unified channel or separate channels per event type.")
-    @app_commands.describe(unified="One channel for ALL events",messages="Edits/deletes",members="Joins/leaves/bans",server="Channels/roles/server changes",voice="Voice events")
+    @app_commands.command(name="setup", description="Configure the elite logging system with smart defaults.")
+    @app_commands.describe(channel="Primary channel for ALL logs (Unified)", messages="Specific channel for edits/deletes", members="Specific channel for joins/leaves/roles", server="Specific channel for server/role changes", voice="Specific channel for voice sessions")
     @app_commands.checks.has_permissions(administrator=True)
-    async def setup(self, interaction: discord.Interaction,
-                    unified: discord.TextChannel=None, messages: discord.TextChannel=None,
-                    members: discord.TextChannel=None, server: discord.TextChannel=None,
-                    voice: discord.TextChannel=None):
-        updates = {}
-        if unified:
-            for k in ["log_channel_id","message_log_channel_id","member_log_channel_id","server_log_channel_id","voice_log_channel_id"]:
-                updates[k] = unified.id
-        if messages: updates["message_log_channel_id"] = messages.id
-        if members:  updates["member_log_channel_id"]  = members.id
-        if server:   updates["server_log_channel_id"]  = server.id
-        if voice:    updates["voice_log_channel_id"]   = voice.id
+    async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel, messages: discord.TextChannel=None, members: discord.TextChannel=None, server: discord.TextChannel=None, voice: discord.TextChannel=None):
+        updates = {"log_channel_id": channel.id}
+        if not messages: updates["message_log_channel_id"] = channel.id
+        else: updates["message_log_channel_id"] = messages.id
+        if not members: updates["member_log_channel_id"] = channel.id
+        else: updates["member_log_channel_id"] = members.id
+        if not server: updates["server_log_channel_id"] = channel.id
+        else: updates["server_log_channel_id"] = server.id
+        if not voice: updates["voice_log_channel_id"] = channel.id
+        else: updates["voice_log_channel_id"] = voice.id
+        
         for k,v in updates.items(): await self.bot.db.update_guild_setting(interaction.guild.id,k,v)
         adv = self.bot.cogs.get("AdvancedLogger")
         if adv: adv._cache.pop(interaction.guild.id, None)
-        def fmt(ch): return ch.mention if ch else "—"
+        
+        def fmt(cid): return f"<#{cid}>" if cid else "—"
         embed = discord.Embed(
-            title="📋  Logging Configured",
+            title="📋  Logging Protocol Initialized",
             description=(
-                "XERO now logs **every** Discord event with AI threat scoring, "
-                "full permission diffs, invite tracking, voice session durations, "
-                "WHO deleted each message, and bulk-delete transcripts.\n\n"
+                "XERO elite logging is now active. We monitor every event with AI threat scoring, "
+                "permission diffs, and deep audit integration.\n\n"
                 "**The most detailed logging of any bot. Period.**"
             ),
             color=0x00D4FF, timestamp=discord.utils.utcnow()
         )
-        embed.add_field(name="🌐 Unified",  value=fmt(unified),  inline=True)
-        embed.add_field(name="💬 Messages", value=fmt(messages), inline=True)
-        embed.add_field(name="👥 Members",  value=fmt(members),  inline=True)
-        embed.add_field(name="🏰 Server",   value=fmt(server),   inline=True)
-        embed.add_field(name="🔊 Voice",    value=fmt(voice),    inline=True)
+        embed.add_field(name="🌐 Unified",  value=channel.mention,  inline=True)
+        embed.add_field(name="💬 Messages", value=fmt(updates.get("message_log_channel_id")), inline=True)
+        embed.add_field(name="👥 Members",  value=fmt(updates.get("member_log_channel_id")),  inline=True)
+        embed.add_field(name="🏰 Server",   value=fmt(updates.get("server_log_channel_id")),   inline=True)
+        embed.add_field(name="🔊 Voice",    value=fmt(updates.get("voice_log_channel_id")),    inline=True)
         embed.add_field(name="📋 What's Logged", value=(
             "✅ Message edits (before/after + char diff)\n"
             "✅ Deletions (who deleted + full content + attachments)\n"
@@ -1049,12 +1066,30 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         embed.set_footer(text="XERO Logging  •  Period.")
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="ignore-channel", description="Exclude a channel from message logging.")
+    @app_commands.describe(channel="Channel to ignore")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def ignore_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        async with self.bot.db._db_context() as db:
+            await db.execute("INSERT OR IGNORE INTO log_ignored_channels (guild_id, channel_id) VALUES (?,?)", (interaction.guild.id, channel.id))
+            await db.commit()
+        await interaction.response.send_message(embed=success_embed("Channel Ignored", f"Messages in {channel.mention} will no longer be logged."))
+
+    @app_commands.command(name="ignore-role", description="Exclude a role from message logging.")
+    @app_commands.describe(role="Role to ignore")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def ignore_role(self, interaction: discord.Interaction, role: discord.Role):
+        async with self.bot.db._db_context() as db:
+            await db.execute("INSERT OR IGNORE INTO log_ignored_roles (guild_id, role_id) VALUES (?,?)", (interaction.guild.id, role.id))
+            await db.commit()
+        await interaction.response.send_message(embed=success_embed("Role Ignored", f"Users with the {role.mention} role will no longer have their messages logged."))
+
     @app_commands.command(name="view", description="View current logging configuration.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def view(self, interaction: discord.Interaction):
         s = await self.bot.db.get_guild_settings(interaction.guild.id)
         def ch(cid): return f"<#{cid}>" if cid else "❌ Not set"
-        embed = discord.Embed(title=f"📋  Logging — {interaction.guild.name}", color=0x00D4FF)
+        embed = comprehensive_embed(title=f"📋  Logging — {interaction.guild.name}", color=0x00D4FF)
         embed.add_field(name="🌐 Unified",   value=ch(s.get("log_channel_id")),           inline=True)
         embed.add_field(name="💬 Messages",  value=ch(s.get("message_log_channel_id")),   inline=True)
         embed.add_field(name="👥 Members",   value=ch(s.get("member_log_channel_id")),    inline=True)
@@ -1073,7 +1108,7 @@ class LoggingConfig(commands.GroupCog, name="logs"):
         if adv: adv._cache.pop(interaction.guild.id, None)
         msg = ("✅ **Webhook Protection enabled.**\nWebhooks created by non-admins are auto-deleted instantly." if enabled
                else "❌ **Webhook Protection disabled.**")
-        await interaction.response.send_message(embed=discord.Embed(description=msg,color=0x00FF94 if enabled else 0xFF3B5C))
+        await interaction.response.send_message(embed=comprehensive_embed(description=msg,color=0x00FF94 if enabled else 0xFF3B5C))
 
     @app_commands.command(name="test", description="Send test log messages to all configured channels.")
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -1086,19 +1121,19 @@ class LoggingConfig(commands.GroupCog, name="logs"):
             ch = await adv._ch(interaction.guild, lt)
             if ch and ch.id not in sent:
                 try:
-                    e = discord.Embed(title="🧪  XERO Logging Test",
+                    e = comprehensive_embed(title="🧪  XERO Logging Test",
                                      description=f"✅ **{lt.replace('_',' ').title()}** logs working!",
                                      color=0x00D4FF, timestamp=discord.utils.utcnow())
                     e.set_footer(text=f"Tested by {interaction.user}  •  XERO Logging")
                     await ch.send(embed=e); sent.add(ch.id)
                 except Exception: pass
         result = f"✅ Tests sent to {len(sent)} channel(s)." if sent else "❌ No log channels set. Use `/logs setup` first."
-        await interaction.followup.send(embed=discord.Embed(description=result,color=0x00FF94 if sent else 0xFF3B5C),ephemeral=True)
+        await interaction.followup.send(embed=comprehensive_embed(description=result,color=0x00FF94 if sent else 0xFF3B5C),ephemeral=True)
 
 
 async def setup(bot):
     try:
-        async with aiosqlite.connect(bot.db.db_path) as db:
+        async with bot.db._db_context() as db:
             for col in ["message_log_channel_id INTEGER","member_log_channel_id INTEGER",
                         "server_log_channel_id INTEGER","voice_log_channel_id INTEGER",
                         "webhook_protection_enabled INTEGER DEFAULT 0"]:

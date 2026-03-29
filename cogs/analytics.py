@@ -29,7 +29,7 @@ class Analytics(commands.GroupCog, name="analytics"):
         text_ch = len([c for c in guild.channels if isinstance(c, discord.TextChannel)])
         voice_ch = len([c for c in guild.channels if isinstance(c, discord.VoiceChannel)])
         # Economy stats
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT COUNT(*), SUM(wallet+bank), AVG(wallet+bank) FROM economy WHERE guild_id=?", (interaction.guild.id,)) as c:
                 eco = await c.fetchone()
             async with db.execute("SELECT COUNT(*), SUM(total_xp), MAX(level) FROM levels WHERE guild_id=?", (interaction.guild.id,)) as c:
@@ -99,7 +99,7 @@ class Analytics(commands.GroupCog, name="analytics"):
     @command_guard
     async def top_members(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT user_id, commands_used, messages_sent FROM user_stats WHERE guild_id=? ORDER BY commands_used+messages_sent DESC LIMIT 10",
@@ -123,7 +123,7 @@ class Analytics(commands.GroupCog, name="analytics"):
     @command_guard
     async def economy_stats(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT COUNT(*) as users, SUM(wallet) as total_wallet, SUM(bank) as total_bank, "
@@ -166,7 +166,7 @@ class Analytics(commands.GroupCog, name="analytics"):
     @command_guard
     async def moderation_stats(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT action, COUNT(*) as count FROM mod_cases WHERE guild_id=? GROUP BY action ORDER BY count DESC",
@@ -210,7 +210,7 @@ class Analytics(commands.GroupCog, name="analytics"):
     @command_guard
     async def level_stats(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT COUNT(*) as users, SUM(total_xp) as total_xp, AVG(total_xp) as avg_xp, "
@@ -326,7 +326,7 @@ class Analytics(commands.GroupCog, name="analytics"):
             bar = "█" * int(count / max_count * 12)
             active = " ◄ PEAK" if h == peak_hour else ""
             bar_lines.append(f"`{h:02d}:00` {bar or '░'} {count}{active}")
-        embed = discord.Embed(title=f"⏰  Peak Hours — {interaction.guild.name}", color=0x00D4FF)
+        embed = comprehensive_embed(title=f"⏰  Peak Hours — {interaction.guild.name}", color=0x00D4FF)
         mid = len(bar_lines) // 2
         embed.add_field(name="🌅 00:00–11:59", value="\n".join(bar_lines[:12]), inline=True)
         embed.add_field(name="🌇 12:00–23:59", value="\n".join(bar_lines[12:]), inline=True)
@@ -345,7 +345,7 @@ class Analytics(commands.GroupCog, name="analytics"):
     async def server_health(self, interaction: discord.Interaction):
         await interaction.response.defer()
         guild = interaction.guild
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT SUM(commands_used),SUM(messages_sent) FROM user_stats WHERE guild_id=?", (guild.id,)) as c:
                 stats = await c.fetchone()
             async with db.execute("SELECT COUNT(*) FROM mod_cases WHERE guild_id=? AND timestamp >= datetime(\'now\', \'-7 days\')", (guild.id,)) as c:
@@ -374,7 +374,7 @@ class Analytics(commands.GroupCog, name="analytics"):
             health_score = 70; recs = ["Increase member engagement with events","Set up auto-moderation","Configure welcome messages"]
         color = 0x00FF94 if health_score >= 75 else 0xFFB800 if health_score >= 50 else 0xFF3B5C
         bar   = "█" * (health_score//10) + "░" * (10 - health_score//10)
-        embed = discord.Embed(title=f"❤️  Server Health — {guild.name}", color=color)
+        embed = comprehensive_embed(title=f"❤️  Server Health — {guild.name}", color=color)
         embed.add_field(name="💊 Health Score", value=f"**{health_score}/100**\n`{bar}`", inline=True)
         embed.add_field(name="👥 Online Rate",  value=f"{online_pct:.0f}%",               inline=True)
         embed.add_field(name="💎 Boost Level",  value=f"Level {guild.premium_tier}",       inline=True)

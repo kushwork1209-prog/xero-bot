@@ -54,7 +54,7 @@ class AdminDashboardView(discord.ui.View):
             f"**Economy:** {'✅ On' if settings.get('economy_enabled', 1) else '❌ Off'}",
             f"**AI Responses:** {'✅ On' if settings.get('ai_enabled', 1) else '❌ Off'}",
             "",
-            "Use **`/setup <option>`** to change any setting.",
+            "Use **`/settings <option>`** to change any setting.",
         ], discord.Color.blue())
 
     @discord.ui.button(label="🤖 AI Features", style=discord.ButtonStyle.blurple, row=0)
@@ -120,13 +120,16 @@ class AdminDashboardView(discord.ui.View):
 
     @discord.ui.button(label="✅ Verification", style=discord.ButtonStyle.success, row=1)
     async def verify_btn(self, i, b):
-        await self._set_embed(i, "✅ Verification System", [
-            "**`/verify setup`** — Post verification panel with custom message",
-            "**`/verify config`** — View current configuration",
-            "**`/verify update-message`** — Change panel message",
-            "**`/verify update-role`** — Change role assigned on verify",
-            "**`/verify stats`** — View verification statistics",
-            "**`/verify reset`** — Reset a user's verification",
+        await self._set_embed(i, "🛡️ Aegis Protocol", [
+            "**`/verify setup`** — Deploy the 4-tier security gateway",
+            "",
+            "**Tiers:**",
+            "1. **Silent Guard** (Click-to-Verify)",
+            "2. **Secret Gate** (Custom Question)",
+            "3. **Neural Link** (Math CAPTCHA)",
+            "4. **Total Lockdown** (Quarantine + Appeal)",
+            "",
+            "*Includes real-time Silent Risk Scoring.*"
         ], discord.Color.green())
 
     @discord.ui.button(label="🎵 Music", style=discord.ButtonStyle.blurple, row=1)
@@ -224,7 +227,7 @@ class Admin(commands.Cog):
                           price: int = 0, description: str = "A shop item.", role: discord.Role = None, emoji: str = "🛍️"):
         import aiosqlite
         if action == "add":
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 await db.execute(
                     "INSERT INTO economy_shop (guild_id, name, description, price, role_id, emoji) VALUES (?,?,?,?,?,?)",
                     (interaction.guild.id, name, description, max(0, price), role.id if role else None, emoji)
@@ -234,7 +237,7 @@ class Admin(commands.Cog):
             if role:
                 embed.add_field(name="Grants Role", value=role.mention, inline=True)
         else:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 await db.execute("DELETE FROM economy_shop WHERE guild_id=? AND LOWER(name)=LOWER(?)", (interaction.guild.id, name))
                 await db.commit()
             embed = success_embed("Item Removed", f"**{name}** has been removed from the shop.")

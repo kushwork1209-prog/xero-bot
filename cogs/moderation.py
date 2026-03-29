@@ -297,8 +297,7 @@ class Moderation(commands.GroupCog, name="mod"):
         await user.ban(reason=f"XERO TempBan ({duration}): {reason}", delete_message_days=0)
         case_id = await self.bot.db.add_mod_case(interaction.guild.id, user.id, interaction.user.id, "tempban", f"{reason} [expires <t:{int(expires_at.timestamp())}:R>]", duration=duration)
         # Store for auto-unban
-        import aiosqlite as _aio
-        async with _aio.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("CREATE TABLE IF NOT EXISTS temp_bans (case_id INTEGER PRIMARY KEY, guild_id INTEGER, user_id INTEGER, expires_at TEXT, reason TEXT)")
             await db.execute("INSERT OR REPLACE INTO temp_bans VALUES (?,?,?,?,?)", (case_id, interaction.guild.id, user.id, expires_at.isoformat(), reason))
             await db.commit()
@@ -312,8 +311,7 @@ class Moderation(commands.GroupCog, name="mod"):
     @app_commands.describe(user="User to add note for", note="The note content")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def note(self, interaction: discord.Interaction, user: discord.Member, note: str):
-        import aiosqlite as _aio
-        async with _aio.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("CREATE TABLE IF NOT EXISTS mod_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id INTEGER, user_id INTEGER, mod_id INTEGER, content TEXT, created_at TEXT DEFAULT (datetime(\'now\')))")
             await db.execute("INSERT INTO mod_notes (guild_id, user_id, mod_id, content) VALUES (?,?,?,?)",
                              (interaction.guild.id, user.id, interaction.user.id, note))
@@ -325,9 +323,7 @@ class Moderation(commands.GroupCog, name="mod"):
     @app_commands.describe(user="User to view notes for")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def notes(self, interaction: discord.Interaction, user: discord.Member):
-        import aiosqlite as _aio
-        async with _aio.connect(self.bot.db.db_path) as db:
-            db.row_factory = _aio.Row
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT * FROM mod_notes WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 10",
                                   (interaction.guild.id, user.id)) as c:
                 rows = [dict(r) for r in await c.fetchall()]
@@ -344,8 +340,7 @@ class Moderation(commands.GroupCog, name="mod"):
     @app_commands.describe(case_id="Case ID to edit", reason="New reason")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def case_edit(self, interaction: discord.Interaction, case_id: int, reason: str):
-        import aiosqlite as _aio
-        async with _aio.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT * FROM mod_cases WHERE case_id=? AND guild_id=?", (case_id, interaction.guild.id)) as c:
                 row = await c.fetchone()
             if not row:

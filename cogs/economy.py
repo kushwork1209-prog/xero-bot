@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, random, datetime, aiosqlite
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, economy_embed, XERO, FOOTER_ECO
+from utils.embeds import success_embed, error_embed, info_embed, economy_embed, XERO, FOOTER_ECO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Economy")
 JOBS=[("Software Engineer",1400,2800),("Doctor",1600,3200),("Chef",700,1500),("Lawyer",1300,2600),("Artist",500,1200),("Pilot",1500,2900),("Teacher",800,1700),("Mechanic",750,1600),("Scientist",1100,2300),("Nurse",900,1900),("Writer",500,1100),("Trader",1200,2500),("Crypto Bro",200,5000),("Streamer",300,3000)]
@@ -114,7 +114,7 @@ class Economy(commands.GroupCog, name="economy"):
         won = s1==s2==s3 or s1==s2 or s2==s3 or s1==s3
         personality = self.bot.cogs.get("Personality")
         comment = await personality.get_slot_comment(won) if personality else ""
-        embed=discord.Embed(title="🎰  Slot Machine",description=f"**[ {s1}  {s2}  {s3} ]**\n\n{res}" + (f"\n\n*{comment}*" if comment else ""),color=color)
+        embed=comprehensive_embed(title="🎰  Slot Machine",description=f"**[ {s1}  {s2}  {s3} ]**\n\n{res}" + (f"\n\n*{comment}*" if comment else ""),color=color)
         embed.set_footer(text=FOOTER_ECO); await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="blackjack", description="Play blackjack against the dealer.")
@@ -140,7 +140,7 @@ class Economy(commands.GroupCog, name="economy"):
         elif dv>21 or pv>dv: await self.bot.db.update_economy(interaction.user.id,interaction.guild.id,wallet_delta=amount,earned_delta=amount); res,color=f"You win! {pv} vs {dv}. **+${amount:,}**!",XERO.SUCCESS
         elif pv==dv: res,color=f"Push! {pv} vs {dv}.",XERO.WARNING
         else: await self.bot.db.update_economy(interaction.user.id,interaction.guild.id,wallet_delta=-amount,spent_delta=amount); res,color=f"Dealer wins. {pv} vs {dv}. **-${amount:,}**.",XERO.ERROR
-        embed=discord.Embed(title="🃏  Blackjack",color=color)
+        embed=comprehensive_embed(title="🃏  Blackjack",color=color)
         embed.add_field(name=f"You ({pv})",value=fmt(p),inline=True); embed.add_field(name=f"Dealer ({dv})",value=fmt(d),inline=True)
         embed.add_field(name="Result",value=res,inline=False); embed.set_footer(text=FOOTER_ECO)
         await interaction.response.send_message(embed=embed)
@@ -163,7 +163,7 @@ class Economy(commands.GroupCog, name="economy"):
 
     @app_commands.command(name="shop", description="Browse the server shop.")
     async def shop(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory=aiosqlite.Row
             async with db.execute("SELECT * FROM economy_shop WHERE guild_id=? ORDER BY price ASC",(interaction.guild.id,)) as c:
                 items=[dict(r) for r in await c.fetchall()]
@@ -178,21 +178,21 @@ class Economy(commands.GroupCog, name="economy"):
     @app_commands.describe(name="Item name",price="Price",description="Description",role="Role to grant",emoji="Emoji",stock="Stock (-1=unlimited)")
     @app_commands.checks.has_permissions(administrator=True)
     async def shop_add(self, interaction: discord.Interaction, name: str, price: int, description: str="A shop item.", role: discord.Role=None, emoji: str="🛍️", stock: int=-1):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("INSERT INTO economy_shop (guild_id,name,description,price,role_id,emoji,stock) VALUES (?,?,?,?,?,?,?)",(interaction.guild.id,name,description,max(0,price),role.id if role else None,emoji,stock)); await db.commit()
         await interaction.response.send_message(embed=success_embed("Item Added!",f"**{emoji} {name}** — ${price:,}"))
 
     @app_commands.command(name="shop-remove", description="[Admin] Remove an item.")
     @app_commands.checks.has_permissions(administrator=True)
     async def shop_remove(self, interaction: discord.Interaction, name: str):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM economy_shop WHERE guild_id=? AND LOWER(name)=LOWER(?)",(interaction.guild.id,name)); await db.commit()
         await interaction.response.send_message(embed=success_embed("Removed",f"**{name}** removed."))
 
     @app_commands.command(name="buy", description="Purchase an item from the shop.")
     @app_commands.describe(item_name="Item to buy")
     async def buy(self, interaction: discord.Interaction, item_name: str):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory=aiosqlite.Row
             async with db.execute("SELECT * FROM economy_shop WHERE guild_id=? AND LOWER(name)=LOWER(?)",(interaction.guild.id,item_name)) as c: item=await c.fetchone()
         if not item: return await interaction.response.send_message(embed=error_embed("Not Found",f"No `{item_name}`. Check `/economy shop`."),ephemeral=True)
@@ -200,7 +200,7 @@ class Economy(commands.GroupCog, name="economy"):
         if data["wallet"]<item["price"]: return await interaction.response.send_message(embed=error_embed("Not Enough",f"Costs **${item['price']:,}**, have **${data['wallet']:,}**."),ephemeral=True)
         if item["stock"]==0: return await interaction.response.send_message(embed=error_embed("Out of Stock","Sold out!"),ephemeral=True)
         await self.bot.db.update_economy(interaction.user.id,interaction.guild.id,wallet_delta=-item["price"],spent_delta=item["price"])
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             try: await db.execute("INSERT INTO economy_inventory (user_id,guild_id,item_name,quantity) VALUES (?,?,?,1)",(interaction.user.id,interaction.guild.id,item["name"]))
             except: await db.execute("UPDATE economy_inventory SET quantity=quantity+1 WHERE user_id=? AND guild_id=? AND item_name=?",(interaction.user.id,interaction.guild.id,item["name"]))
             if item["stock"]>0: await db.execute("UPDATE economy_shop SET stock=stock-1 WHERE item_id=?",(item["item_id"],))
@@ -216,7 +216,7 @@ class Economy(commands.GroupCog, name="economy"):
     @app_commands.describe(user="User to check")
     async def inventory(self, interaction: discord.Interaction, user: discord.Member=None):
         target=user or interaction.user
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory=aiosqlite.Row
             async with db.execute("SELECT item_name,SUM(quantity) as qty FROM economy_inventory WHERE user_id=? AND guild_id=? GROUP BY item_name ORDER BY qty DESC",(target.id,interaction.guild.id)) as c:
                 items=[dict(r) for r in await c.fetchall()]
@@ -250,7 +250,7 @@ class Economy(commands.GroupCog, name="economy"):
     @app_commands.command(name="reset-user", description="[Admin] Wipe a user's economy data.")
     @app_commands.checks.has_permissions(administrator=True)
     async def reset_user(self, interaction: discord.Interaction, user: discord.Member):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM economy WHERE user_id=? AND guild_id=?",(user.id,interaction.guild.id)); await db.commit()
         await interaction.response.send_message(embed=success_embed("Reset",f"{user.mention}'s economy wiped."),ephemeral=True)
 

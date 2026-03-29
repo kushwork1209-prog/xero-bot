@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging, datetime, aiosqlite, asyncio
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, XERO, FOOTER_ECO, FOOTER_MAIN
+from utils.embeds import success_embed, error_embed, info_embed, XERO, FOOTER_ECO, FOOTER_MAIN, comprehensive_embed
 
 logger = logging.getLogger("XERO.ProfileExtras")
 
@@ -20,7 +20,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
         self.bot = bot
 
     async def _ensure_tables(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS reputation (
                     user_id INTEGER, guild_id INTEGER, rep INTEGER DEFAULT 0,
@@ -61,7 +61,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
             return await interaction.response.send_message(embed=error_embed("Bots Don't Need Rep", "Give rep to real people!"), ephemeral=True)
 
         now = datetime.datetime.now(datetime.timezone.utc)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             # Check giver's cooldown
             async with db.execute(
                 "SELECT last_given FROM reputation WHERE user_id=? AND guild_id=?",
@@ -109,7 +109,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
     async def check(self, interaction: discord.Interaction, user: discord.Member = None):
         await self._ensure_tables()
         target = user or interaction.user
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT rep FROM reputation WHERE user_id=? AND guild_id=?", (target.id, interaction.guild.id)) as c:
                 row = await c.fetchone()
             async with db.execute("SELECT COUNT(*)+1 FROM reputation WHERE guild_id=? AND rep>(SELECT COALESCE(rep,0) FROM reputation WHERE user_id=? AND guild_id=?)", (interaction.guild.id, target.id, interaction.guild.id)) as c:
@@ -117,7 +117,7 @@ class ProfileExtras(commands.GroupCog, name="rep"):
 
         rep = row[0] if row else 0
         bar = "⭐" * min(rep, 10) + "☆" * max(0, 10-rep)
-        embed = discord.Embed(title=f"⭐  {target.display_name}'s Reputation", color=XERO.GOLD)
+        embed = comprehensive_embed(title=f"⭐  {target.display_name}'s Reputation", color=XERO.GOLD)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="⭐ Total Rep", value=f"**{rep}**", inline=True)
         embed.add_field(name="🏆 Server Rank", value=f"**#{rank}**", inline=True)
@@ -129,13 +129,13 @@ class ProfileExtras(commands.GroupCog, name="rep"):
     @app_commands.command(name="leaderboard", description="See the most reputable members in this server.")
     async def leaderboard(self, interaction: discord.Interaction):
         await self._ensure_tables()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT user_id, rep FROM reputation WHERE guild_id=? ORDER BY rep DESC LIMIT 10", (interaction.guild.id,)) as c:
                 rows = await c.fetchall()
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Rep Yet", "Nobody has rep yet! Use `/rep give @user` to start."))
         medals = ["🥇","🥈","🥉"] + [f"#{i}" for i in range(4,11)]
-        embed = discord.Embed(title="⭐  Reputation Leaderboard", color=XERO.GOLD)
+        embed = comprehensive_embed(title="⭐  Reputation Leaderboard", color=XERO.GOLD)
         desc = ""
         for i,(uid,rep) in enumerate(rows):
             m = interaction.guild.get_member(uid)
@@ -151,7 +151,7 @@ class MarriageSystem(commands.GroupCog, name="marry"):
         self.bot = bot
 
     async def _ensure_tables(self):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS marriages (
                     user1_id INTEGER NOT NULL, user2_id INTEGER NOT NULL,
@@ -162,7 +162,7 @@ class MarriageSystem(commands.GroupCog, name="marry"):
             await db.commit()
 
     async def _get_partner(self, user_id: int, guild_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute(
                 "SELECT user1_id, user2_id FROM marriages WHERE (user1_id=? OR user2_id=?) AND guild_id=?",
                 (user_id, user_id, guild_id)
@@ -214,14 +214,14 @@ class MarriageSystem(commands.GroupCog, name="marry"):
             msg = f"{'You are' if target==interaction.user else f'{target.display_name} is'} single. 💔"
             return await interaction.response.send_message(embed=info_embed("Relationship Status", msg))
         partner = interaction.guild.get_member(partner_id)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute(
                 "SELECT married_at FROM marriages WHERE (user1_id=? OR user2_id=?) AND guild_id=?",
                 (target.id, target.id, interaction.guild.id)
             ) as c:
                 row = await c.fetchone()
         married_at = row[0] if row else None
-        embed = discord.Embed(title=f"💍  {target.display_name}'s Relationship", color=XERO.SECONDARY)
+        embed = comprehensive_embed(title=f"💍  {target.display_name}'s Relationship", color=XERO.SECONDARY)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.add_field(name="💑 Partner", value=partner.mention if partner else f"<@{partner_id}>", inline=True)
         if married_at:
@@ -236,7 +236,7 @@ class MarriageSystem(commands.GroupCog, name="marry"):
         partner_id = await self._get_partner(interaction.user.id, interaction.guild.id)
         if not partner_id:
             return await interaction.response.send_message(embed=error_embed("Not Married", "You're not married. Nothing to divorce."), ephemeral=True)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "DELETE FROM marriages WHERE (user1_id=? OR user2_id=?) AND guild_id=?",
                 (interaction.user.id, interaction.user.id, interaction.guild.id)
@@ -257,7 +257,7 @@ class ProposalView(discord.ui.View):
         if interaction.user.id != self.target.id:
             return await interaction.response.send_message("Only the person being proposed to can accept!")
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO marriages (user1_id, user2_id, guild_id, married_at) VALUES (?,?,?,?)",
                 (self.proposer.id, self.target.id, interaction.guild.id, now)
@@ -296,7 +296,7 @@ class EconomyExtras(commands.Cog):
     async def apply_bank_interest(self):
         """0.5% daily interest on all banked money."""
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 async with db.execute("SELECT user_id, guild_id, bank FROM economy WHERE bank > 100") as c:
                     rows = await c.fetchall()
                 for user_id, guild_id, bank in rows:
@@ -315,7 +315,7 @@ class EconomyExtras(commands.Cog):
 
     async def log_transaction(self, user_id, guild_id, amount, type_, desc):
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 await db.execute(
                     "CREATE TABLE IF NOT EXISTS economy_transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, guild_id INTEGER, amount INTEGER, type TEXT, description TEXT, timestamp TEXT DEFAULT (datetime('now')))"
                 )
@@ -332,7 +332,7 @@ class EconomyExtras(commands.Cog):
     async def history(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 async with db.execute(
                     "SELECT amount, type, description, timestamp FROM economy_transactions WHERE user_id=? AND guild_id=? ORDER BY id DESC LIMIT 20",
                     (target.id, interaction.guild.id)
@@ -381,7 +381,7 @@ class EconomyExtras(commands.Cog):
                 "Invalid Timezone",
                 f"`{timezone}` is not a valid timezone.\n\n**Common timezones:**\n" + "\n".join(f"`{tz}`" for tz in common)
             ))
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "CREATE TABLE IF NOT EXISTS user_timezones (user_id INTEGER PRIMARY KEY, timezone TEXT)"
             )

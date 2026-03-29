@@ -45,7 +45,7 @@ class Fun(commands.GroupCog, name="fun"):
             opt_a, opt_b = (parts[0], parts[1]) if len(parts) >= 2 else ("Have unlimited money", "Live forever")
         except Exception:
             opt_a, opt_b = "Have unlimited money", "Live forever"
-        embed = discord.Embed(title="🤔  Would You Rather...", color=XERO.SECONDARY)
+        embed = comprehensive_embed(title="🤔  Would You Rather...", color=XERO.SECONDARY)
         embed.add_field(name="🅰️ Option A", value=f"**{opt_a}**", inline=False)
         embed.add_field(name="🅱️ Option B", value=f"**{opt_b}**", inline=False)
         if theme: embed.description = f"*Theme: {theme}*"
@@ -66,7 +66,7 @@ class Fun(commands.GroupCog, name="fun"):
             if not stmt.startswith("..."): stmt = "..." + stmt
         except Exception:
             stmt = "...accidentally sent a text to the wrong person."
-        embed = discord.Embed(title="🙈  Never Have I Ever...", description=f"## {stmt}", color=XERO.PRIMARY)
+        embed = comprehensive_embed(title="🙈  Never Have I Ever...", description=f"## {stmt}", color=XERO.PRIMARY)
         embed.set_footer(text="🤚 Done it  |  👏 Never done it")
         msg = await interaction.followup.send(embed=embed)
         try: await msg.add_reaction("🤚"); await msg.add_reaction("👏")
@@ -78,7 +78,7 @@ class Fun(commands.GroupCog, name="fun"):
         prompt = f"Write a fortune cookie message for someone named {interaction.user.display_name}. Poetic, mystical, personal. 2-3 sentences max."
         try: text = await self.bot.nvidia.ask(prompt)
         except Exception: text = "Your path ahead is bright. Trust your instincts, for they know the way."
-        embed = discord.Embed(title="🥠  Your Fortune", description=f"*{text}*", color=XERO.GOLD)
+        embed = comprehensive_embed(title="🥠  Your Fortune", description=f"*{text}*", color=XERO.GOLD)
         embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
         embed.set_footer(text="XERO Fortune Cookie  •  The future is yours")
         await interaction.followup.send(embed=embed)
@@ -91,7 +91,7 @@ class Fun(commands.GroupCog, name="fun"):
         prompt = f"Write a funny, clever, lighthearted roast of a Discord user named {target.display_name}. 2-3 sentences. Witty not mean. Reference being on Discord."
         try: text = await self.bot.nvidia.ask(prompt)
         except Exception: text = f"{target.display_name} is so online, their dreams have loading screens."
-        embed = discord.Embed(title=f"🔥  {target.display_name} Got Roasted", description=text, color=XERO.ERROR)
+        embed = comprehensive_embed(title=f"🔥  {target.display_name} Got Roasted", description=text, color=XERO.ERROR)
         embed.set_thumbnail(url=target.display_avatar.url)
         embed.set_footer(text="All in good fun  •  XERO Roast Machine")
         await interaction.followup.send(embed=embed)
@@ -103,7 +103,7 @@ class Fun(commands.GroupCog, name="fun"):
         prompt = f"Write a genuine, heartfelt, specific compliment for someone named {user.display_name}. Not generic. 2 sentences max."
         try: text = await self.bot.nvidia.ask(prompt)
         except Exception: text = f"{user.display_name} has the kind of energy that makes every conversation better."
-        embed = discord.Embed(title=f"💛  A Note for {user.display_name}", description=text, color=XERO.SUCCESS)
+        embed = comprehensive_embed(title=f"💛  A Note for {user.display_name}", description=text, color=XERO.SUCCESS)
         embed.set_author(name=f"From {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
         embed.set_thumbnail(url=user.display_avatar.url)
         await interaction.followup.send(embed=embed)
@@ -129,7 +129,7 @@ class Fun(commands.GroupCog, name="fun"):
 
         expires = datetime.datetime.now() + datetime.timedelta(seconds=30)
         TRIVIA_ACTIVE[interaction.channel.id] = {"answer": a.lower().strip(), "expires": expires, "guild_id": interaction.guild.id, "question": q}
-        embed = discord.Embed(title=f"🧠  Trivia — {category.title()}", color=XERO.PRIMARY)
+        embed = comprehensive_embed(title=f"🧠  Trivia — {category.title()}", color=XERO.PRIMARY)
         embed.add_field(name="❓ Question", value=f"**{q}**", inline=False)
         embed.add_field(name="💡 Hint",     value=f"*{h}*",   inline=True)
         embed.add_field(name="⏰ Time",     value="30 seconds", inline=True)
@@ -138,7 +138,7 @@ class Fun(commands.GroupCog, name="fun"):
         await asyncio.sleep(30)
         if TRIVIA_ACTIVE.get(interaction.channel.id):
             TRIVIA_ACTIVE.pop(interaction.channel.id, None)
-            reveal = discord.Embed(title="⏰  Time's Up!", description=f"Nobody got it!\n**Answer:** {a}", color=XERO.ERROR)
+            reveal = comprehensive_embed(title="⏰  Time's Up!", description=f"Nobody got it!\n**Answer:** {a}", color=XERO.ERROR)
             try: await interaction.channel.send(embed=reveal)
             except Exception: pass
 
@@ -157,7 +157,7 @@ class Fun(commands.GroupCog, name="fun"):
             total = d['correct'] + d.get('wrong',0)
             acc   = int(d['correct']/max(total,1)*100)
             lines.append(f"{medals[i]} **{name}** — {d['correct']} ✅ | {acc}% acc | 🔥{d.get('streak',0)}")
-        embed = discord.Embed(title="🧠  Trivia Leaderboard", description="\n".join(lines), color=XERO.PRIMARY)
+        embed = comprehensive_embed(title="🧠  Trivia Leaderboard", description="\n".join(lines), color=XERO.PRIMARY)
         embed.set_footer(text="XERO Trivia  •  /fun trivia to play")
         await interaction.response.send_message(embed=embed)
 
@@ -194,7 +194,7 @@ class Fun(commands.GroupCog, name="fun"):
         else:            label, color = "💔 Tough Road Ahead", XERO.PRIMARY
         bar = "💗" * (score // 10) + "🖤" * (10 - score // 10)
         name = user1.display_name[:len(user1.display_name)//2] + user2.display_name[len(user2.display_name)//2:]
-        embed = discord.Embed(title="💘  Love Calculator", color=discord.Color(color))
+        embed = comprehensive_embed(title="💘  Love Calculator", color=discord.Color(color))
         embed.add_field(name="💑 Ship Name", value=f"**{name}**",          inline=True)
         embed.add_field(name="💯 Score",     value=f"**{score}%** {label}", inline=True)
         embed.add_field(name="💗 Meter",     value=bar,                     inline=False)
@@ -214,7 +214,7 @@ class Fun(commands.GroupCog, name="fun"):
             total = sum(rolls) + modifier
             mod_s = f" + {modifier}" if modifier > 0 else (f" - {abs(modifier)}" if modifier < 0 else "")
             crit  = " 🎯 **CRIT!**" if count==1 and rolls[0]==sides else (" 💀 **FAIL**" if count==1 and rolls[0]==1 else "")
-            embed = discord.Embed(title=f"🎲  {dice}", color=XERO.PRIMARY)
+            embed = comprehensive_embed(title=f"🎲  {dice}", color=XERO.PRIMARY)
             embed.add_field(name="🎲 Rolls", value=", ".join(map(str, rolls[:20])), inline=False)
             embed.add_field(name="📊 Total", value=f"**{total}**{mod_s}{crit}", inline=True)
             if len(rolls) > 1: embed.add_field(name="📈 High/Low", value=f"{max(rolls)} / {min(rolls)}", inline=True)
@@ -228,7 +228,7 @@ class Fun(commands.GroupCog, name="fun"):
         choices = [o.strip() for o in options.split(",") if o.strip()]
         if len(choices) < 2: return await interaction.response.send_message(embed=error_embed("Too Few","Give at least 2 options."), ephemeral=True)
         chosen = random.choice(choices)
-        embed = discord.Embed(title="🎯  Decision Made", color=XERO.SUCCESS)
+        embed = comprehensive_embed(title="🎯  Decision Made", color=XERO.SUCCESS)
         embed.add_field(name="🗳️ Options", value="\n".join(f"• {c}" for c in choices[:10]), inline=True)
         embed.add_field(name="✅ Chosen",  value=f"**{chosen}**", inline=True)
         embed.set_footer(text=f"Out of {len(choices)} options")
@@ -249,7 +249,7 @@ class Fun(commands.GroupCog, name="fun"):
             post = data[0]["data"]["children"][0]["data"]
             url  = post.get("url","")
             if post.get("over_18") or not any(url.endswith(e) for e in [".jpg",".png",".gif",".jpeg"]): raise Exception()
-            embed = discord.Embed(title=post["title"][:200], color=XERO.PRIMARY, url=f"https://reddit.com{post['permalink']}")
+            embed = comprehensive_embed(title=post["title"][:200], color=XERO.PRIMARY, url=f"https://reddit.com{post['permalink']}")
             embed.set_image(url=url)
             embed.set_footer(text=f"r/{sub}  •  👍 {post.get('ups',0):,}")
             await interaction.followup.send(embed=embed)
@@ -263,7 +263,7 @@ class Fun(commands.GroupCog, name="fun"):
             async with aiohttp.ClientSession() as s:
                 async with s.get("https://api.thecatapi.com/v1/images/search", timeout=aiohttp.ClientTimeout(total=5)) as r:
                     data = await r.json()
-            embed = discord.Embed(title="🐱  Meow!", color=0xFF9999)
+            embed = comprehensive_embed(title="🐱  Meow!", color=0xFF9999)
             embed.set_image(url=data[0]["url"])
             embed.set_footer(text="XERO Fun  •  /fun dog for dogs")
             await interaction.followup.send(embed=embed)
@@ -276,7 +276,7 @@ class Fun(commands.GroupCog, name="fun"):
             async with aiohttp.ClientSession() as s:
                 async with s.get("https://dog.ceo/api/breeds/image/random", timeout=aiohttp.ClientTimeout(total=5)) as r:
                     data = await r.json()
-            embed = discord.Embed(title="🐶  Woof!", color=0xADD8E6)
+            embed = comprehensive_embed(title="🐶  Woof!", color=0xADD8E6)
             embed.set_image(url=data["message"])
             embed.set_footer(text="XERO Fun  •  /fun cat for cats")
             await interaction.followup.send(embed=embed)
@@ -295,7 +295,7 @@ class Fun(commands.GroupCog, name="fun"):
         if choice == bot_c:       result, color = "🤝  Tie!",       XERO.WARNING
         elif wins[choice]==bot_c: result, color = "🎉  You Win!",   XERO.SUCCESS
         else:                     result, color = "💀  XERO Wins!", XERO.ERROR
-        embed = discord.Embed(title="✊  Rock Paper Scissors", color=discord.Color(color))
+        embed = comprehensive_embed(title="✊  Rock Paper Scissors", color=discord.Color(color))
         embed.add_field(name=f"You: {emojis[choice]}",  value=choice.title(),  inline=True)
         embed.add_field(name=f"XERO: {emojis[bot_c]}", value=bot_c.title(), inline=True)
         embed.add_field(name="Result", value=result, inline=False)
@@ -316,7 +316,7 @@ class Fun(commands.GroupCog, name="fun"):
             score = random.randint(1, 10); r_line = "XERO's neural network had feelings about this."
         stars = "⭐" * score + "☆" * (10-score)
         color = XERO.SUCCESS if score >= 7 else XERO.WARNING if score >= 4 else XERO.ERROR
-        embed = discord.Embed(title=f"📊  XERO Rates: {thing[:50]}", color=discord.Color(color))
+        embed = comprehensive_embed(title=f"📊  XERO Rates: {thing[:50]}", color=discord.Color(color))
         embed.add_field(name="Score",   value=f"**{score}/10**", inline=True)
         embed.add_field(name="Stars",   value=stars,              inline=True)
         embed.add_field(name="Verdict", value=r_line,             inline=False)
@@ -331,7 +331,7 @@ class Fun(commands.GroupCog, name="fun"):
         prompt = f"Share one genuinely fascinating, true, lesser-known fact{t}. 2-3 sentences max. Make it surprising."
         try: text = await self.bot.nvidia.ask(prompt)
         except Exception: text = "Honey never spoils. 3,000-year-old honey found in Egyptian tombs was still edible."
-        embed = discord.Embed(title="🤯  Random Fact", description=text, color=XERO.PRIMARY)
+        embed = comprehensive_embed(title="🤯  Random Fact", description=text, color=XERO.PRIMARY)
         embed.set_footer(text=f"{'Topic: ' + topic + '  •  ' if topic else ''}XERO Facts  •  Powered by Nemotron")
         await interaction.followup.send(embed=embed)
 
@@ -347,7 +347,7 @@ class Fun(commands.GroupCog, name="fun"):
             against = next((l.replace('AGAINST:','').strip() for l in lines if l.startswith('AGAINST:')), "But the other side makes sense too.")
         except Exception:
             for_txt = "There are valid arguments in favor."; against = "But the other side makes sense too."
-        embed = discord.Embed(title=f"⚖️  Debate: {topic[:60]}", color=XERO.SECONDARY)
+        embed = comprehensive_embed(title=f"⚖️  Debate: {topic[:60]}", color=XERO.SECONDARY)
         embed.add_field(name="✅ For",     value=for_txt, inline=False)
         embed.add_field(name="❌ Against", value=against, inline=False)
         embed.set_footer(text="XERO takes no sides  •  React to vote")
@@ -371,7 +371,7 @@ class Fun(commands.GroupCog, name="fun"):
             TRIVIA_SCORES[gid][uid]["correct"] += 1
             TRIVIA_SCORES[gid][uid]["streak"]  += 1
             streak = TRIVIA_SCORES[gid][uid]["streak"]
-            embed = discord.Embed(title="🎉  Correct!", description=f"**{message.author.mention}** got it!\n**Answer:** {active['answer'].title()}", color=XERO.SUCCESS)
+            embed = comprehensive_embed(title="🎉  Correct!", description=f"**{message.author.mention}** got it!\n**Answer:** {active['answer'].title()}", color=XERO.SUCCESS)
             if streak >= 3: embed.add_field(name="🔥 Hot Streak", value=f"**{streak}** in a row!", inline=True)
             try: await message.reply(embed=embed)
             except Exception: pass

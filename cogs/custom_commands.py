@@ -47,7 +47,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
         if len(name) > 32:
             return await interaction.response.send_message(
                 embed=error_embed("Name Too Long", "Command name must be 32 characters or less."), ephemeral=True)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             try:
                 await db.execute(
                     "INSERT INTO custom_commands (guild_id, name, response, embed_title, embed_color, role_id, created_by) VALUES (?,?,?,?,?,?,?)",
@@ -71,7 +71,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
     @app_commands.describe(name="Name of the custom command to trigger")
     async def use(self, interaction: discord.Interaction, name: str):
         name = name.lower().strip()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM custom_commands WHERE guild_id=? AND name=?",
@@ -80,7 +80,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
                 cmd = await c.fetchone()
         if not cmd:
             # Suggest close matches
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute("SELECT name FROM custom_commands WHERE guild_id=?", (interaction.guild.id,)) as c:
                     all_cmds = [r["name"] for r in await c.fetchall()]
@@ -92,7 +92,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
         response_text = cmd["response"].replace("{user}", interaction.user.mention)
         if cmd.get("embed_title"):
             color = COLOR_MAP.get(cmd.get("embed_color", "blue"), discord.Color.blue())
-            embed = discord.Embed(title=cmd["embed_title"], description=response_text, color=color)
+            embed = comprehensive_embed(title=cmd["embed_title"], description=response_text, color=color)
             embed.set_footer(text=f"Custom Command: {name} | XERO Bot")
             await interaction.response.send_message(embed=embed)
         else:
@@ -109,7 +109,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
                 except Exception:
                     pass
         # Increment uses
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE custom_commands SET uses=uses+1 WHERE guild_id=? AND name=?",
                              (interaction.guild.id, name))
             await db.commit()
@@ -120,7 +120,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def edit(self, interaction: discord.Interaction, name: str, new_response: str, new_embed_title: str = None):
         name = name.lower().strip()
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             if new_embed_title is not None:
                 await db.execute(
                     "UPDATE custom_commands SET response=?, embed_title=? WHERE guild_id=? AND name=?",
@@ -143,7 +143,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
     @app_commands.describe(name="Command to delete")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def delete(self, interaction: discord.Interaction, name: str):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM custom_commands WHERE guild_id=? AND name=?",
                              (interaction.guild.id, name.lower()))
             await db.commit()
@@ -153,7 +153,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
     # ── List ──────────────────────────────────────────────────────────────
     @app_commands.command(name="list", description="View all custom commands for this server.")
     async def list_cmds(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT name, uses, embed_title, role_id FROM custom_commands WHERE guild_id=? ORDER BY uses DESC",
@@ -187,7 +187,7 @@ class CustomCommands(commands.GroupCog, name="cmd"):
     @app_commands.command(name="info", description="Get detailed info about a specific custom command.")
     @app_commands.describe(name="Command to inspect")
     async def info(self, interaction: discord.Interaction, name: str):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM custom_commands WHERE guild_id=? AND name=?",

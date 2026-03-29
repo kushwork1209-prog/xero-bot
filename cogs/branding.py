@@ -1,108 +1,161 @@
 """XERO Bot — Unified Branding & Customization"""
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import aiosqlite
 import io
-import base64
 import logging
-from utils.embeds import success_embed, error_embed, info_embed, brand_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
 
 logger = logging.getLogger("XERO.Branding")
 
 class Branding(commands.GroupCog, name="branding"):
     def __init__(self, bot):
         self.bot = bot
+        self.auto_apply_banners.start()
 
-    @app_commands.command(name="unified-image", description="Set a single image to be used across all server modules (Tickets, Verification, Welcome, etc.).")
+    def cog_unload(self):
+        self.auto_apply_banners.cancel()
+
+    @tasks.loop(hours=24)
+    async def auto_apply_banners(self):
+        """Auto-applies the biggest file from the banner channel on restart/daily."""
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            try:
+                settings = await self.bot.db.get_guild_settings(guild.id)
+                channel_id = settings.get("banner_channel_id")
+                if channel_id:
+                    channel = guild.get_channel(int(channel_id))
+                    if channel:
+                        await self._apply_latest_banner(guild, channel)
+            except Exception as e:
+                logger.error(f"Auto-apply banner error for {guild.id}: {e}")
+
+    async def _apply_latest_banner(self, guild, channel):
+        """Helper to find and apply the largest image from a channel."""
+        best_url = None
+        max_size = 0
+        async for message in channel.history(limit=50):
+            for attachment in message.attachments:
+                if attachment.content_type and attachment.content_type.startswith("image/"):
+                    if attachment.size > max_size:
+                        max_size = attachment.size
+                        best_url = attachment.url
+        
+        if best_url:
+            await self.bot.db.update_guild_setting(guild.id, "unified_image_url", best_url)
+            logger.info(f"Applied banner for {guild.name}: {best_url} ({max_size} bytes)")
+            return best_url
+        return None
+
+    @app_commands.command(name="setup-channel", description="Set the channel where the bot will save and fetch the unified banner image.")
+    @app_commands.describe(channel="The channel to use for banner storage")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def setup_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        await self.bot.db.update_guild_setting(interaction.guild.id, "banner_channel_id", str(channel.id))
+        await interaction.response.send_message(embed=success_embed("Banner Channel Set", f"The bot will now save and fetch banners from {channel.mention}.\nUpload an image there and use `/branding apply` to set it!"))
+
+    @app_commands.command(name="apply", description="Manually trigger the auto-apply logic to fetch the biggest image from the banner channel.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def apply_banner(self, interaction: discord.Interaction):
+        settings = await self.bot.db.get_guild_settings(interaction.guild.id)
+        channel_id = settings.get("banner_channel_id")
+        if not channel_id:
+            return await interaction.response.send_message(embed=error_embed("Not Setup", "Please set a banner channel first using `/branding setup-channel`."), ephemeral=True)
+        
+        channel = interaction.guild.get_channel(int(channel_id))
+        if not channel:
+            return await interaction.response.send_message(embed=error_embed("Channel Not Found", "The configured banner channel no longer exists."), ephemeral=True)
+        
+        await interaction.response.defer()
+        url = await self._apply_latest_banner(interaction.guild, channel)
+        
+        if url:
+            embed = success_embed("Banner Applied", "The largest image from the banner channel has been applied to all modules.")
+            embed.set_image(url=url)
+            await interaction.followup.send(embed=embed)
+        else:
+            await interaction.followup.send(embed=error_embed("No Image Found", "No images were found in the banner channel."))
+
+    @app_commands.command(name="set", description="Upload a new unified banner image. It will be saved to the banner channel and applied.")
     @app_commands.describe(image="The image to use (upload a file)")
     @app_commands.checks.has_permissions(administrator=True)
-    async def unified_image(self, interaction: discord.Interaction, image: discord.Attachment):
+    async def set_banner(self, interaction: discord.Interaction, image: discord.Attachment):
         if not image.content_type or not image.content_type.startswith("image/"):
-            return await interaction.response.send_message(embed=error_embed("Invalid File", "Please upload a valid image file (PNG, JPG, etc.)."), ephemeral=True)
+            return await interaction.response.send_message(embed=error_embed("Invalid File", "Please upload a valid image file."), ephemeral=True)
+        
+        settings = await self.bot.db.get_guild_settings(interaction.guild.id)
+        channel_id = settings.get("banner_channel_id")
         
         await interaction.response.defer()
         
-        try:
-            image_bytes = await image.read()
-            # Basic validation
-            from PIL import Image
-            img = Image.open(io.BytesIO(image_bytes))
-            img.verify()
-            
-            # Convert to base64 for DB storage
-            b64_data = base64.b64encode(image_bytes).decode("utf-8")
-            
-            await self.bot.db.update_guild_setting(interaction.guild.id, "unified_image_data", b64_data)
-            
-            modules = [
-                "Tickets", "Verification", "Giveaways", "Suggestions", 
-                "Reaction Roles", "Announcements", "Welcome", "Farewell", "Level-Up"
-            ]
-            module_list = "\n".join([f"• {m}" for m in modules])
-            
-            embed = success_embed("Unified Branding Active!", f"This image will now be used across all **{len(modules)}** core modules:\n{module_list}")
-            embed.set_image(url=image.url)
-            embed.set_footer(text=f"{interaction.guild.name}  •  Unified Branding")
-            await interaction.followup.send(embed=embed)
-            
-        except Exception as e:
-            logger.error(f"Unified image upload error: {e}")
-            await interaction.followup.send(embed=error_embed("Upload Failed", f"An error occurred while processing the image: {str(e)}"))
-
-    @app_commands.command(name="color", description="Set a custom embed color for the bot in this server.")
-    @app_commands.describe(hex_code="Hex color code (e.g. XERO.PRIMARY)")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def set_color(self, interaction: discord.Interaction, hex_code: str):
-        hex_code = hex_code.lstrip("#")
-        if len(hex_code) != 6:
-            return await interaction.response.send_message(embed=error_embed("Invalid Color", "Please provide a valid 6-character hex code (e.g. XERO.PRIMARY)."), ephemeral=True)
-        
-        try:
-            int(hex_code, 16)
-        except ValueError:
-            return await interaction.response.send_message(embed=error_embed("Invalid Color", "Invalid hex characters provided."), ephemeral=True)
-        
-        await self.bot.db.update_guild_setting(interaction.guild.id, "embed_color", f"#{hex_code}")
-        
-        color = discord.Color(int(hex_code, 16))
-        embed = discord.Embed(title="Custom Color Set!", description=f"The bot will now use `#{hex_code}` for its embeds in this server.", color=color, timestamp=discord.utils.utcnow())
-        embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="nickname", description="Set a custom nickname for the bot in this server.")
-    @app_commands.describe(name="The new nickname (leave blank to reset)")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def set_nickname(self, interaction: discord.Interaction, name: str = None):
-        try:
-            await interaction.guild.me.edit(nick=name)
-            await self.bot.db.update_guild_setting(interaction.guild.id, "bot_nickname", name)
-            
-            if name:
-                await interaction.response.send_message(embed=success_embed("Nickname Updated", f"I am now known as **{name}** in this server!"))
+        # If channel is set, save it there first
+        if channel_id:
+            channel = interaction.guild.get_channel(int(channel_id))
+            if channel:
+                # Re-upload to the storage channel to ensure it stays there
+                img_bytes = await image.read()
+                file = discord.File(io.BytesIO(img_bytes), filename=image.filename)
+                msg = await channel.send(content=f"New Unified Banner uploaded by {interaction.user}", file=file)
+                # Use the new URL from our storage channel
+                final_url = msg.attachments[0].url
             else:
-                await interaction.response.send_message(embed=success_embed("Nickname Reset", "My nickname has been reset to default."))
-        except discord.Forbidden:
-            await interaction.response.send_message(embed=error_embed("Permission Denied", "I don't have permission to change my own nickname. Please check my roles."), ephemeral=True)
+                final_url = image.url
+        else:
+            final_url = image.url
+
+        await self.bot.db.update_guild_setting(interaction.guild.id, "unified_image_url", final_url)
+        
+        modules = ["Tickets", "Verification", "Welcome", "Leaderboards", "Economy", "Level-Up"]
+        module_list = "\n".join([f"──────────────────────────\n**{m}**" for m in modules])
+        
+        desc = (
+            f"**Branding Deployment**\n"
+            f"This image is now the pride of your server and will be used across:\n\n"
+            f"{module_list}\n"
+            f"──────────────────────────"
+        )
+        
+        embed = success_embed(
+            title="XERO™ ELITE — UNIFIED BRANDING ACTIVE",
+            description=f"**BRANDING DEPLOYED**\n\n{desc}",
+            color=XERO.SUCCESS
+        )
+        embed.set_image(url=final_url)
+        if not channel_id:
+            embed.set_footer(text="Tip: Use /branding setup-channel to ensure this persists forever!")
+        
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="view", description="View your server's branding configuration.")
     async def view_branding(self, interaction: discord.Interaction):
         settings = await self.bot.db.get_guild_settings(interaction.guild.id)
         
-        embed = info_embed("Server Branding", f"Customization settings for **{interaction.guild.name}**")
-        embed.add_field(name="🎨 Embed Color", value=settings.get("embed_color", "XERO.PRIMARY"), inline=True)
-        embed.add_field(name="🏷️ Bot Nickname", value=settings.get("bot_nickname") or "Default (XERO Bot)", inline=True)
+        channel_id = settings.get("banner_channel_id")
+        channel_mention = f"<#{channel_id}>" if channel_id else "Not Set"
+        image_url = settings.get("unified_image_url")
         
-        has_image = "Yes" if settings.get("unified_image_data") else "No"
-        embed.add_field(name="🖼️ Unified Image", value=has_image, inline=True)
+        desc = (
+            f"**Branding Configuration**\n"
+            f"──────────────────────────\n"
+            f"**Embed Color**\n`{settings.get('embed_color', '#00D4FF')}`\n"
+            f"──────────────────────────\n"
+            f"**Storage Channel**\n{channel_mention}\n"
+            f"──────────────────────────\n"
+            f"**Unified Image**\n{'Active' if image_url else 'None'}\n"
+            f"──────────────────────────"
+        )
         
-        if settings.get("embed_color"):
-            try:
-                embed.color = discord.Color(int(settings["embed_color"].lstrip("#"), 16))
-            except: pass
+        embed = info_embed(
+            title="XERO™ ELITE — BRANDING OVERVIEW",
+            description=f"**CUSTOMIZATION SETTINGS**\n\n{desc}",
+            color=XERO.PRIMARY
+        )
+        
+        if image_url:
+            embed.set_image(url=image_url)
             
-        embed.set_footer(text=f"{interaction.guild.name}  •  XERO Branding")
-        embed.timestamp = discord.utils.utcnow()
         await interaction.response.send_message(embed=embed)
 
 async def setup(bot):

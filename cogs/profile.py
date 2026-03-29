@@ -116,7 +116,7 @@ class Profile(commands.GroupCog, name="profile"):
 
         def winner(a, b): return "🏆" if a > b else ("🤝" if a == b else "")
 
-        embed = discord.Embed(title=f"⚔️ {user1.display_name} vs {u2.display_name}", color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"⚔️ {user1.display_name} vs {u2.display_name}", color=discord.Color.blurple())
         embed.add_field(name=f"📊 Level", value=(
             f"{user1.display_name}: **{d1_lvl.get('level',0)}** {winner(d1_lvl.get('level',0), d2_lvl.get('level',0))}\n"
             f"{u2.display_name}: **{d2_lvl.get('level',0)}** {winner(d2_lvl.get('level',0), d1_lvl.get('level',0))}"

@@ -30,7 +30,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
                     category: discord.CategoryChannel = None,
                     default_name: str = "{user}'s Channel",
                     user_limit: int = 0):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO temp_voice_config (guild_id, trigger_channel_id, category_id, default_name, default_limit) VALUES (?,?,?,?,?)",
                 (interaction.guild.id, trigger_channel.id, category.id if category else None, default_name, user_limit)
@@ -54,7 +54,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
             return await interaction.response.send_message(
                 embed=error_embed("Not in Voice", "You must be in your temp channel to rename it."), ephemeral=True)
         vc = interaction.user.voice.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM temp_voice_channels WHERE channel_id=?", (vc.id,)) as c:
                 temp = await c.fetchone()
@@ -72,7 +72,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
             return await interaction.response.send_message(
                 embed=error_embed("Not in Voice", "Join your temp channel first."), ephemeral=True)
         vc = interaction.user.voice.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT owner_id FROM temp_voice_channels WHERE channel_id=?", (vc.id,)) as c:
                 row = await c.fetchone()
         if not row or row[0] != interaction.user.id:
@@ -91,7 +91,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
         if not interaction.user.voice or not interaction.user.voice.channel:
             return await interaction.response.send_message(embed=error_embed("Not in Voice", "Join your channel first."), ephemeral=True)
         vc = interaction.user.voice.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT owner_id FROM temp_voice_channels WHERE channel_id=?", (vc.id,)) as c:
                 row = await c.fetchone()
         if not row or row[0] != interaction.user.id:
@@ -114,7 +114,7 @@ class TempVoice(commands.GroupCog, name="tempvoice"):
     # ── Active ────────────────────────────────────────────────────────────
     @app_commands.command(name="active", description="View all active temp voice channels in the server.")
     async def active(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM temp_voice_channels WHERE guild_id=?", (interaction.guild.id,)) as c:
                 channels = [dict(r) for r in await c.fetchall()]

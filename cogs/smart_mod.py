@@ -79,7 +79,7 @@ class SmartMod(commands.GroupCog, name="smart"):
                 pass
 
         # Log
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT INTO raid_log (guild_id, join_count, action_taken) VALUES (?,?,?)",
                 (guild.id, count, f"auto_lockdown_{locked}_channels")
@@ -157,7 +157,7 @@ class SmartMod(commands.GroupCog, name="smart"):
         guild = interaction.guild
 
         # Gather stats for AI
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT COUNT(*) FROM mod_cases WHERE guild_id=?", (guild.id,)) as c:
                 total_cases = (await c.fetchone())[0]
             async with db.execute("SELECT COUNT(*) FROM warnings WHERE guild_id=?", (guild.id,)) as c:
@@ -233,7 +233,7 @@ class SmartMod(commands.GroupCog, name="smart"):
         if recent_cases > 20:                  recs.append("High mod volume — consider if AutoMod can handle some cases")
 
         # Cache
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO health_cache (guild_id, score, analysis) VALUES (?,?,?)",
                 (guild.id, score, analysis)
@@ -289,7 +289,7 @@ class SmartMod(commands.GroupCog, name="smart"):
     @app_commands.command(name="raid-log", description="View the history of raid attempts and auto-lockdowns in this server.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def raid_log(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT * FROM raid_log WHERE guild_id=? ORDER BY timestamp DESC LIMIT 10",
@@ -370,7 +370,7 @@ class SmartMod(commands.GroupCog, name="smart"):
     @command_guard
     async def warn_stats(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("""
                 SELECT user_id, COUNT(*) as count FROM warnings

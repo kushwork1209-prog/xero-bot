@@ -5,7 +5,13 @@ import asyncio
 from discord.ext import commands
 from discord import app_commands
 import logging
-from utils.embeds import comprehensive_embed, success_embed, error_embed, info_embed
+from utils.embeds import (
+    comprehensive_embed,
+    success_embed,
+    error_embed,
+    ai_embed,
+    XERO,
+)
 
 logger = logging.getLogger("XERO.AI")
 
@@ -21,8 +27,8 @@ class AI(commands.GroupCog, name="ai"):
         return text[:limit] + ("..." if len(text) > limit else "")
 
     async def _send(self, interaction: discord.Interaction, title: str, content: str, color=None):
-        import discord as d
-        embed = comprehensive_embed(title=title, description=self._chunk(content), color=color or d.Color.blurple(), footer_text="XERO AI | Powered by NVIDIA Llama 4 Maverick")
+        from utils.embeds import ai_embed
+        embed = ai_embed(title=title, description=self._chunk(content), color=color)
         if interaction.response.is_done():
             await interaction.followup.send(embed=embed)
         else:
@@ -47,6 +53,11 @@ class AI(commands.GroupCog, name="ai"):
     @command_guard
     async def chat(self, interaction: discord.Interaction, message: str):
         await interaction.response.defer()
+        if interaction.guild is None:
+            return await interaction.followup.send(
+                embed=error_embed("Server Only", "This command can only be used in a server."),
+                ephemeral=True
+            )
         gid = interaction.guild.id
         if gid not in MEMORY:
             MEMORY[gid] = []
@@ -182,7 +193,15 @@ class AI(commands.GroupCog, name="ai"):
     async def roast(self, interaction: discord.Interaction, target: str):
         await interaction.response.defer()
         response = await self.bot.nvidia.roast(target)
-        await self._send(interaction, f"🔥 Roast: {target[:30]}", response, discord.Color.dark_orange())
+        if not response:
+            response = "I tried to roast them, but they're too boring to even insult."
+        
+        embed = ai_embed(
+            title=f"🔥 ROASTED: {target[:30]}",
+            description=response,
+            color=XERO.ERROR
+        )
+        await interaction.followup.send(embed=embed)
 
     # ── Image Analyze ─────────────────────────────────────────────────────
     @app_commands.command(name="analyze-image", description="Analyze any image URL using NVIDIA Vision AI.")
@@ -199,9 +218,72 @@ class AI(commands.GroupCog, name="ai"):
     @app_commands.command(name="clear-memory", description="Clear the AI's conversation memory for this server.")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def clear_memory(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            return await interaction.response.send_message(
+                embed=error_embed("Server Only", "This command can only be used in a server."),
+                ephemeral=True
+            )
         gid = interaction.guild.id
         MEMORY.pop(gid, None)
         await interaction.response.send_message(embed=success_embed("Memory Cleared", "The AI's conversation history for this server has been reset."))
+
+    # ── Imagine (AI Image Generation) ─────────────────────────────────────
+    @app_commands.command(name="imagine", description="Generate an AI image from your description. Powered by FLUX AI — completely free.")
+    @app_commands.describe(
+        prompt="Describe the image you want to generate in detail",
+        style="Visual style of the image"
+    )
+    @app_commands.choices(style=[
+        app_commands.Choice(name="🌟 Realistic",  value="flux-realism"),
+        app_commands.Choice(name="✨ Default",     value="flux"),
+        app_commands.Choice(name="🎌 Anime",       value="flux-anime"),
+        app_commands.Choice(name="🔷 3D Render",   value="flux-3d"),
+        app_commands.Choice(name="⚡ Fast",         value="turbo"),
+    ])
+    @command_guard
+    async def imagine(self, interaction: discord.Interaction, prompt: str, style: str = "flux"):
+        await interaction.response.defer()
+        style_names = {
+            "flux-realism": "Realistic",
+            "flux":         "Default",
+            "flux-anime":   "Anime",
+            "flux-3d":      "3D Render",
+            "turbo":        "Fast",
+        }
+        url = self.bot.nvidia.image_url(prompt, model=style, width=1024, height=1024)
+        embed = discord.Embed(
+            title="🎨  AI Image Generated",
+            description=f"**Prompt:** {prompt[:300]}",
+            color=discord.Color.purple()
+        )
+        embed.set_image(url=url)
+        embed.set_footer(text=f"Style: {style_names.get(style, style)}  •  Powered by FLUX AI  •  XERO Bot")
+        await interaction.followup.send(embed=embed)
+
+    # ── Persona ───────────────────────────────────────────────────────────
+    @app_commands.command(name="persona", description="Change the AI's personality for this server.")
+    @app_commands.describe(persona="The personality style for the AI")
+    @app_commands.choices(persona=[
+        app_commands.Choice(name="😐 Neutral (default)",    value="neutral"),
+        app_commands.Choice(name="😄 Friendly & Warm",      value="friendly"),
+        app_commands.Choice(name="🔬 Analytical & Detailed", value="analytical"),
+        app_commands.Choice(name="😏 Clever & Sarcastic",   value="sarcastic"),
+        app_commands.Choice(name="🎓 Mentor Mode",           value="mentor"),
+    ])
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def persona(self, interaction: discord.Interaction, persona: str):
+        await self.bot.db.update_guild_setting(interaction.guild.id, "persona", persona)
+        descriptions = {
+            "neutral":    "Balanced and professional.",
+            "friendly":   "Warm, casual, and enthusiastic.",
+            "analytical": "Highly detailed and data-driven.",
+            "sarcastic":  "Clever and witty with light sarcasm.",
+            "mentor":     "Wise, encouraging, and educational.",
+        }
+        await interaction.response.send_message(
+            embed=success_embed("AI Persona Updated", f"AI personality set to **{persona.title()}**.\n{descriptions.get(persona, '')}"),
+            ephemeral=True
+        )
 
 
 async def setup(bot):

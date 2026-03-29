@@ -3,25 +3,37 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
-from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed
+from utils.embeds import success_embed, error_embed, info_embed, comprehensive_embed, brand_embed
 
 logger = logging.getLogger("XERO.Setup")
 
 
-class Setup(commands.GroupCog, name="setup"):
+class Setup(commands.GroupCog, name="settings"):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="welcome", description="Configure the welcome message system.")
-    @app_commands.describe(channel="Channel to send welcome messages", message="Message ({user}=mention, {server}=name, {count}=member count)")
+    @app_commands.command(name="welcome-channel", description="Configure the welcome message system.")
+    @app_commands.describe(
+        channel="Channel to send welcome messages", 
+        message="Message ({user}=mention, {server}=name, {count}=member count)",
+        use_brand_image="Whether to use the Unified Brand Image (True) or a custom image (False)",
+        custom_image="Custom image URL to use for welcome messages (if use_brand_image is False)"
+    )
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def welcome(self, interaction: discord.Interaction, channel: discord.TextChannel, message: str = None):
+    async def welcome(self, interaction: discord.Interaction, channel: discord.TextChannel, 
+                      message: str = None, use_brand_image: bool = True, custom_image: str = None):
         await self.bot.db.update_guild_setting(interaction.guild.id, "welcome_channel_id", channel.id)
         if message:
             await self.bot.db.update_guild_setting(interaction.guild.id, "welcome_message", message)
+        
+        await self.bot.db.update_guild_setting(interaction.guild.id, "welcome_use_brand", 1 if use_brand_image else 0)
+        if custom_image:
+            await self.bot.db.update_guild_setting(interaction.guild.id, "welcome_custom_image", custom_image)
+            
         settings = await self.bot.db.get_guild_settings(interaction.guild.id)
-        preview = (message or settings.get("welcome_message", "Welcome {user}!")).replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
-        embed = success_embed("Welcome System Configured", f"**Channel:** {channel.mention}\n**Message Preview:**\n{preview}")
+        preview_text = (message or settings.get("welcome_message", "Welcome {user}!")).replace("{user}", interaction.user.mention).replace("{server}", interaction.guild.name).replace("{count}", str(interaction.guild.member_count))
+        
+        embed = success_embed("Welcome System Configured", f"**Channel:** {channel.mention}\n**Message Preview:**\n{preview_text}")
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(name="farewell", description="Configure the farewell message system.")
@@ -33,7 +45,7 @@ class Setup(commands.GroupCog, name="setup"):
             await self.bot.db.update_guild_setting(interaction.guild.id, "farewell_message", message)
         await interaction.response.send_message(embed=success_embed("Farewell System Configured", f"**Channel:** {channel.mention}"))
 
-    @app_commands.command(name="logs", description="Set the moderation & bot log channel.")
+    @app_commands.command(name="log-channel", description="Set the moderation & bot log channel.")
     @app_commands.describe(channel="Channel to send logs to")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def logs(self, interaction: discord.Interaction, channel: discord.TextChannel):
@@ -57,7 +69,7 @@ class Setup(commands.GroupCog, name="setup"):
         await self.bot.db.update_guild_setting(interaction.guild.id, "mute_role_id", role.id)
         await interaction.response.send_message(embed=success_embed("Mute Role Set", f"{role.mention} will be used as the mute role."))
 
-    @app_commands.command(name="leveling", description="Enable or disable the leveling/XP system.")
+    @app_commands.command(name="leveling-toggle", description="Enable or disable the leveling/XP system.")
     @app_commands.describe(enabled="Enable or disable leveling")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def leveling(self, interaction: discord.Interaction, enabled: bool):
@@ -65,7 +77,7 @@ class Setup(commands.GroupCog, name="setup"):
         status = "enabled" if enabled else "disabled"
         await interaction.response.send_message(embed=success_embed(f"Leveling {status.capitalize()}", f"The XP and leveling system is now **{status}**."))
 
-    @app_commands.command(name="economy", description="Enable or disable the economy system.")
+    @app_commands.command(name="economy-toggle", description="Enable or disable the economy system.")
     @app_commands.describe(enabled="Enable or disable economy")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def economy(self, interaction: discord.Interaction, enabled: bool):
@@ -112,7 +124,7 @@ class Setup(commands.GroupCog, name="setup"):
         }
         await interaction.response.send_message(embed=success_embed("AI Persona Updated", f"**Persona:** {persona.capitalize()}\n**Style:** {persona_descriptions.get(persona, '')}"))
 
-    @app_commands.command(name="view", description="View the current server configuration.")
+    @app_commands.command(name="status", description="View the current server configuration.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def view(self, interaction: discord.Interaction):
         settings = await self.bot.db.get_guild_settings(interaction.guild.id)

@@ -76,76 +76,41 @@ class Info(commands.GroupCog, name="info"):
             discord.Status.offline:   "⚫ Offline",
         }
 
-        embed = discord.Embed(
-            title=f"{'  '.join(badges)}" if badges else f"👤 {target.display_name}",
-            color=target.color if target.color.value else discord.Color.blurple()
-        )
-        embed.set_author(name=f"{target} — Full Profile", icon_url=target.display_avatar.url)
-        embed.set_thumbnail(url=target.display_avatar.url)
-
-        embed.add_field(name="📋 Account", value=(
-            f"**Username:** {target}\n"
-            f"**Display Name:** {target.display_name}\n"
-            f"**ID:** `{target.id}`\n"
-            f"**Created:** <t:{int(target.created_at.timestamp())}:D> (<t:{int(target.created_at.timestamp())}:R>)\n"
-            f"**Bot:** {'Yes' if target.bot else 'No'}"
-        ), inline=True)
-
-        embed.add_field(name="🏠 In This Server", value=(
-            f"**Joined:** <t:{int(target.joined_at.timestamp())}:D> (<t:{int(target.joined_at.timestamp())}:R>)\n"
-            f"**Status:** {status_icons.get(target.status, '⚫ Unknown')}\n"
-            f"**Top Role:** {target.top_role.mention}\n"
-            f"**Role Count:** {len(target.roles) - 1}\n"
-            f"**Nickname:** {target.nick or 'None'}"
-        ), inline=True)
-
-        embed.add_field(name="📊 Level & XP", value=(
-            f"**Level:** {level}  |  **XP:** {curr_xp:,}/{next_xp:,}\n"
+        desc = (
+            f"**Account Identity**\n"
+            f"──────────────────────────\n"
+            f"**User**\n{target.mention} (`{target.id}`)\n"
+            f"──────────────────────────\n"
+            f"**Server Presence**\n"
+            f"Joined: <t:{int(target.joined_at.timestamp())}:D>\n"
+            f"Top Role: {target.top_role.mention}\n"
+            f"Status: {status_icons.get(target.status, '⚫ Unknown')}\n"
+            f"──────────────────────────\n"
+            f"**Experience & Progression**\n"
+            f"Level: {level} | Total XP: {total_xp:,}\n"
             f"`{xp_bar}`\n"
-            f"**Total XP:** {total_xp:,}"
-        ), inline=False)
+            f"──────────────────────────\n"
+            f"**Economy & Assets**\n"
+            f"Wallet: `${wallet:,}` | Bank: `${bank:,}`\n"
+            f"Net Worth: **`${net_worth:,}`**\n"
+            f"──────────────────────────\n"
+            f"**Activity Metrics**\n"
+            f"Commands: {stats_data.get('commands_used', 0):,} | Messages: {stats_data.get('messages_sent', 0):,}\n"
+            f"Warnings: {len(warnings)}"
+        )
 
-        embed.add_field(name="💰 Economy", value=(
-            f"**Wallet:** ${wallet:,}\n"
-            f"**Bank:** ${bank:,}\n"
-            f"**Net Worth:** ${net_worth:,}"
-        ), inline=True)
-
-        embed.add_field(name="📈 Activity", value=(
-            f"**Commands Used:** {stats_data.get('commands_used', 0):,}\n"
-            f"**Messages Sent:** {stats_data.get('messages_sent', 0):,}\n"
-            f"**Warnings:** {len(warnings)}\n"
-            f"**Mod Cases:** {len(cases)}"
-        ), inline=True)
-
-        # Key permissions
-        key_perms = []
-        perm_map = {
-            "administrator": "Admin", "manage_guild": "Manage Server",
-            "ban_members": "Ban", "kick_members": "Kick",
-            "manage_messages": "Manage Messages", "manage_roles": "Manage Roles",
-            "manage_channels": "Manage Channels", "mention_everyone": "Mention All",
-        }
-        for perm, label in perm_map.items():
-            if getattr(target.guild_permissions, perm):
-                key_perms.append(label)
-        if key_perms:
-            embed.add_field(name="🔑 Key Permissions", value=", ".join(key_perms), inline=False)
-
-        # Roles (up to 10)
-        roles = [r.mention for r in reversed(target.roles) if r != interaction.guild.default_role]
-        if roles:
-            display = " ".join(roles[:10]) + (f" *+{len(roles)-10} more*" if len(roles) > 10 else "")
-            embed.add_field(name=f"🎭 Roles ({len(roles)})", value=display, inline=False)
-
-        # Recent activity
-        if target.activity:
-            act = target.activity
-            act_type = str(act.type).replace("ActivityType.", "").title()
-            embed.add_field(name="🎮 Activity", value=f"**{act_type}:** {act.name}", inline=True)
-
-        embed.set_footer(text=f"Requested by {interaction.user.display_name} | XERO Bot")
-        await interaction.followup.send(embed=embed)
+        embed = comprehensive_embed(
+            title=f"{'  '.join(badges)}" if badges else f"USER PROFILE: {target.display_name}",
+            description=f"**ELITE DOSSIER — {target.display_name.upper()}**\n\n{desc}",
+            color=target.color if target.color.value else XERO.PRIMARY,
+            thumbnail=target.display_avatar.url,
+            author_name=f"{target} — ELITE DOSSIER",
+            author_icon=target.display_avatar.url
+        )
+        
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        await interaction.followup.send(embed=embed, file=file)
 
     # ── /info server ──────────────────────────────────────────────────────
     @app_commands.command(name="server", description="Complete server breakdown — members, channels, boosts, security, activity stats.")
@@ -156,7 +121,7 @@ class Info(commands.GroupCog, name="info"):
 
         # Fetch DB stats
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT SUM(commands_used), SUM(messages_sent) FROM user_stats WHERE guild_id=?", (g.id,)) as c:
                 stat_row = await c.fetchone()
             async with db.execute("SELECT COUNT(*) FROM mod_cases WHERE guild_id=?", (g.id,)) as c:
@@ -183,66 +148,41 @@ class Info(commands.GroupCog, name="info"):
         # Boost perks
         boost_perks = {0: "None", 1: "50 emojis, 128kbps audio", 2: "150 emojis, 256kbps, banner", 3: "250 emojis, 384kbps, vanity URL"}
 
-        embed = discord.Embed(
-            title=f"🏰 {g.name}",
-            description=g.description or "*No description set*",
-            color=discord.Color.blurple()
+        desc = (
+            f"**Server Identity**\n"
+            f"──────────────────────────\n"
+            f"**Owner**\n{g.owner.mention if g.owner else 'Unknown'} (`{g.id}`)\n"
+            f"──────────────────────────\n"
+            f"**Member Breakdown**\n"
+            f"Total: {g.member_count:,} | Humans: {humans:,} | Bots: {bots:,}\n"
+            f"🟢 {online} | 🟡 {idle} | 🔴 {dnd}\n"
+            f"──────────────────────────\n"
+            f"**Channel Infrastructure**\n"
+            f"Text: {len(text_ch)} | Voice: {len(voice_ch)} | Forum: {len(forum_ch)}\n"
+            f"──────────────────────────\n"
+            f"**Boost Status**\n"
+            f"Level: {g.premium_tier} | Boosts: {g.premium_subscription_count}\n"
+            f"──────────────────────────\n"
+            f"**Security & Verification**\n"
+            f"Level: {g.verification_level.name.replace('_', ' ').title()}\n"
+            f"──────────────────────────\n"
+            f"**XERO Activity Metrics**\n"
+            f"Commands: {total_cmds:,} | Messages: {total_msgs:,}\n"
+            f"Mod Cases: {mod_cases:,} | Leveled Members: {leveled_members:,}"
         )
-        if g.icon:
-            embed.set_thumbnail(url=g.icon.url)
-        if g.banner:
-            embed.set_image(url=g.banner.url)
 
-        embed.add_field(name="📋 Identity", value=(
-            f"**ID:** `{g.id}`\n"
-            f"**Owner:** {g.owner.mention if g.owner else 'Unknown'}\n"
-            f"**Created:** <t:{int(g.created_at.timestamp())}:D>\n"
-            f"**Age:** <t:{int(g.created_at.timestamp())}:R>"
-        ), inline=True)
-
-        embed.add_field(name="👥 Members", value=(
-            f"**Total:** {g.member_count:,}\n"
-            f"**Humans:** {humans:,}  |  **Bots:** {bots:,}\n"
-            f"🟢 {online} 🟡 {idle} 🔴 {dnd}"
-        ), inline=True)
-
-        embed.add_field(name="📡 Channels", value=(
-            f"**Text:** {len(text_ch)}  |  **Voice:** {len(voice_ch)}\n"
-            f"**Stage:** {len(stage_ch)}  |  **Forum:** {len(forum_ch)}\n"
-            f"**Categories:** {len(g.categories)}"
-        ), inline=True)
-
-        embed.add_field(name="🎨 Assets", value=(
-            f"**Roles:** {len(g.roles) - 1}\n"
-            f"**Emojis:** {len(g.emojis)} / {g.emoji_limit}\n"
-            f"**Stickers:** {len(g.stickers)} / {g.sticker_limit}"
-        ), inline=True)
-
-        embed.add_field(name="💎 Boost Status", value=(
-            f"**Level:** {g.premium_tier}\n"
-            f"**Boosts:** {g.premium_subscription_count}\n"
-            f"**Perks:** {boost_perks.get(g.premium_tier, 'Unknown')}"
-        ), inline=True)
-
-        embed.add_field(name="🔒 Security", value=(
-            f"**Verification:** {g.verification_level.name.replace('_', ' ').title()}\n"
-            f"**2FA Required:** {'Yes' if g.mfa_level else 'No'}\n"
-            f"**Content Filter:** {g.explicit_content_filter.name.replace('_', ' ').title()}"
-        ), inline=True)
-
-        embed.add_field(name="📊 XERO Activity", value=(
-            f"**Commands Used:** {total_cmds:,}\n"
-            f"**Messages Tracked:** {total_msgs:,}\n"
-            f"**Mod Cases:** {mod_cases:,}\n"
-            f"**Members with Levels:** {leveled_members:,}"
-        ), inline=False)
-
-        if g.features:
-            feature_display = ", ".join(f.replace("_", " ").title() for f in list(g.features)[:8])
-            embed.add_field(name="✨ Server Features", value=feature_display, inline=False)
-
-        embed.set_footer(text=f"Requested by {interaction.user.display_name} | XERO Bot")
-        await interaction.followup.send(embed=embed)
+        embed = comprehensive_embed(
+            title=f"SERVER OVERVIEW — {g.name.upper()}",
+            description=f"**ELITE SERVER DOSSIER**\n\n{desc}",
+            color=XERO.PRIMARY,
+            thumbnail=g.icon.url if g.icon else None,
+            author_name=f"{g.name} — SERVER INFO",
+            author_icon=g.icon.url if g.icon else None
+        )
+        
+        from utils.embeds import brand_embed
+        embed, file = await brand_embed(embed, g, self.bot)
+        await interaction.followup.send(embed=embed, file=file)
 
     # ── /info role ────────────────────────────────────────────────────────
     @app_commands.command(name="role", description="Everything about a role — permissions, color, members, creation date, position.")
@@ -553,5 +493,5 @@ class Info(commands.GroupCog, name="info"):
         await interaction.response.send_message(embed=embed)
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     await bot.add_cog(Info(bot))

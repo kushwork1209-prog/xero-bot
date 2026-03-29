@@ -17,7 +17,7 @@ class Counting(commands.GroupCog, name="counting"):
     @app_commands.describe(channel="Channel to use for counting")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO counting_config (guild_id, channel_id, current, last_user_id, high_score, enabled) VALUES (?,?,0,NULL,0,1)",
                 (interaction.guild.id, channel.id)
@@ -36,7 +36,7 @@ class Counting(commands.GroupCog, name="counting"):
 
     @app_commands.command(name="stats", description="View counting game stats for this server.")
     async def stats(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM counting_config WHERE guild_id=?", (interaction.guild.id,)) as c:
                 configs = [dict(r) for r in await c.fetchall()]
@@ -63,7 +63,7 @@ class Counting(commands.GroupCog, name="counting"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def reset(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
         ch = channel or interaction.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "UPDATE counting_config SET current=0, last_user_id=NULL WHERE guild_id=? AND channel_id=?",
                 (interaction.guild.id, ch.id)
@@ -76,7 +76,7 @@ class Counting(commands.GroupCog, name="counting"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def toggle(self, interaction: discord.Interaction, enabled: bool, channel: discord.TextChannel = None):
         ch = channel or interaction.channel
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE counting_config SET enabled=? WHERE guild_id=? AND channel_id=?",
                              (1 if enabled else 0, interaction.guild.id, ch.id))
             await db.commit()
@@ -87,7 +87,7 @@ class Counting(commands.GroupCog, name="counting"):
 
     @app_commands.command(name="leaderboard", description="View counting high scores.")
     async def leaderboard(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM counting_config WHERE guild_id=? ORDER BY high_score DESC", (interaction.guild.id,)) as c:
                 configs = [dict(r) for r in await c.fetchall()]
@@ -117,12 +117,12 @@ class Confessions(commands.GroupCog, name="confess"):
         if not channel:
             return await interaction.response.send_message(
                 embed=error_embed("Channel Not Found", "Confessions channel not found."), ephemeral=True)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("INSERT INTO confessions (guild_id, user_id, message) VALUES (?,?,?)",
                                   (interaction.guild.id, interaction.user.id, message)) as c:
                 confession_id = c.lastrowid
             await db.commit()
-        embed = discord.Embed(title=f"Anonymous Confession #{confession_id}", description=message, color=discord.Color.purple())
+        embed = comprehensive_embed(title=f"Anonymous Confession #{confession_id}", description=message, color=discord.Color.purple())
         embed.set_footer(text=f"Confession #{confession_id} | XERO Anonymous System")
         await channel.send(embed=embed)
         await interaction.response.send_message(
@@ -143,7 +143,7 @@ class Confessions(commands.GroupCog, name="confess"):
     @app_commands.describe(confession_id="Confession ID to reveal")
     @app_commands.checks.has_permissions(administrator=True)
     async def reveal(self, interaction: discord.Interaction, confession_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM confessions WHERE id=? AND guild_id=?",
                                   (confession_id, interaction.guild.id)) as c:
@@ -163,7 +163,7 @@ class Confessions(commands.GroupCog, name="confess"):
     @app_commands.describe(confession_id="Confession ID to delete")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def delete(self, interaction: discord.Interaction, confession_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM confessions WHERE id=? AND guild_id=?", (confession_id, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(

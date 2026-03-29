@@ -20,9 +20,16 @@ import re
 import os
 import logging
 
-import asyncpg
+try:
+    import asyncpg
+    _ASYNCPG_AVAILABLE = True
+except ImportError:
+    asyncpg = None  # type: ignore
+    _ASYNCPG_AVAILABLE = False
 
 logger = logging.getLogger("XERO.DBAdapter")
+if not _ASYNCPG_AVAILABLE:
+    logger.warning("asyncpg not installed — PostgreSQL unavailable, using SQLite fallback.")
 
 DATABASE_URL: str | None = os.getenv("DATABASE_URL")
 
@@ -128,6 +135,7 @@ class _PGExecContext:
 
 
 # ── Connection wrapper ─────────────────────────────────────────────────────────
+
 
 class _PGConn:
     """
@@ -238,6 +246,8 @@ async def create_pg_pool() -> "asyncpg.Pool":
     Handles the postgres:// → postgresql:// normalization that
     Neon and Supabase sometimes produce.
     """
+    if not _ASYNCPG_AVAILABLE:
+        raise RuntimeError("asyncpg is not installed; cannot connect to PostgreSQL.")
     url = DATABASE_URL or ""
     if url.startswith("postgres://"):
         url = "postgresql://" + url[11:]

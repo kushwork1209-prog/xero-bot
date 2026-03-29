@@ -32,7 +32,7 @@ import discord, asyncio, io, os, wave, struct, logging, aiohttp, tempfile, base6
 import numpy as np
 from discord.ext import commands
 from discord import app_commands
-from utils.embeds import success_embed, error_embed, info_embed, XERO
+from utils.embeds import success_embed, error_embed, info_embed, XERO, comprehensive_embed
 
 try:
     import discord.ext.voice_recv as vr
@@ -494,7 +494,7 @@ class VoiceAI(commands.GroupCog, name="ai-voice"):
         lines   = len(session.conversation) // 2
         listeners = [m for m in (vc.channel.members if vc and vc.channel else []) if not m.bot]
 
-        embed = discord.Embed(title="🎙️  Voice AI — Active", color=XERO.SUCCESS)
+        embed = comprehensive_embed(title="🎙️  Voice AI — Active", color=XERO.SUCCESS)
         embed.add_field(name="📢 Channel",    value=f"**{ch_name}**",      inline=True)
         embed.add_field(name="💬 Exchanges",  value=str(lines),             inline=True)
         embed.add_field(name="👥 Listeners",  value=str(len(listeners)),    inline=True)

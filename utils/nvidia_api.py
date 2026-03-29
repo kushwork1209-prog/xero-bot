@@ -22,7 +22,7 @@ from typing import Optional, List, Dict
 logger = logging.getLogger("XERO.AI")
 
 BASE_URL       = "https://integrate.api.nvidia.com/v1/chat/completions"
-MODEL_PRIMARY  = "meta/llama-3.1-8b-instruct"
+MODEL_PRIMARY  = "nvidia/nemotron-3-super-120b-a12b"
 MODEL_VISION   = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
 
 SYSTEM_BASE = (
@@ -78,14 +78,19 @@ class NvidiaAPI:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     BASE_URL, headers=headers, json=payload,
-                    timeout=aiohttp.ClientTimeout(total=25)
+                    timeout=aiohttp.ClientTimeout(total=45)
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        return data["choices"][0]["message"]["content"]
+                        content = data["choices"][0]["message"]["content"]
+                        if not content:
+                            return "⚠️ AI returned an empty response. Try rephrasing."
+                        return content
                     elif resp.status == 401:
                         logger.error("NVIDIA API: 401 Unauthorized — check your API key")
                         return "❌ Invalid API key. Check your `NVIDIA_MAIN_KEY` in `.env`."
+                    elif resp.status == 402:
+                        return "⚠️ NVIDIA API Credits exhausted. Please check your account."
                     elif resp.status == 429:
                         logger.warning("NVIDIA API: 429 Rate limited")
                         return "⏳ Rate limited. Try again in a few seconds."
@@ -95,10 +100,10 @@ class NvidiaAPI:
                         return f"API error ({resp.status}). Try again."
         except asyncio.TimeoutError:
             logger.warning("NVIDIA API: timeout")
-            return "⌛ AI is taking too long. Try again in a moment."
+            return "⌛ AI is taking too long (45s+). Try again in a moment."
         except Exception as e:
             logger.error(f"NVIDIA API exception: {e}")
-            return "❌ Connection error. Try again."
+            return f"❌ Connection error: {str(e)[:100]}"
 
     # ── Vision pipeline ───────────────────────────────────────────────────
 

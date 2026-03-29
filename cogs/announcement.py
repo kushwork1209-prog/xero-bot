@@ -21,7 +21,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     @tasks.loop(minutes=1)
     async def process_announcements(self):
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 db.row_factory = aiosqlite.Row
                 async with db.execute(
                     "SELECT * FROM announcements WHERE sent=0 AND scheduled_time <= datetime('now')"
@@ -31,10 +31,17 @@ class Announcement(commands.GroupCog, name="announcement"):
                 try:
                     ch = self.bot.get_channel(ann["channel_id"])
                     if ch:
-                        embed = discord.Embed(title=f"📢 {ann['title']}", description=ann["message"], color=discord.Color.blurple())
-                        embed.set_footer(text="Scheduled Announcement | XERO Bot")
-                        await ch.send(embed=embed)
-                    async with aiosqlite.connect(self.bot.db.db_path) as db:
+                        from utils.embeds import brand_embed, comprehensive_embed
+                        embed = comprehensive_embed(title=f"📢 {ann['title']}", description=ann["message"], color=discord.Color.blurple())
+                        embed.set_footer(text="Scheduled Announcement")
+                        
+                        # Unified Branding
+                        embed, file = await brand_embed(embed, ch.guild, self.bot)
+                        if file:
+                            await ch.send(embed=embed, file=file)
+                        else:
+                            await ch.send(embed=embed)
+                    async with self.bot.db._db_context() as db:
                         await db.execute("UPDATE announcements SET sent=1 WHERE announcement_id=?", (ann["announcement_id"],))
                         await db.commit()
                 except Exception as e:
@@ -60,10 +67,17 @@ class Announcement(commands.GroupCog, name="announcement"):
                    ping_everyone: bool = False, color: str = "blue"):
         color_map = {"blue": discord.Color.blue(), "red": discord.Color.red(), "green": discord.Color.green(),
                      "gold": discord.Color.gold(), "purple": discord.Color.purple()}
-        embed = discord.Embed(title=f"📢 {title}", description=message, color=color_map.get(color, discord.Color.blue()))
-        embed.set_footer(text=f"Announced by {interaction.user.display_name} | XERO Bot")
+        from utils.embeds import brand_embed, comprehensive_embed
+        embed = comprehensive_embed(title=f"📢 {title}", description=message, color=color_map.get(color, discord.Color.blue()))
+        embed.set_footer(text=f"Announced by {interaction.user.display_name}")
         content = "@everyone" if ping_everyone else None
-        await channel.send(content=content, embed=embed)
+        
+        # Unified Branding
+        embed, file = await brand_embed(embed, interaction.guild, self.bot)
+        if file:
+            await channel.send(content=content, embed=embed, file=file)
+        else:
+            await channel.send(content=content, embed=embed)
         await interaction.response.send_message(embed=success_embed("Announcement Sent!", f"**{title}** posted in {channel.mention}."))
 
     @app_commands.command(name="schedule", description="Schedule an announcement for a future time.")
@@ -72,7 +86,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     async def schedule(self, interaction: discord.Interaction, channel: discord.TextChannel, title: str, message: str, minutes_from_now: int = 60):
         minutes_from_now = max(1, min(43200, minutes_from_now))
         scheduled_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=minutes_from_now)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT INTO announcements (guild_id, channel_id, title, message, scheduled_time, created_by) VALUES (?,?,?,?,?,?)",
                 (interaction.guild.id, channel.id, title, message, scheduled_time, interaction.user.id)
@@ -84,7 +98,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.command(name="list", description="View all pending scheduled announcements.")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def list_announcements(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute("SELECT * FROM announcements WHERE guild_id=? AND sent=0 ORDER BY scheduled_time ASC", (interaction.guild.id,)) as c:
                 anns = [dict(r) for r in await c.fetchall()]
@@ -105,7 +119,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.describe(announcement_id="ID of the announcement to cancel")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def cancel(self, interaction: discord.Interaction, announcement_id: int):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("DELETE FROM announcements WHERE announcement_id=? AND guild_id=?", (announcement_id, interaction.guild.id))
             await db.commit()
         await interaction.response.send_message(embed=success_embed("Cancelled", f"Announcement **#{announcement_id}** has been cancelled."))
@@ -114,7 +128,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.describe(announcement_id="ID to edit", new_title="New title (optional)", new_message="New message body")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def edit(self, interaction: discord.Interaction, announcement_id: int, new_message: str, new_title: str = None):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("UPDATE announcements SET message=? WHERE announcement_id=? AND guild_id=?", (new_message, announcement_id, interaction.guild.id))
             if new_title:
                 await db.execute("UPDATE announcements SET title=? WHERE announcement_id=? AND guild_id=?", (new_title, announcement_id, interaction.guild.id))
@@ -125,7 +139,7 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.describe(role="Role to mention", channel="Target channel", title="Title", message="Message body")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def mention_role(self, interaction: discord.Interaction, role: discord.Role, channel: discord.TextChannel, title: str, message: str):
-        embed = discord.Embed(title=f"📢 {title}", description=message, color=discord.Color.blurple())
+        embed = comprehensive_embed(title=f"📢 {title}", description=message, color=discord.Color.blurple())
         embed.set_footer(text=f"Announced by {interaction.user.display_name} | XERO Bot")
         await channel.send(content=role.mention, embed=embed)
         await interaction.response.send_message(embed=success_embed("Announcement Sent!", f"Announcement sent with {role.mention} in {channel.mention}."))
@@ -134,7 +148,10 @@ class Announcement(commands.GroupCog, name="announcement"):
     @app_commands.describe(channel="Default channel for announcements")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        await self.bot.db.update_guild_setting(interaction.guild.id, "welcome_channel_id", channel.id)
+        # BUG FIX: This was overwriting welcome_channel_id. 
+        # Since there is no dedicated announcement_channel_id in the schema yet, 
+        # we'll use a new key and the DB will auto-add the column.
+        await self.bot.db.update_guild_setting(interaction.guild.id, "announcement_channel_id", channel.id)
         await interaction.response.send_message(embed=success_embed("Default Channel Set", f"Default announcement channel set to {channel.mention}."))
 
 

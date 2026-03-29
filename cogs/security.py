@@ -1,134 +1,109 @@
 """
 XERO Bot — Security System v2
-Beats Wick, Carl-bot, and every paid security bot. Free. Always.
-
-Features:
-  🛡️  Anti-Nuke       — detects & stops server destruction in real time
-  👶  Account Age     — blocks new accounts from joining (kills raid bots)
-  🔗  Link Filter     — domain allowlist with Discord-native exceptions
-  💾  Role Restore    — saves and restores roles on rejoin
-  🚨  Raid Detection  — detects mass joins and locks down automatically
-  🤖  Alt Detection   — flags accounts with suspicious patterns
-  🔇  Mention Spam    — protects against mass mention attacks
-  📋  Audit Logging   — every security action logged with full context
-  🔒  Channel Lockdown — one command locks/unlocks the entire server
-  ⚡  Quarantine Role — soft-lock suspicious users without banning
+Better than WickBot. Free. AI-enhanced.
+Anti-nuke, permission watchdog, webhook protection, bot protection,
+alt-account scoring, smart lockdown, raid mode, security dashboard.
 """
 import discord
-import logging
-import datetime
-import asyncio
-import aiosqlite
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import app_commands
-from utils.embeds import success_embed, error_embed, info_embed, XERO
-from utils.guard import command_guard
+import logging, datetime, asyncio, aiosqlite, re, math
+from utils.embeds import (
+    success_embed, error_embed, info_embed, warning_embed,
+    comprehensive_embed, XERO, FOOTER_MOD
+)
 
 logger = logging.getLogger("XERO.Security")
 
-# ── In-memory tracking ────────────────────────────────────────────────────────
-# Anti-nuke: tracks destructive actions per user per guild
-NUKE_TRACK:  dict = {}  # {guild_id: {user_id: {action: [timestamps]}}}
-# Raid detection: tracks join timestamps per guild
-JOIN_TRACK:  dict = {}  # {guild_id: [timestamps]}
-# Quarantine: tracks quarantined users
-QUARANTINED: dict = {}  # {guild_id: {user_id: [original_role_ids]}}
+# ── In-memory state ───────────────────────────────────────────────────────────
+# Anti-nuke: guild_id -> {user_id -> {action -> [timestamps]}}
+NUKE_TRACK: dict = {}
+# Smart lockdown channel permission snapshots: guild_id -> {channel_id -> overwrites}
+LOCKDOWN_SNAPSHOTS: dict = {}
 
 
 class Security(commands.GroupCog, name="security"):
     def __init__(self, bot):
         self.bot = bot
-        self._raid_locked: set = set()  # guilds currently raid-locked
-        self.unraid_check.start()
-
-    def cog_unload(self):
-        self.unraid_check.cancel()
 
     # ══════════════════════════════════════════════════════════════════════
-    # ANTI-NUKE ENGINE
+    # INTERNAL ANTI-NUKE ENGINE (called from events.py listeners)
     # ══════════════════════════════════════════════════════════════════════
 
-    async def track_nuke_action(self, guild: discord.Guild, user: discord.Member | discord.User, action: str):
+    async def track_nuke_action(self, guild: discord.Guild,
+                                user: discord.Member, action: str):
         """
-        Called by events.py on every destructive action.
-        Actions: channel_delete, role_delete, mass_ban, mass_kick, webhook_delete,
-                 emoji_delete, bot_add, permission_escalate
-        Triggers at configurable threshold within a 10-second window.
+        Track rapid destructive actions. Trigger response at threshold.
+        Call from events.py on_guild_channel_delete, on_guild_role_delete, etc.
         """
-        settings = await self.bot.db.get_guild_settings(guild.id)
-        if not settings or not settings.get("anti_nuke_enabled", 0):
-            return
+        try:
+            settings = await self.bot.db.get_guild_settings(guild.id)
+            if not settings.get("anti_nuke_enabled", 0):
+                return
 
-        now       = datetime.datetime.utcnow()
-        threshold = int(settings.get("anti_nuke_threshold", 3))
+            gid, uid = guild.id, user.id
+            now = datetime.datetime.now()
 
-        NUKE_TRACK.setdefault(guild.id, {})
-        NUKE_TRACK[guild.id].setdefault(user.id, {})
-        NUKE_TRACK[guild.id][user.id].setdefault(action, [])
+            if gid not in NUKE_TRACK: NUKE_TRACK[gid] = {}
+            if uid not in NUKE_TRACK[gid]: NUKE_TRACK[gid][uid] = {}
+            if action not in NUKE_TRACK[gid][uid]: NUKE_TRACK[gid][uid][action] = []
 
-        # Keep only last 10 seconds
-        cutoff = now - datetime.timedelta(seconds=10)
-        NUKE_TRACK[guild.id][user.id][action] = [
-            t for t in NUKE_TRACK[guild.id][user.id][action] if t > cutoff
-        ]
-        NUKE_TRACK[guild.id][user.id][action].append(now)
+            NUKE_TRACK[gid][uid][action].append(now)
+            cutoff = now - datetime.timedelta(seconds=10)
+            NUKE_TRACK[gid][uid][action] = [
+                t for t in NUKE_TRACK[gid][uid][action] if t > cutoff
+            ]
+            count     = len(NUKE_TRACK[gid][uid][action])
+            threshold = settings.get("anti_nuke_threshold", 3)
 
-        count = len(NUKE_TRACK[guild.id][user.id][action])
-        logger.debug(f"Nuke track: {user} in {guild.name} — {action} x{count}")
-
-        if count >= threshold:
-            NUKE_TRACK[guild.id][user.id][action] = []  # Reset
-            await self._trigger_anti_nuke(guild, user, action, count, settings)
+            if count >= threshold:
+                NUKE_TRACK[gid][uid][action] = []
+                await self._trigger_anti_nuke(guild, user, action, count, settings)
+                # Log to DB
+                try:
+                    async with self.bot.db._db_context() as db:
+                        await db.execute(
+                            "INSERT INTO antinuke_log (guild_id, user_id, action, count) "
+                            "VALUES (?,?,?,?)",
+                            (guild.id, user.id, action, count)
+                        )
+                        await db.commit()
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.error(f"track_nuke_action: {e}")
 
     async def _trigger_anti_nuke(self, guild, user, action, count, settings):
-        """Strip all roles, quarantine, alert admins, log everything."""
+        """Strip all dangerous roles, alert admins, log."""
         logger.warning(f"🚨 ANTI-NUKE: {user} in {guild.name} — {count}x {action}")
+        try:
+            if user.id != guild.owner_id:
+                safe_roles = [
+                    r for r in user.roles
+                    if not r.managed and r != guild.default_role
+                ]
+                if safe_roles:
+                    await user.remove_roles(
+                        *safe_roles,
+                        reason=f"XERO Anti-Nuke: {count}x {action} in 10s"
+                    )
+        except Exception as e:
+            logger.error(f"Anti-nuke role removal: {e}")
 
-        member = guild.get_member(user.id)
-        stripped_roles = []
-
-        if member and member.id != guild.owner_id:
-            # Save roles before stripping
-            saveable = [r for r in member.roles if not r.managed and r != guild.default_role]
-            stripped_roles = [r.id for r in saveable]
-
-            # Strip all non-managed roles
-            try:
-                await member.remove_roles(*saveable, reason=f"XERO Anti-Nuke: {count}x {action} in 10s")
-            except Exception as e:
-                logger.error(f"Anti-nuke role strip failed: {e}")
-
-            # Timeout for 10 minutes as extra safety
-            try:
-                until = discord.utils.utcnow() + datetime.timedelta(minutes=10)
-                await member.timeout(until, reason=f"XERO Anti-Nuke: {count}x {action}")
-            except Exception:
-                pass
-
-            # Save stripped roles in case of false positive restore
-            QUARANTINED.setdefault(guild.id, {})[user.id] = stripped_roles
-
-        # Build detailed alert embed
         embed = discord.Embed(
             title="🚨  ANTI-NUKE TRIGGERED",
             description=(
-                f"**Attacker:** {user.mention} (`{user.id}`)\n"
-                f"**Action:** `{action}` × **{count}** times in 10 seconds\n\n"
-                f"**Immediate response:**\n"
-                f"{'✅ All admin roles stripped' if stripped_roles else '⚠️ Could not strip roles'}\n"
-                f"{'✅ User timed out for 10 minutes' if member else '⚠️ User not in server'}\n\n"
-                f"**If this was a false positive:**\n"
-                f"`/security restore-roles @{user.name}` to undo"
+                f"**{user.mention}** (`{user.id}`) performed "
+                f"**{count}x `{action}`** within 10 seconds.\n\n"
+                f"**Action taken:** All administrative roles removed.\n"
+                f"Verify this person and use `/security restore-roles` if it was a mistake."
             ),
-            color=0xFF1744,
+            color=discord.Color.red(),
             timestamp=discord.utils.utcnow()
         )
-        embed.set_thumbnail(url=user.display_avatar.url if hasattr(user, 'display_avatar') else discord.Embed.Empty)
-        embed.add_field(name="Account Age", value=f"{(discord.utils.utcnow() - user.created_at).days}d old", inline=True)
-        embed.add_field(name="Stripped Roles", value=str(len(stripped_roles)), inline=True)
-        embed.set_footer(text="XERO Anti-Nuke  ·  Automatic Protection")
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.set_footer(text="XERO Anti-Nuke  •  Automatic Protection")
 
-        # Alert to log channel
         log_ch = guild.get_channel(settings.get("log_channel_id") or 0)
         if log_ch:
             try:
@@ -136,7 +111,6 @@ class Security(commands.GroupCog, name="security"):
             except Exception:
                 pass
 
-        # DM ALL admins (not just log channel)
         for m in guild.members:
             if m.guild_permissions.administrator and not m.bot and m.id != user.id:
                 try:
@@ -145,549 +119,584 @@ class Security(commands.GroupCog, name="security"):
                     pass
 
     # ══════════════════════════════════════════════════════════════════════
-    # RAID DETECTION ENGINE
+    # ALT ACCOUNT SCORING (called from events.py on_member_join)
     # ══════════════════════════════════════════════════════════════════════
 
-    async def check_raid(self, member: discord.Member):
-        """
-        Called on every member join.
-        Detects mass-join raids and auto-locks the server.
-        """
-        settings = await self.bot.db.get_guild_settings(member.guild.id)
-        if not settings or not settings.get("anti_nuke_enabled", 0):
-            return
+    async def check_alt_score(self, member: discord.Member):
+        """Calculate suspicion score. Auto-quarantine if >= 75."""
+        try:
+            score    = 0
+            factors  = []
+            now      = discord.utils.utcnow()
+            age_days = (now - member.created_at).days
 
-        guild = member.guild
-        now   = datetime.datetime.utcnow()
+            if age_days < 7:
+                score += 30; factors.append(f"+30  Account under 7 days old ({age_days}d)")
+            elif age_days < 30:
+                score += 20; factors.append(f"+20  Account under 30 days old ({age_days}d)")
 
-        JOIN_TRACK.setdefault(guild.id, [])
-        JOIN_TRACK[guild.id].append(now)
+            if member.display_avatar.key == member.default_avatar.key:
+                score += 15; factors.append("+15  Default avatar")
 
-        # Keep only last 10 seconds
-        cutoff = now - datetime.timedelta(seconds=10)
-        JOIN_TRACK[guild.id] = [t for t in JOIN_TRACK[guild.id] if t > cutoff]
-        join_count = len(JOIN_TRACK[guild.id])
+            # Random-looking username (all numbers or very short or long random)
+            name = member.name
+            if re.fullmatch(r'\d+', name):
+                score += 10; factors.append("+10  Username is all numbers")
+            elif re.fullmatch(r'[a-z0-9]{16,}', name.lower()):
+                score += 10; factors.append("+10  Username looks randomly generated")
 
-        # Raid threshold: 10 joins in 10 seconds
-        raid_threshold = int(settings.get("raid_threshold", 10))
-        if join_count >= raid_threshold and guild.id not in self._raid_locked:
-            await self._trigger_raid_lock(guild, join_count, settings)
-
-    async def _trigger_raid_lock(self, guild: discord.Guild, join_count: int, settings: dict):
-        """Lock all channels, alert admins, auto-unlock after 10 min."""
-        logger.warning(f"🚨 RAID DETECTED: {guild.name} — {join_count} joins in 10s")
-        self._raid_locked.add(guild.id)
-
-        # Lock all text channels for @everyone
-        locked = 0
-        for channel in guild.text_channels:
+            # Rejoins
             try:
-                overwrite = channel.overwrites_for(guild.default_role)
-                overwrite.send_messages = False
-                await channel.set_permissions(
-                    guild.default_role, overwrite=overwrite,
-                    reason=f"XERO Raid Lock: {join_count} joins in 10s"
+                async with self.bot.db._db_context() as db:
+                    async with db.execute(
+                        "SELECT COUNT(*) FROM member_join_history WHERE user_id=? AND guild_id=?",
+                        (member.id, member.guild.id)
+                    ) as c:
+                        rejoins = (await c.fetchone())[0]
+                if rejoins >= 3:
+                    score += 25; factors.append(f"+25  Rejoined {rejoins} times before")
+            except Exception:
+                pass
+
+            # Record this join
+            try:
+                async with self.bot.db._db_context() as db:
+                    await db.execute(
+                        "INSERT INTO member_join_history (user_id, guild_id) VALUES (?,?)",
+                        (member.id, member.guild.id)
+                    )
+                    await db.commit()
+            except Exception:
+                pass
+
+            if score < 30:
+                return  # Not suspicious
+
+            settings = await self.bot.db.get_guild_settings(member.guild.id)
+            log_ch   = member.guild.get_channel(settings.get("log_channel_id") or 0)
+
+            if score >= 50 and log_ch:
+                embed = discord.Embed(
+                    title="🔍  Alt Account Alert",
+                    description=(
+                        f"{member.mention} (`{member.id}`) joined with a "
+                        f"**suspicion score of {score}/100**"
+                    ),
+                    color=discord.Color.orange(),
+                    timestamp=discord.utils.utcnow()
                 )
-                locked += 1
-            except Exception:
-                pass
-
-        embed = discord.Embed(
-            title="🚨  RAID DETECTED — SERVER LOCKED",
-            description=(
-                f"**{join_count} accounts joined in 10 seconds.**\n\n"
-                f"**Action taken:**\n"
-                f"✅ {locked} channels locked for @everyone\n"
-                f"✅ Server will auto-unlock in **10 minutes**\n\n"
-                f"To unlock now: `/security unlock`\n"
-                f"To ban recent joiners: `/mod massban` with a reason"
-            ),
-            color=0xFF1744,
-            timestamp=discord.utils.utcnow()
-        )
-        embed.set_footer(text="XERO Raid Protection  ·  Auto-unlocks in 10 minutes")
-
-        log_ch = guild.get_channel(settings.get("log_channel_id") or 0)
-        if log_ch:
-            try:
-                await log_ch.send(content="@here", embed=embed)
-            except Exception:
-                pass
-        for m in guild.members:
-            if m.guild_permissions.administrator and not m.bot:
+                embed.add_field(name="Score Breakdown", value="\n".join(factors), inline=False)
+                embed.add_field(name="Account Age", value=f"{age_days} days", inline=True)
+                embed.add_field(name="Action",
+                                value="Auto-quarantined" if score >= 75 else "Alert only",
+                                inline=True)
+                embed.set_thumbnail(url=member.display_avatar.url)
+                embed.set_footer(text="XERO Alt Detection  •  /security alt-score to check manually")
                 try:
-                    await m.send(embed=embed)
+                    await log_ch.send(embed=embed)
                 except Exception:
                     pass
 
-    @tasks.loop(minutes=1)
-    async def unraid_check(self):
-        """Auto-unlock raid-locked guilds after 10 minutes."""
-        to_unlock = []
-        for guild_id in list(self._raid_locked):
-            guild = self.bot.get_guild(guild_id)
-            if not guild:
-                self._raid_locked.discard(guild_id)
-                continue
-            # Check if the join flood has settled
-            joins = JOIN_TRACK.get(guild_id, [])
-            cutoff = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
-            recent = [t for t in joins if t > cutoff]
-            if len(recent) < 5:  # Under 5 joins in last 10 minutes — safe
-                to_unlock.append(guild)
+            # Auto-quarantine at 75+
+            if score >= 75:
+                q_role_id = settings.get("quarantine_role_id")
+                if q_role_id:
+                    q_role = member.guild.get_role(q_role_id)
+                    if q_role:
+                        try:
+                            await member.add_roles(
+                                q_role,
+                                reason=f"XERO Alt Detection: suspicion score {score}"
+                            )
+                        except Exception:
+                            pass
 
-        for guild in to_unlock:
-            self._raid_locked.discard(guild.id)
-            for channel in guild.text_channels:
-                try:
-                    overwrite = channel.overwrites_for(guild.default_role)
-                    overwrite.send_messages = None  # Reset to default
-                    if not any(v is not None for v in [
-                        overwrite.send_messages, overwrite.read_messages,
-                        overwrite.add_reactions
-                    ]):
-                        await channel.set_permissions(guild.default_role, overwrite=None, reason="XERO Raid auto-unlock")
-                    else:
-                        await channel.set_permissions(guild.default_role, overwrite=overwrite, reason="XERO Raid auto-unlock")
-                except Exception:
-                    pass
-            settings = await self.bot.db.get_guild_settings(guild.id)
-            log_ch = guild.get_channel((settings or {}).get("log_channel_id") or 0)
-            if log_ch:
-                try:
-                    await log_ch.send(embed=discord.Embed(
-                        description="✅ **Server auto-unlocked.** Raid threat has settled.",
-                        color=0x00FF94
-                    ))
-                except Exception:
-                    pass
-
-    @unraid_check.before_loop
-    async def before_unraid(self):
-        await self.bot.wait_until_ready()
+        except Exception as e:
+            logger.error(f"check_alt_score: {e}")
 
     # ══════════════════════════════════════════════════════════════════════
     # SLASH COMMANDS
     # ══════════════════════════════════════════════════════════════════════
 
-    @app_commands.command(name="setup", description="View all active security settings for this server.")
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.command(name="setup",
+                          description="Security dashboard — view all settings + recent actions.")
+    @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         s = await self.bot.db.get_guild_settings(interaction.guild.id)
-        if not s:
-            return await interaction.response.send_message(
-                embed=error_embed("Not Found", "Run `/config dashboard` to initialize settings first."),
-                ephemeral=True
-            )
 
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
-            try:
-                async with db.execute("SELECT domain FROM allowed_domains WHERE guild_id=?", (interaction.guild.id,)) as c:
-                    domains = [r[0] for r in await c.fetchall()]
-            except Exception:
-                domains = []
+        def tog(v, on="✅ On", off="❌ Off"): return on if v else off
 
-        def tog(v): return "✅ On" if v else "❌ Off"
-
-        embed = discord.Embed(
-            title=f"🔒  Security — {interaction.guild.name}",
-            color=0x00D4FF,
-            timestamp=discord.utils.utcnow()
+        embed = comprehensive_embed(
+            title=f"🔒  Security Dashboard — {interaction.guild.name}",
+            color=XERO.PRIMARY
         )
-        embed.add_field(
-            name="🚨 Anti-Nuke",
-            value=(
-                f"{tog(s.get('anti_nuke_enabled', 0))}\n"
-                f"Threshold: **{s.get('anti_nuke_threshold', 3)}** actions / 10s\n"
-                f"Raid lockdown: **{s.get('raid_threshold', 10)}** joins / 10s"
-            ),
-            inline=True
-        )
-        embed.add_field(
-            name="👶 Account Age Filter",
-            value=(
-                f"Minimum: **{s.get('min_account_age_days', 0)}** days\n"
-                f"Action: **{s.get('account_age_action', 'disabled')}**"
-            ),
-            inline=True
-        )
-        embed.add_field(
-            name="🔗 Link Filter",
-            value=(
-                f"{tog(s.get('link_filter_enabled', 0))}\n"
-                f"Allowed: **{len(domains)}** domain(s)"
-            ),
-            inline=True
-        )
-        embed.add_field(name="💾 Role Restore", value=tog(s.get("role_restore_enabled", 0)), inline=True)
-        embed.add_field(name="🔒 Raid Lock", value="🔴 ACTIVE" if interaction.guild.id in self._raid_locked else "🟢 Normal", inline=True)
+        embed.add_field(name="🚨 Anti-Nuke", value=(
+            f"{tog(s.get('anti_nuke_enabled',0))}\n"
+            f"Threshold: **{s.get('anti_nuke_threshold',3)}** actions/10s"
+        ), inline=True)
+        embed.add_field(name="👶 Account Age", value=(
+            f"Min: **{s.get('min_account_age_days',0)}d**\n"
+            f"Action: `{s.get('account_age_action','kick_dm')}`"
+        ), inline=True)
+        embed.add_field(name="🔗 Link Filter", value=(
+            f"{tog(s.get('link_filter_enabled',0))}"
+        ), inline=True)
+        embed.add_field(name="💾 Role Restore",  value=tog(s.get("role_restore_enabled",0)), inline=True)
+        embed.add_field(name="🪝 Webhook Prot.", value=tog(s.get("webhook_protection_enabled",1)), inline=True)
+        embed.add_field(name="🤖 Bot Prot.",     value=tog(s.get("bot_protection_enabled",0)), inline=True)
+        embed.add_field(name="🔐 Perm Watchdog", value=tog(s.get("perm_watchdog_enabled",1)), inline=True)
 
-        if domains:
-            embed.add_field(
-                name="✅ Allowed Domains",
-                value="\n".join(f"`{d}`" for d in domains[:10]),
-                inline=False
-            )
+        # Raid mode
+        raid_on     = s.get("raid_mode_enabled", 0)
+        raid_until  = s.get("raid_mode_until")
+        raid_status = "✅ ACTIVE" if raid_on else "❌ Off"
+        if raid_on and raid_until:
+            raid_status += f"\nExpires: <t:{int(datetime.datetime.fromisoformat(str(raid_until)).timestamp())}:R>"
+        embed.add_field(name="⚡ Raid Mode", value=raid_status, inline=True)
 
-        embed.add_field(
-            name="📋 Commands",
-            value=(
-                "`/security anti-nuke` — configure anti-nuke\n"
-                "`/security account-age` — block new accounts\n"
-                "`/security link-filter` — manage link allowlist\n"
-                "`/security role-restore` — toggle role restore\n"
-                "`/security lockdown` — manual server lockdown\n"
-                "`/security unlock` — unlock server\n"
-                "`/security quarantine @user` — soft-lock a user\n"
-                "`/security restore-roles @user` — restore after nuke"
-            ),
-            inline=False
-        )
-        embed.set_footer(text="XERO Security  ·  Protecting your server 24/7")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        # Quarantine count
+        q_count = 0
+        try:
+            async with self.bot.db._db_context() as db:
+                async with db.execute(
+                    "SELECT COUNT(*) FROM aegis_quarantine WHERE guild_id=? AND status='pending'",
+                    (interaction.guild.id,)
+                ) as c:
+                    q_count = (await c.fetchone())[0]
+        except Exception:
+            pass
+        embed.add_field(name="🔒 Quarantined", value=str(q_count), inline=True)
 
-    @app_commands.command(name="anti-nuke", description="Configure anti-nuke protection — stops server destruction instantly.")
-    @app_commands.describe(
-        enabled="Enable or disable anti-nuke",
-        threshold="Destructive actions in 10s to trigger (2-10, default 3)",
-        raid_threshold="Joins in 10s to trigger raid lock (5-50, default 10)"
-    )
+        # Last 5 anti-nuke triggers
+        recent = []
+        try:
+            async with self.bot.db._db_context() as db:
+                async with db.execute(
+                    "SELECT user_id, action, count, triggered_at FROM antinuke_log "
+                    "WHERE guild_id=? ORDER BY triggered_at DESC LIMIT 5",
+                    (interaction.guild.id,)
+                ) as c:
+                    recent = await c.fetchall()
+        except Exception:
+            pass
+
+        if recent:
+            lines = []
+            for uid, act, cnt, ts in recent:
+                lines.append(f"<@{uid}>  **{cnt}x {act}**  `{str(ts)[:16]}`")
+            embed.add_field(name="🕓 Recent Anti-Nuke Triggers",
+                            value="\n".join(lines), inline=False)
+
+        embed.add_field(name="Commands", value=(
+            "`/security anti-nuke` · `/security account-age` · `/security link-filter`\n"
+            "`/security role-restore` · `/security raid-mode` · `/security alt-score`\n"
+            "`/security webhook-protection` · `/security bot-protection`\n"
+            "`/security lockdown` · `/security unlock` · `/security restore-roles`"
+        ), inline=False)
+        embed.set_footer(text="XERO Security  •  Beating WickBot — free")
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="anti-nuke",
+                          description="Toggle anti-nuke protection.")
+    @app_commands.describe(enabled="Enable/disable", threshold="Actions in 10s to trigger (2–10)")
     @app_commands.checks.has_permissions(administrator=True)
     async def anti_nuke(self, interaction: discord.Interaction,
-                         enabled: bool,
-                         threshold: int = 3,
-                         raid_threshold: int = 10):
-        threshold      = max(2, min(10, threshold))
-        raid_threshold = max(5, min(50, raid_threshold))
-
+                        enabled: bool, threshold: int = 3):
+        threshold = max(2, min(10, threshold))
         await self.bot.db.update_guild_setting(interaction.guild.id, "anti_nuke_enabled",   1 if enabled else 0)
         await self.bot.db.update_guild_setting(interaction.guild.id, "anti_nuke_threshold", threshold)
-        await self.bot.db.update_guild_setting(interaction.guild.id, "raid_threshold",      raid_threshold)
-
-        embed = discord.Embed(
-            title=f"🛡️  Anti-Nuke {'Enabled' if enabled else 'Disabled'}",
-            color=0x00FF94 if enabled else 0xFF1744,
-            timestamp=discord.utils.utcnow()
+        embed = success_embed(
+            f"Anti-Nuke {'Enabled' if enabled else 'Disabled'}",
+            f"**Status:** {'✅ Active' if enabled else '❌ Inactive'}\n"
+            f"**Trigger:** {threshold} destructive actions within 10 seconds\n"
+            f"**Watches:** channel delete, role delete, mass ban, webhook create, "
+            f"permission escalation, bulk message delete, emoji delete\n"
+            f"**Response:** All admin roles stripped instantly + DM all admins"
         )
-        if enabled:
-            embed.description = (
-                "Your server is now protected against nukes and raids.\n\n"
-                "**What XERO watches:**\n"
-                "• Mass channel deletions\n"
-                "• Mass role deletions\n"
-                "• Mass bans / kicks\n"
-                "• Webhook spam\n"
-                "• Bot additions by non-admins\n"
-                "• Permission escalation attempts\n\n"
-                "**Response:**\n"
-                "→ Strip all admin roles instantly\n"
-                "→ Timeout user for 10 minutes\n"
-                "→ DM all admins immediately\n"
-                "→ Log with full audit context"
-            )
-        embed.add_field(name="Nuke Threshold",   value=f"**{threshold}** actions / 10s", inline=True)
-        embed.add_field(name="Raid Threshold",   value=f"**{raid_threshold}** joins / 10s", inline=True)
-        embed.set_footer(text="XERO Security  ·  Better than Wick. Free.")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="account-age", description="Block accounts younger than X days. Kills raid bots instantly.")
-    @app_commands.describe(
-        days="Minimum account age in days (0 = disabled, 7 recommended for raids)",
-        action="What to do with underage accounts"
-    )
+    @app_commands.command(name="account-age",
+                          description="Block accounts younger than X days from joining.")
+    @app_commands.describe(days="Minimum age in days (0 = disabled)",
+                           action="Action for underage accounts")
     @app_commands.choices(action=[
-        app_commands.Choice(name="Kick silently",        value="kick"),
-        app_commands.Choice(name="Kick + DM reason",     value="kick_dm"),
-        app_commands.Choice(name="Ban permanently",       value="ban"),
-        app_commands.Choice(name="Quarantine role",       value="quarantine"),
+        app_commands.Choice(name="Kick silently",    value="kick"),
+        app_commands.Choice(name="Kick + DM reason", value="kick_dm"),
+        app_commands.Choice(name="Ban",              value="ban"),
     ])
     @app_commands.checks.has_permissions(administrator=True)
-    async def account_age(self, interaction: discord.Interaction, days: int, action: str = "kick_dm"):
+    async def account_age(self, interaction: discord.Interaction,
+                          days: int, action: str = "kick_dm"):
         days = max(0, min(365, days))
         await self.bot.db.update_guild_setting(interaction.guild.id, "min_account_age_days", days)
-        await self.bot.db.update_guild_setting(interaction.guild.id, "account_age_action",   action)
+        await self.bot.db.update_guild_setting(interaction.guild.id, "account_age_action",  action)
+        msg = (f"Accounts under **{days} days** will be **{action.replace('_',' ')}** on join.\n"
+               f"*Most raid bots use accounts <7 days old. Setting 7+ blocks ~90% of raids.*"
+               if days > 0 else "Account age filter **disabled**.")
+        await interaction.response.send_message(embed=success_embed("Account Age Filter", msg))
 
-        if days == 0:
-            await interaction.response.send_message(
-                embed=success_embed("Account Age Filter Disabled", "All accounts can now join regardless of age.")
-            )
-        else:
-            embed = discord.Embed(
-                title="👶  Account Age Filter Set",
-                color=0x00FF94,
-                timestamp=discord.utils.utcnow()
-            )
-            embed.add_field(name="Minimum Age", value=f"**{days}** days",                         inline=True)
-            embed.add_field(name="Action",      value=action.replace("_", " ").title(),            inline=True)
-            embed.description = (
-                f"Accounts younger than **{days} days** will be **{action.replace('_',' ')}**d on join.\n\n"
-                f"💡 **Tip:** Setting **7 days** blocks ~90% of raid bots.\n"
-                f"Setting **30 days** blocks almost all automation accounts."
-            )
-            embed.set_footer(text="XERO Security  ·  Account Age Protection")
-            await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="link-filter", description="Control which links are allowed. Block all except approved domains.")
-    @app_commands.describe(
-        enabled="Enable or disable link filter",
-        add_domain="Allow a domain (e.g. youtube.com)",
-        remove_domain="Remove a domain from allowlist"
-    )
+    @app_commands.command(name="link-filter",
+                          description="Block external links. Manage allowed domains.")
+    @app_commands.describe(enabled="Enable/disable", add_domain="Allow this domain",
+                           remove_domain="Remove this domain")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def link_filter(self, interaction: discord.Interaction,
-                           enabled: bool = None,
-                           add_domain: str = None,
-                           remove_domain: str = None):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+                          enabled: bool = None,
+                          add_domain: str = None,
+                          remove_domain: str = None):
+        async with self.bot.db._db_context() as db:
             await db.execute(
-                "CREATE TABLE IF NOT EXISTS allowed_domains"
-                " (guild_id INTEGER, domain TEXT, PRIMARY KEY(guild_id, domain))"
+                "CREATE TABLE IF NOT EXISTS allowed_domains "
+                "(guild_id INTEGER, domain TEXT, PRIMARY KEY(guild_id, domain))"
             )
+            if enabled is not None:
+                await self.bot.db.update_guild_setting(
+                    interaction.guild.id, "link_filter_enabled", 1 if enabled else 0
+                )
+            if add_domain:
+                d = add_domain.lower().strip().replace("https://","").replace("http://","").split("/")[0]
+                await db.execute(
+                    "INSERT OR IGNORE INTO allowed_domains VALUES (?,?)",
+                    (interaction.guild.id, d)
+                )
+            if remove_domain:
+                d = remove_domain.lower().strip().replace("https://","").replace("http://","").split("/")[0]
+                await db.execute(
+                    "DELETE FROM allowed_domains WHERE guild_id=? AND domain=?",
+                    (interaction.guild.id, d)
+                )
             await db.commit()
-
-        if enabled is not None:
-            await self.bot.db.update_guild_setting(interaction.guild.id, "link_filter_enabled", 1 if enabled else 0)
-
-        if add_domain:
-            domain = add_domain.lower().strip().replace("https://", "").replace("http://", "").split("/")[0]
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
-                await db.execute("INSERT OR IGNORE INTO allowed_domains (guild_id, domain) VALUES (?,?)", (interaction.guild.id, domain))
-                await db.commit()
-
-        if remove_domain:
-            domain = remove_domain.lower().strip().replace("https://", "").replace("http://", "").split("/")[0]
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
-                await db.execute("DELETE FROM allowed_domains WHERE guild_id=? AND domain=?", (interaction.guild.id, domain))
-                await db.commit()
-
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
-            async with db.execute("SELECT domain FROM allowed_domains WHERE guild_id=? ORDER BY domain", (interaction.guild.id,)) as c:
+            async with db.execute(
+                "SELECT domain FROM allowed_domains WHERE guild_id=? ORDER BY domain",
+                (interaction.guild.id,)
+            ) as c:
                 domains = [r[0] for r in await c.fetchall()]
 
-        settings = await self.bot.db.get_guild_settings(interaction.guild.id)
-        status   = "✅ Active" if settings.get("link_filter_enabled", 0) else "❌ Inactive"
+        s      = await self.bot.db.get_guild_settings(interaction.guild.id)
+        status = "✅ Active" if s.get("link_filter_enabled") else "❌ Inactive"
+        dlist  = "\n".join(f"• `{d}`" for d in domains) if domains else "*None — all links blocked when enabled*"
+        await interaction.response.send_message(embed=success_embed(
+            "Link Filter", f"**Status:** {status}\n\n**Allowed Domains:**\n{dlist}\n\n"
+            "*discord.com, tenor.com, giphy.com always allowed.*"
+        ))
 
-        embed = discord.Embed(
-            title="🔗  Link Filter",
-            color=0x00D4FF,
-            timestamp=discord.utils.utcnow()
-        )
-        embed.add_field(name="Status", value=status, inline=True)
-        embed.add_field(name="Allowed Domains", value=str(len(domains)), inline=True)
-        embed.add_field(
-            name="Always Allowed",
-            value="`discord.com` `discord.gg` `tenor.com` `giphy.com`",
-            inline=False
-        )
-        if domains:
-            embed.add_field(
-                name="Your Allowlist",
-                value="\n".join(f"`{d}`" for d in domains[:15]),
-                inline=False
-            )
-        else:
-            embed.add_field(name="Your Allowlist", value="Empty — add with `/security link-filter add_domain:youtube.com`", inline=False)
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="role-restore", description="Save and restore member roles when they rejoin. MEE6 charges for this — we don't.")
-    @app_commands.describe(enabled="Enable or disable role restore")
+    @app_commands.command(name="role-restore",
+                          description="Automatically restore roles when a member rejoins.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def role_restore(self, interaction: discord.Interaction, enabled: bool):
-        await self.bot.db.update_guild_setting(interaction.guild.id, "role_restore_enabled", 1 if enabled else 0)
-        if enabled:
-            await interaction.response.send_message(embed=success_embed(
-                "✅ Role Restore Enabled",
-                "When a member leaves and rejoins, their roles are automatically restored.\n\n"
-                "**How it works:**\n"
-                "• Roles are saved when a member leaves\n"
-                "• Restored automatically on rejoin\n"
-                "• Managed/integration roles excluded\n"
-                "• Works even if they were gone for months"
-            ))
-        else:
-            await interaction.response.send_message(embed=info_embed("Role Restore Disabled", "Roles will no longer be saved or restored."))
+        await self.bot.db.update_guild_setting(
+            interaction.guild.id, "role_restore_enabled", 1 if enabled else 0
+        )
+        msg = (
+            "Roles are saved when members leave and restored on rejoin.\n"
+            "Managed/integration roles are excluded."
+            if enabled else "Role restore disabled."
+        )
+        await interaction.response.send_message(embed=success_embed("Role Restore", msg))
 
-    @app_commands.command(name="lockdown", description="Lock ALL channels for @everyone instantly. Use during raids or emergencies.")
-    @app_commands.describe(reason="Reason for lockdown (shown in logs)")
+    @app_commands.command(name="webhook-protection",
+                          description="Auto-delete webhooks created by non-admins.")
     @app_commands.checks.has_permissions(administrator=True)
-    @command_guard
-    async def lockdown(self, interaction: discord.Interaction, reason: str = "Manual lockdown"):
+    async def webhook_protection(self, interaction: discord.Interaction, enabled: bool):
+        await self.bot.db.update_guild_setting(
+            interaction.guild.id, "webhook_protection_enabled", 1 if enabled else 0
+        )
+        msg = (
+            "**Webhook Protection ON**\n"
+            "Any webhook created by a non-admin will be instantly deleted and the "
+            "attempt logged. Stops phishing attacks dead."
+            if enabled else "Webhook protection disabled."
+        )
+        await interaction.response.send_message(embed=success_embed("Webhook Protection", msg))
+
+    @app_commands.command(name="bot-protection",
+                          description="Block bots added without Manage Server permission.")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def security_bot_protection(self, interaction: discord.Interaction, enabled: bool):
+        await self.bot.db.update_guild_setting(
+            interaction.guild.id, "bot_protection_enabled", 1 if enabled else 0
+        )
+        msg = (
+            "**Bot Protection ON**\n"
+            "If a bot is added by someone without **Manage Server** permission, "
+            "it will be kicked immediately and all admins alerted."
+            if enabled else "Bot protection disabled."
+        )
+        await interaction.response.send_message(embed=success_embed("Bot Protection", msg))
+
+    @app_commands.command(name="raid-mode",
+                          description="Pre-emptively lock server against raids.")
+    @app_commands.describe(
+        enabled="Enable or disable raid mode",
+        duration_minutes="Auto-disable after this many minutes (0 = manual)",
+        min_age_days="Kick any joining account younger than this (default 7)"
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def raid_mode(self, interaction: discord.Interaction,
+                        enabled: bool,
+                        duration_minutes: int = 30,
+                        min_age_days: int = 7):
+        await interaction.response.defer()
+        guild = interaction.guild
+
+        if enabled:
+            # Set @everyone view_channel=False in all text channels
+            locked_count = 0
+            for ch in guild.text_channels:
+                try:
+                    overwrite = ch.overwrites_for(guild.default_role)
+                    overwrite.send_messages = False
+                    await ch.set_permissions(
+                        guild.default_role, overwrite=overwrite,
+                        reason="XERO Raid Mode activated"
+                    )
+                    locked_count += 1
+                except Exception:
+                    pass
+
+            expires = None
+            if duration_minutes > 0:
+                expires = (datetime.datetime.now() +
+                           datetime.timedelta(minutes=duration_minutes)).isoformat()
+
+            await self.bot.db.update_guild_setting(guild.id, "raid_mode_enabled",      1)
+            await self.bot.db.update_guild_setting(guild.id, "raid_mode_until",        expires)
+            await self.bot.db.update_guild_setting(guild.id, "raid_mode_min_age_days", min_age_days)
+
+            expire_txt = (f"Auto-disables in **{duration_minutes}m**"
+                          if duration_minutes > 0 else "Manual disable required")
+            embed = discord.Embed(
+                title="⚡  RAID MODE ACTIVE",
+                description=(
+                    f"**{locked_count}** channels locked.\n"
+                    f"Accounts under **{min_age_days} days** old will be kicked on join.\n"
+                    f"{expire_txt}\n\n"
+                    f"Run `/security raid-mode enabled:False` to disable."
+                ),
+                color=discord.Color.red(),
+                timestamp=discord.utils.utcnow()
+            )
+            await interaction.followup.send(embed=embed)
+
+            # Schedule auto-disable
+            if duration_minutes > 0:
+                async def _auto_disable():
+                    await asyncio.sleep(duration_minutes * 60)
+                    try:
+                        s = await self.bot.db.get_guild_settings(guild.id)
+                        if s.get("raid_mode_enabled"):
+                            await self._disable_raid_mode(guild)
+                    except Exception:
+                        pass
+                asyncio.create_task(_auto_disable())
+        else:
+            await self._disable_raid_mode(guild)
+            await interaction.followup.send(embed=success_embed(
+                "Raid Mode Disabled",
+                "Server channels have been unlocked and raid mode is off."
+            ))
+
+    async def _disable_raid_mode(self, guild: discord.Guild):
+        """Unlock all channels and clear raid mode settings."""
+        try:
+            for ch in guild.text_channels:
+                try:
+                    overwrite = ch.overwrites_for(guild.default_role)
+                    if overwrite.send_messages is False:
+                        overwrite.send_messages = None
+                        await ch.set_permissions(
+                            guild.default_role, overwrite=overwrite,
+                            reason="XERO Raid Mode deactivated"
+                        )
+                except Exception:
+                    pass
+            await self.bot.db.update_guild_setting(guild.id, "raid_mode_enabled", 0)
+            await self.bot.db.update_guild_setting(guild.id, "raid_mode_until",   None)
+        except Exception as e:
+            logger.error(f"_disable_raid_mode: {e}")
+
+    @app_commands.command(name="lockdown",
+                          description="Lock all channels — stores exact permission snapshot for restore.")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def lockdown(self, interaction: discord.Interaction):
         await interaction.response.defer()
         guild  = interaction.guild
         locked = 0
-        failed = 0
+        LOCKDOWN_SNAPSHOTS[guild.id] = {}
 
-        for channel in guild.text_channels:
+        for ch in guild.text_channels:
             try:
-                overwrite = channel.overwrites_for(guild.default_role)
-                overwrite.send_messages = False
-                await channel.set_permissions(
-                    guild.default_role, overwrite=overwrite,
-                    reason=f"XERO Lockdown by {interaction.user}: {reason}"
+                # Snapshot existing overwrites for @everyone
+                existing = ch.overwrites_for(guild.default_role)
+                LOCKDOWN_SNAPSHOTS[guild.id][ch.id] = existing
+                # Lock
+                lock_ow = discord.PermissionOverwrite(**{k: v for k, v in existing})
+                lock_ow.send_messages = False
+                await ch.set_permissions(
+                    guild.default_role, overwrite=lock_ow,
+                    reason="XERO Lockdown"
                 )
                 locked += 1
             except Exception:
-                failed += 1
-
-        self._raid_locked.add(guild.id)
+                pass
 
         embed = discord.Embed(
             title="🔒  Server Locked Down",
             description=(
-                f"**{locked}** channels locked  ·  {failed} failed\n"
-                f"**Reason:** {reason}\n"
-                f"**By:** {interaction.user.mention}\n\n"
-                f"Use `/security unlock` to restore normal access."
+                f"**{locked}** channels locked.\n"
+                f"Permission snapshots saved — `/security unlock` will restore exact previous state.\n\n"
+                f"*Use only in emergencies. Inform your team.*"
             ),
-            color=0xFF1744,
+            color=discord.Color.red(),
             timestamp=discord.utils.utcnow()
         )
-        embed.set_footer(text="XERO Security  ·  Emergency Lockdown")
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="unlock", description="Unlock all channels after a lockdown.")
-    @app_commands.checks.has_permissions(administrator=True)
-    @command_guard
+    @app_commands.command(name="unlock",
+                          description="Unlock all channels and restore exact previous permissions.")
+    @app_commands.checks.has_permissions(manage_guild=True)
     async def unlock(self, interaction: discord.Interaction):
         await interaction.response.defer()
         guild    = interaction.guild
-        unlocked = 0
+        restored = 0
+        snapshot = LOCKDOWN_SNAPSHOTS.get(guild.id, {})
 
-        for channel in guild.text_channels:
+        for ch in guild.text_channels:
             try:
-                overwrite = channel.overwrites_for(guild.default_role)
-                overwrite.send_messages = None
-                if not any(v is not None for k, v in overwrite):
-                    await channel.set_permissions(guild.default_role, overwrite=None, reason="XERO Unlock")
+                if ch.id in snapshot:
+                    # Restore exact pre-lockdown permissions
+                    await ch.set_permissions(
+                        guild.default_role, overwrite=snapshot[ch.id],
+                        reason="XERO Unlock: restoring pre-lockdown permissions"
+                    )
                 else:
-                    await channel.set_permissions(guild.default_role, overwrite=overwrite, reason="XERO Unlock")
-                unlocked += 1
+                    # No snapshot — just re-enable send_messages
+                    ow = ch.overwrites_for(guild.default_role)
+                    ow.send_messages = None
+                    await ch.set_permissions(
+                        guild.default_role, overwrite=ow,
+                        reason="XERO Unlock"
+                    )
+                restored += 1
             except Exception:
                 pass
 
-        self._raid_locked.discard(guild.id)
+        if guild.id in LOCKDOWN_SNAPSHOTS:
+            del LOCKDOWN_SNAPSHOTS[guild.id]
+
         await interaction.followup.send(embed=success_embed(
-            "🔓  Server Unlocked",
-            f"**{unlocked}** channels restored to normal.\n"
-            f"Members can send messages again."
+            "Server Unlocked",
+            f"**{restored}** channels restored to their pre-lockdown permission state."
         ))
 
-    @app_commands.command(name="quarantine", description="Silently remove all roles from a user and give them a quarantine role.")
-    @app_commands.describe(user="User to quarantine", reason="Reason")
-    @app_commands.checks.has_permissions(manage_roles=True)
-    @command_guard
-    async def quarantine(self, interaction: discord.Interaction, user: discord.Member, reason: str = "Suspicious activity"):
+    @app_commands.command(name="alt-score",
+                          description="Check the alt/suspicion score for a user.")
+    @app_commands.describe(user="User to check")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def alt_score(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True)
+        now      = discord.utils.utcnow()
+        age_days = (now - user.created_at).days
 
-        # Create quarantine role if it doesn't exist
-        q_role = discord.utils.get(interaction.guild.roles, name="Quarantined")
-        if not q_role:
-            try:
-                q_role = await interaction.guild.create_role(
-                    name="Quarantined",
-                    color=discord.Color.dark_gray(),
-                    reason="XERO Security — Quarantine role"
-                )
-                # Deny send messages in all channels
-                for channel in interaction.guild.text_channels:
-                    try:
-                        await channel.set_permissions(q_role, send_messages=False, add_reactions=False)
-                    except Exception:
-                        pass
-            except Exception as e:
-                return await interaction.followup.send(embed=error_embed("Failed", f"Could not create quarantine role: {e}"), ephemeral=True)
+        score   = 0
+        factors = []
 
-        # Save current roles
-        current_roles = [r for r in user.roles if not r.managed and r != interaction.guild.default_role]
-        QUARANTINED.setdefault(interaction.guild.id, {})[user.id] = [r.id for r in current_roles]
+        if age_days < 7:
+            score += 30; factors.append(f"+30  Account under 7 days ({age_days}d)")
+        elif age_days < 30:
+            score += 20; factors.append(f"+20  Account under 30 days ({age_days}d)")
 
-        # Strip roles and add quarantine
+        if user.display_avatar.key == user.default_avatar.key:
+            score += 15; factors.append("+15  Default avatar")
+
+        name = user.name
+        if re.fullmatch(r'\d+', name):
+            score += 10; factors.append("+10  Username is all numbers")
+        elif re.fullmatch(r'[a-z0-9]{16,}', name.lower()):
+            score += 10; factors.append("+10  Username looks randomly generated")
+
+        rejoins = 0
         try:
-            await user.remove_roles(*current_roles, reason=f"XERO Quarantine: {reason}")
-            await user.add_roles(q_role, reason=f"XERO Quarantine by {interaction.user}: {reason}")
-        except discord.Forbidden:
-            return await interaction.followup.send(embed=error_embed("No Permission", "I can't manage that user's roles."), ephemeral=True)
-
-        # DM user
-        try:
-            await user.send(embed=discord.Embed(
-                title=f"⚠️  Quarantined in {interaction.guild.name}",
-                description=f"You have been quarantined by a staff member.\n**Reason:** {reason}\n\nPlease contact a staff member if you believe this is an error.",
-                color=0xFFB800
-            ))
+            async with self.bot.db._db_context() as db:
+                async with db.execute(
+                    "SELECT COUNT(*) FROM member_join_history WHERE user_id=? AND guild_id=?",
+                    (user.id, interaction.guild.id)
+                ) as c:
+                    rejoins = (await c.fetchone())[0]
         except Exception:
             pass
 
-        await interaction.followup.send(embed=success_embed(
-            "User Quarantined",
-            f"{user.mention} has been quarantined.\n**Reason:** {reason}\n**Roles saved:** {len(current_roles)}\n\nUse `/security restore-roles` to unquarantine."
-        ), ephemeral=True)
+        if rejoins >= 3:
+            score += 25; factors.append(f"+25  Rejoined {rejoins} times")
 
-    @app_commands.command(name="restore-roles", description="Restore all roles for a user (after quarantine or anti-nuke false positive).")
-    @app_commands.describe(user="User to restore")
+        risk_label = (
+            "🟢 Low"    if score < 30 else
+            "🟡 Medium" if score < 50 else
+            "🟠 High"   if score < 75 else
+            "🔴 Very High — auto-quarantine threshold"
+        )
+
+        embed = discord.Embed(
+            title=f"🔍  Alt Score — {user.display_name}",
+            color=discord.Color.red() if score >= 75 else
+                  discord.Color.orange() if score >= 50 else
+                  discord.Color.green(),
+            timestamp=discord.utils.utcnow()
+        )
+        embed.add_field(name="Score",       value=f"**{score} / 100**", inline=True)
+        embed.add_field(name="Risk Level",  value=risk_label, inline=True)
+        embed.add_field(name="Account Age", value=f"{age_days} days", inline=True)
+        if factors:
+            embed.add_field(name="Score Breakdown", value="\n".join(factors), inline=False)
+        else:
+            embed.add_field(name="Score Breakdown", value="No risk factors detected.", inline=False)
+        embed.set_thumbnail(url=user.display_avatar.url)
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="restore-roles",
+                          description="Manually restore saved roles for a member.")
+    @app_commands.describe(user="Member to restore roles for")
     @app_commands.checks.has_permissions(manage_roles=True)
-    @command_guard
-    async def restore_roles(self, interaction: discord.Interaction, user: discord.Member):
+    async def restore_roles_cmd(self, interaction: discord.Interaction, user: discord.Member):
         await interaction.response.defer(ephemeral=True)
+        async with self.bot.db._db_context() as db:
+            async with db.execute(
+                "SELECT role_ids FROM member_roles WHERE user_id=? AND guild_id=?",
+                (user.id, interaction.guild.id)
+            ) as c:
+                row = await c.fetchone()
 
-        # Check in-memory quarantine first
-        role_ids = QUARANTINED.get(interaction.guild.id, {}).pop(user.id, None)
-
-        # Fall back to DB
-        if not role_ids:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
-                try:
-                    async with db.execute(
-                        "SELECT role_ids FROM member_roles WHERE user_id=? AND guild_id=?",
-                        (user.id, interaction.guild.id)
-                    ) as c:
-                        row = await c.fetchone()
-                    if row and row[0]:
-                        role_ids = [int(r) for r in row[0].split(",") if r.strip()]
-                except Exception:
-                    role_ids = []
-
-        if not role_ids:
+        if not row or not row[0]:
             return await interaction.followup.send(
-                embed=error_embed("No Saved Roles", f"No saved roles found for {user.mention}."),
+                embed=error_embed("No Saved Roles", f"No roles saved for {user.mention}."),
                 ephemeral=True
             )
 
-        restored = []
-        failed   = []
-
-        # Remove quarantine role if they have it
-        q_role = discord.utils.get(interaction.guild.roles, name="Quarantined")
-        if q_role and q_role in user.roles:
-            try:
-                await user.remove_roles(q_role, reason=f"XERO Restore by {interaction.user}")
-            except Exception:
-                pass
-
+        role_ids = [int(r) for r in row[0].split(",") if r.strip()]
+        restored, failed = [], []
         for rid in role_ids:
             role = interaction.guild.get_role(rid)
-            if role and not role.managed and role != interaction.guild.default_role:
+            if role and role not in user.roles and not role.managed:
                 try:
                     await user.add_roles(role, reason=f"XERO Role Restore by {interaction.user}")
                     restored.append(role.mention)
                 except Exception:
                     failed.append(role.name)
 
-        embed = discord.Embed(
-            title="✅  Roles Restored",
-            color=0x00FF94,
-            timestamp=discord.utils.utcnow()
+        embed = success_embed(
+            "Roles Restored",
+            f"**{user.mention}** — restored **{len(restored)}** role(s)\n"
+            + (", ".join(restored) if restored else "None restored")
+            + (f"\n⚠️ Failed: {', '.join(failed)}" if failed else "")
         )
-        embed.add_field(name="User",     value=user.mention,           inline=True)
-        embed.add_field(name="Restored", value=str(len(restored)),     inline=True)
-        embed.add_field(name="Failed",   value=str(len(failed)) or "0", inline=True)
-        if restored:
-            embed.add_field(name="Roles Given", value=", ".join(restored[:10])[:900], inline=False)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="view", description="View full security configuration.")
+    @app_commands.command(name="view",
+                          description="View all current security settings.")
     @app_commands.checks.has_permissions(manage_guild=True)
     async def view(self, interaction: discord.Interaction):
+        # Redirect to setup (which is now the full dashboard)
         await self.setup.callback(self, interaction)
 
 

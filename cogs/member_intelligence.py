@@ -1,3 +1,5 @@
+from utils.guard import command_guard
+from discord import app_commands
 """
 XERO Bot — Passive Member Intelligence + Always-On AI
 
@@ -30,7 +32,7 @@ Relevance threshold: only replies if confidence > 0.72
 """
 import discord, aiosqlite, asyncio, json, logging, datetime, random
 from discord.ext import commands, tasks
-from utils.embeds import XERO
+from utils.embeds import XERO, comprehensive_embed
 
 logger = logging.getLogger("XERO.Intelligence")
 
@@ -57,12 +59,12 @@ MSG_COUNTS: dict = {}
 # PROFILE DB HELPERS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-async def get_profile(db_path: str, user_id: int, guild_id: int) -> dict:
+async def get_profile(db_obj, user_id: int, guild_id: int) -> dict:
     """Load a member's full profile. Returns empty profile if none."""
     key = (user_id, guild_id)
     if key in PROFILE_CACHE:
         return PROFILE_CACHE[key]
-    async with aiosqlite.connect(db_path) as db:
+    async with db_obj._db_context() as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT * FROM member_profiles WHERE user_id=? AND guild_id=?",
@@ -81,10 +83,10 @@ async def get_profile(db_path: str, user_id: int, guild_id: int) -> dict:
     return profile
 
 
-async def save_profile(db_path: str, user_id: int, guild_id: int, profile: dict):
+async def save_profile(db_obj, user_id: int, guild_id: int, profile: dict):
     """Save a member profile to DB."""
     PROFILE_CACHE[(user_id, guild_id)] = profile
-    async with aiosqlite.connect(db_path) as db:
+    async with db_obj._db_context() as db:
         await db.execute("""
             INSERT INTO member_profiles (user_id, guild_id, skills, interests, personality, xero_knows, message_sample, last_updated)
             VALUES (?,?,?,?,?,?,?,datetime('now'))
@@ -104,10 +106,10 @@ async def save_profile(db_path: str, user_id: int, guild_id: int, profile: dict)
         await db.commit()
 
 
-async def get_guild_skill_experts(db_path: str, guild_id: int, skill: str) -> list:
+async def get_guild_skill_experts(db_obj, guild_id: int, skill: str) -> list:
     """Find members who know a specific skill (for @-ing them in chat)."""
     skill_lower = skill.lower()
-    async with aiosqlite.connect(db_path) as db:
+    async with db_obj._db_context() as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             "SELECT user_id, skills FROM member_profiles WHERE guild_id=?",
@@ -139,7 +141,7 @@ async def extract_skills_from_messages(bot, user: discord.Member, messages: list
         return
 
     msg_text = "\n".join(f"- {m}" for m in messages[:15])
-    profile   = await get_profile(bot.db.db_path, user.id, guild_id)
+    profile   = await get_profile(bot.db, user.id, guild_id)
 
     prompt = (
         f"Analyze these messages from Discord user '{user.display_name}' and extract:\n\n"
@@ -182,7 +184,7 @@ async def extract_skills_from_messages(bot, user: discord.Member, messages: list
         # Keep a message sample for context
         profile["message_sample"] = messages[-1][:200] if messages else ""
 
-        await save_profile(bot.db.db_path, user.id, guild_id, profile)
+        await save_profile(bot.db, user.id, guild_id, profile)
         logger.debug(f"Profile updated: {user.display_name} in guild {guild_id}")
 
     except (json.JSONDecodeError, Exception) as e:
@@ -333,7 +335,7 @@ class MemberIntelligence(commands.Cog):
 
         uid     = message.author.id
         gid     = message.guild.id
-        db_path = self.bot.db.db_path
+        db_obj_mi = self.bot.db
 
         # ── 1. Buffer message for skill extraction ────────────────────────
         key = (uid, gid)
@@ -370,7 +372,7 @@ class MemberIntelligence(commands.Cog):
             return
 
         # ── 5. Load speaker's profile ────────────────────────────────────
-        profile = await get_profile(db_path, uid, gid)
+        profile = await get_profile(db_obj, uid, gid)
 
         # ── 6. Build personalized system context for this user ───────────
         # This is what makes it feel like XERO actually KNOWS the person
@@ -443,7 +445,7 @@ class Intelligence(commands.GroupCog, name="intel"):
     @app_commands.describe(user="Member to view profile for (default: yourself)")
     async def profile(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
-        profile = await get_profile(self.bot.db.db_path, target.id, interaction.guild.id)
+        profile = await get_profile(self.bot.db, target.id, interaction.guild.id)
 
         # Check if anything was learned
         has_data = any([
@@ -505,7 +507,7 @@ class Intelligence(commands.GroupCog, name="intel"):
     @command_guard
     async def who_knows(self, interaction: discord.Interaction, skill: str):
         await interaction.response.defer()
-        experts = await get_guild_skill_experts(self.bot.db.db_path, interaction.guild.id, skill)
+        experts = await get_guild_skill_experts(self.bot.db, interaction.guild.id, skill)
 
         if not experts:
             e = discord.Embed(
@@ -534,7 +536,7 @@ class Intelligence(commands.GroupCog, name="intel"):
 
     @app_commands.command(name="clear-profile", description="Clear XERO's learned data about yourself.")
     async def clear_profile(self, interaction: discord.Interaction):
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "DELETE FROM member_profiles WHERE user_id=? AND guild_id=?",
                 (interaction.user.id, interaction.guild.id)
@@ -563,13 +565,12 @@ class Intelligence(commands.GroupCog, name="intel"):
         )
 
 
-from discord import app_commands
 
 
 async def setup(bot):
     # Add new DB columns if needed
     try:
-        async with aiosqlite.connect(bot.db.db_path) as db:
+        async with bot.db._db_context() as db:
             try:
                 await db.execute("ALTER TABLE guild_settings ADD COLUMN ai_personality_enabled INTEGER DEFAULT 1")
             except Exception:

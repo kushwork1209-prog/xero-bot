@@ -42,7 +42,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     async def update_stats_channels(self):
         import aiosqlite
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 async with db.execute("SELECT * FROM stats_channels") as c:
                     all_configs = await c.fetchall()
             for row in all_configs:
@@ -82,7 +82,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     @discord.ext.tasks.loop(minutes=5)
     async def check_bump_reminders(self):
         try:
-            async with aiosqlite.connect(self.bot.db.db_path) as db:
+            async with self.bot.db._db_context() as db:
                 async with db.execute(
                     "SELECT guild_id, channel_id, next_bump FROM bump_reminders WHERE next_bump <= datetime('now') AND enabled=1"
                 ) as c:
@@ -92,7 +92,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
                 if not guild: continue
                 ch = guild.get_channel(channel_id)
                 if not ch: continue
-                from utils.embeds import XERO
+                from utils.embeds import XERO, comprehensive_embed
                 embed = discord.Embed(
                     title="⬆️  Time to Bump!",
                     description=(
@@ -111,7 +111,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
                     await ch.send(content=content, embed=embed)
                     # Schedule next bump in 2 hours
                     next_bump = (datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")
-                    async with aiosqlite.connect(self.bot.db.db_path) as db:
+                    async with self.bot.db._db_context() as db:
                         await db.execute("UPDATE bump_reminders SET next_bump=? WHERE guild_id=?", (next_bump, guild_id))
                         await db.commit()
                 except Exception as e:
@@ -138,7 +138,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     async def stats_channel(self, interaction: discord.Interaction, stat: str, channel: discord.VoiceChannel = None):
         await interaction.response.defer()
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS stats_channels (
                     guild_id INTEGER, channel_id INTEGER, stat_type TEXT,
@@ -163,7 +163,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
             name = self._stats_channel_name(interaction.guild, stat)
             await channel.edit(name=name)
 
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO stats_channels (guild_id, channel_id, stat_type) VALUES (?,?,?)",
                 (interaction.guild.id, channel.id, stat)
@@ -195,7 +195,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     @app_commands.checks.has_permissions(manage_channels=True)
     async def stats_remove(self, interaction: discord.Interaction, stat: str):
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT channel_id FROM stats_channels WHERE guild_id=? AND stat_type=?", (interaction.guild.id, stat)) as c:
                 row = await c.fetchone()
             if row:
@@ -213,7 +213,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def bump_reminder(self, interaction: discord.Interaction, channel: discord.TextChannel, enabled: bool = True, ping_role: discord.Role = None):
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS bump_reminders (
                     guild_id INTEGER PRIMARY KEY, channel_id INTEGER,
@@ -299,7 +299,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def xp_blacklist(self, interaction: discord.Interaction, channel: discord.TextChannel, remove: bool = False):
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("CREATE TABLE IF NOT EXISTS xp_blacklist (guild_id INTEGER, channel_id INTEGER, PRIMARY KEY(guild_id, channel_id))")
             if remove:
                 await db.execute("DELETE FROM xp_blacklist WHERE guild_id=? AND channel_id=?", (interaction.guild.id, channel.id))
@@ -314,7 +314,7 @@ class ServerFeatures(commands.GroupCog, name="features"):
     @app_commands.command(name="weekly", description="Claim your weekly reward — 5× daily bonus + streak multiplier. Once per week.")
     async def weekly(self, interaction: discord.Interaction):
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute("CREATE TABLE IF NOT EXISTS weekly_claims (user_id INTEGER, guild_id INTEGER, last_claim TEXT, PRIMARY KEY(user_id, guild_id))")
             async with db.execute("SELECT last_claim FROM weekly_claims WHERE user_id=? AND guild_id=?", (interaction.user.id, interaction.guild.id)) as c:
                 row = await c.fetchone()
@@ -342,14 +342,14 @@ class ServerFeatures(commands.GroupCog, name="features"):
         total  = int((base + bonus) * mult)
 
         await self.bot.db.update_economy(interaction.user.id, interaction.guild.id, wallet_delta=total, earned_delta=total)
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             await db.execute(
                 "INSERT OR REPLACE INTO weekly_claims (user_id, guild_id, last_claim) VALUES (?,?,?)",
                 (interaction.user.id, interaction.guild.id, now.isoformat())
             )
             await db.commit()
 
-        embed = discord.Embed(title="🗓️  Weekly Reward Claimed!", color=XERO.GOLD)
+        embed = comprehensive_embed(title="🗓️  Weekly Reward Claimed!", color=XERO.GOLD)
         embed.set_thumbnail(url=interaction.user.display_avatar.url)
         embed.add_field(name="💰 Reward",      value=f"**${total:,}**",        inline=True)
         embed.add_field(name="⚡ Multiplier",  value=f"**{mult:.2f}×**",        inline=True)

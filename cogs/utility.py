@@ -41,7 +41,7 @@ class Utility(commands.Cog):
     @app_commands.describe(question="Poll question",option1="Option 1",option2="Option 2",option3="Option 3",option4="Option 4")
     async def poll(self, interaction: discord.Interaction, question: str, option1: str, option2: str, option3: str=None, option4: str=None):
         options=[o for o in [option1,option2,option3,option4] if o]; emojis=["1️⃣","2️⃣","3️⃣","4️⃣"]
-        embed=discord.Embed(title=f"📊 {question}",color=XERO.PRIMARY)
+        embed=comprehensive_embed(title=f"📊 {question}",color=XERO.PRIMARY)
         for i,opt in enumerate(options): embed.add_field(name=f"{emojis[i]} Option {i+1}",value=opt,inline=False)
         embed.set_footer(text=f"Poll by {interaction.user.display_name} • React to vote!")
         msg=await interaction.channel.send(embed=embed)
@@ -54,52 +54,76 @@ class Utility(commands.Cog):
         await self.bot.db.set_afk(interaction.user.id,interaction.guild.id,reason[:200])
         await interaction.response.send_message(embed=info_embed("💤 AFK Set",f"You're now AFK: **{reason}**\nI'll notify anyone who pings you. Automatically cleared when you send a message."))
 
-    @app_commands.command(name="help", description="Browse all 300+ XERO commands organized by category.")
+    @app_commands.command(name="invite", description="Get the invite link for XERO Bot.")
+    async def invite(self, interaction: discord.Interaction):
+        url = discord.utils.oauth_url(self.bot.user.id, permissions=discord.Permissions(8), scopes=("bot", "applications.commands"))
+        embed = comprehensive_embed(title="👋 Invite XERO", description="Click below to add XERO to your server!\n• 400+ Commands\n• AI & Music\n• 100% Free", color=XERO.PRIMARY)
+        view = discord.ui.View().add_item(discord.ui.Button(label="Invite XERO", url=url, style=discord.ButtonStyle.link))
+        await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="commands", description="Browse all 400+ XERO commands organized by category.")
     async def help(self, interaction: discord.Interaction):
-        embed=comprehensive_embed(title="📚 XERO — Complete Command Reference",description="300+ commands. Premium features, completely free.\n**Use `/info bot` for bot stats.**",color=XERO.PRIMARY,thumbnail_url=self.bot.user.display_avatar.url)
+        # Dynamically calculate total commands
+        total_cmds = 0
+        all_commands = []
+        for cog_name, cog in self.bot.cogs.items():
+            for cmd in cog.get_app_commands():
+                total_cmds += 1
+                if isinstance(cmd, app_commands.Group):
+                    total_cmds += len(cmd.commands)
+        
+        embed=comprehensive_embed(
+            title="📚 XERO — Complete Command Reference",
+            description=f"**{total_cmds}** commands found. Premium features, completely free.\n**Use `/info bot` for bot stats.**",
+            color=XERO.PRIMARY,
+            thumbnail_url=self.bot.user.display_avatar.url
+        )
+        
         cats=[
-            ("⚙️ /config","dashboard · view · set-welcome · set-farewell · set-logs · set-autorole · toggle-leveling · toggle-economy · toggle-ai · set-persona · reset"),
-            ("ℹ️ /info","user · server · role · channel · bot · emoji · invite · permissions"),
-            ("🛡️ /mod","warn · warnings · clearwarns · kick · ban · unban · softban · timeout · untimeout · purge · slowmode · lock · unlock · nick · history"),
-            ("🤖 /ai","ask · chat · summarize · translate · brainstorm · code-explain · code-debug · sentiment · rewrite · grammar · generate · fact-check · roast · analyze-image · clear-memory"),
-            ("🧪 /nexus","debate · rpg-start · rpg-action · rpg-quit · mod-advice · coach · explain"),
-            ("💰 /economy","balance · work · deposit · withdraw · pay · rob · slots · blackjack · coinflip · shop · buy · inventory · rich · give · reset-user · shop-add · shop-remove"),
-            ("💰 Advanced","daily · streak · heist · stocks · buy-stock · sell-stock · portfolio · event · craft · craft-add · claim"),
-            ("📊 /levels","rank · leaderboard · set-xp · add-xp · reset · reward-add · reward-remove · rewards"),
-            ("📊 /leaderboard","xp · economy · commands"),
-            ("📊 /analytics","overview · top-members · economy-stats · moderation-stats · level-stats · member-growth · channel-activity"),
-            ("🎮 /fun","8ball · roll · choose · ship · meme · fact · cat · dog · rps · trivia · joke · would-you-rather · never-have-i-ever · fortune · rate"),
-            ("🎭 /social","hug · kiss · pat · slap · cuddle · dance · highfive · wave · bite · poke · stare · shoot"),
-            ("🎉 /giveaway","start · end · reroll · list · cancel · edit-prize · winners · delete"),
-            ("📢 /announcement","send · schedule · list · cancel · edit · mention-role · set-channel"),
-            ("✅ /verify","setup · config · update-message · update-role · stats · reset"),
-            ("🎫 /ticket","setup · create · close · add · remove · list · transcript"),
-            ("🎵 /music","play · pause · resume · skip · stop · queue · nowplaying · volume · loop · remove"),
-            ("🎭 /role","add · remove · info · members · create · delete · color · rename · all · give-all · take-all · bots"),
-            ("🏰 /server","icon · banner · bans · invites · create-invite · channels · members · boosts · audit-log · lockdown · unlockdown · nuke"),
-            ("🧠 /smart","health · raid-config · escalation-config · raid-log · lockdown · unlockdown · warn-stats"),
-            ("🎂 /birthday","set · remove · view · list · setup-channel · announce · today"),
-            ("💡 /suggest","submit · approve · deny · implement · consider · list · setup"),
-            ("📌 /reactionroles","create-panel · add-role · publish · list-panels · delete-panel"),
-            ("⭐ /starboard","setup · toggle · threshold · config"),
-            ("🔢 /counting","setup · stats · reset · toggle · leaderboard"),
-            ("🤫 /confess","send · setup · reveal · delete"),
-            ("📋 /cmd","create · use · list · edit · delete · info"),
-            ("🔊 /tempvoice","setup · rename · limit · lock · unlock · active"),
-            ("🎨 /profile","card · achievements · compare · generate · variations · avatar-style"),
-            ("💾 /backup","create · list · restore · delete · export"),
-            ("🔧 /tools","calc · timestamp · weather · define · color · emojis · snipe"),
+            ("⚙️ Config","`/config` · `/settings` · `/branding` · `/view`"),
+            ("ℹ️ Info","user · server · role · channel · bot · emoji · invite · permissions"),
+            ("🛡️ Moderation","warn · warnings · clearwarns · kick · ban · unban · softban · timeout · untimeout · purge · slowmode · lock · unlock · nick · history"),
+            ("🤖 AI","ask · chat · summarize · translate · brainstorm · code-explain · code-debug · sentiment · rewrite · grammar · generate · fact-check · roast · analyze-image · clear-memory"),
+            ("🧪 Nexus","debate · rpg-start · rpg-action · rpg-quit · mod-advice · coach · explain"),
+            ("💰 Economy","balance · work · daily · streak · heist · deposit · withdraw · pay · rob · slots · blackjack · coinflip · shop · buy · inventory · rich · give"),
+            ("📈 Stocks","stocks · buy-stock · sell-stock · portfolio · event"),
+            ("📊 Levels","rank · leaderboard · set-xp · add-xp · reset · reward-add · reward-remove · rewards"),
+            ("📈 Analytics","overview · top-members · economy-stats · moderation-stats · level-stats · member-growth · channel-activity"),
+            ("🎮 Fun","8ball · roll · choose · ship · meme · fact · cat · dog · rps · trivia · joke · would-you-rather · never-have-i-ever · fortune · rate"),
+            ("🎭 Social","hug · kiss · pat · slap · cuddle · dance · highfive · wave · bite · poke · stare · shoot"),
+            ("🎉 Giveaway","start · end · reroll · list · cancel · edit-prize · winners · delete"),
+            ("📢 Announcement","send · schedule · list · cancel · edit · mention-role · set-channel"),
+            ("🛡️ Aegis","`/verify setup` (4-Tier Protection)"),
+            ("🎫 Ticket","setup · create · close · add · remove · list · transcript"),
+            ("🎵 Music","play · pause · resume · skip · stop · queue · nowplaying · volume · loop · remove · shuffle · clear"),
+            ("🎭 Roles","add · remove · info · members · create · delete · color · rename · all · give-all · take-all · bots"),
+            ("🏰 Server","icon · banner · bans · invites · create-invite · channels · members · boosts · audit-log · lockdown · unlockdown · nuke"),
+            ("🧠 Smart Mod","health · raid-config · escalation-config · raid-log · lockdown · unlockdown · warn-stats"),
+            ("🎂 Birthday","set · remove · view · list · setup-channel · announce · today"),
+            ("💡 Suggest","submit · approve · deny · implement · consider · list · setup"),
+            ("📌 Reaction Roles","create-panel · add-role · publish · list-panels · delete-panel"),
+            ("⭐ Starboard","setup · toggle · threshold · config"),
+            ("🔢 Counting","setup · stats · reset · toggle · leaderboard"),
+            ("🤫 Confess","send · setup · reveal · delete"),
+            ("📋 Custom Commands","create · use · list · edit · delete · info"),
+            ("🔊 Temp Voice","setup · rename · limit · lock · unlock · active"),
+            ("🎨 Profile","card · achievements · compare · generate · variations · avatar-style"),
+            ("🔧 Tools","calc · timestamp · weather · define · color · emojis · snipe"),
             ("🎤 XERO Voice","xero · vibe-check · roast-server · milestone-channel · personality-toggle"),
             ("🔑 Core","/ping · /remind · /poll · /afk · /help · /admin · /purge-bots"),
         ]
-        for name,cmds in cats: embed.add_field(name=name,value=cmds,inline=False)
+        
+        # Split into two fields or more to avoid field length limits if necessary
+        for name, cmds in cats:
+            embed.add_field(name=name, value=cmds, inline=True)
+            
         embed.set_footer(text="XERO Bot by Team Flame • Built to dust every other bot.")
-        await interaction.response.send_message(embed=embed,ephemeral=True)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="reminders", description="View and manage all your active reminders.")
     async def reminders(self, interaction: discord.Interaction):
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
                 "SELECT id, message, remind_at, channel_id FROM reminders WHERE user_id=? AND sent=0 ORDER BY remind_at",
@@ -108,7 +132,7 @@ class Utility(commands.Cog):
                 rows = [dict(r) for r in await c.fetchall()]
         if not rows:
             return await interaction.response.send_message(embed=info_embed("No Reminders","You have no active reminders. Use `/remind` to create one."))
-        embed = discord.Embed(title=f"⏰  Your Reminders ({len(rows)})", color=0x00D4FF)
+        embed = comprehensive_embed(title=f"⏰  Your Reminders ({len(rows)})", color=0x00D4FF)
         for r in rows:
             try:
                 dt  = datetime.datetime.fromisoformat(r["remind_at"])
@@ -128,7 +152,7 @@ class Utility(commands.Cog):
     @app_commands.describe(reminder_id="Reminder ID (from /reminders)")
     async def cancel_reminder(self, interaction: discord.Interaction, reminder_id: int):
         import aiosqlite
-        async with aiosqlite.connect(self.bot.db.db_path) as db:
+        async with self.bot.db._db_context() as db:
             async with db.execute("SELECT user_id FROM reminders WHERE id=?", (reminder_id,)) as c:
                 row = await c.fetchone()
             if not row:
@@ -145,7 +169,7 @@ class Utility(commands.Cog):
         msg = snipes.get(interaction.channel.id)
         if not msg:
             return await interaction.response.send_message(embed=info_embed("Nothing to Snipe","No recently deleted messages cached."))
-        embed = discord.Embed(description=msg['content'] or "*no text*", color=0xFF3B5C, timestamp=msg['deleted_at'])
+        embed = comprehensive_embed(description=msg['content'] or "*no text*", color=0xFF3B5C, timestamp=msg['deleted_at'])
         embed.set_author(name=msg['author'], icon_url=msg['avatar'])
         embed.set_footer(text=f"Sniped from #{interaction.channel.name}  •  XERO Snipe")
         await interaction.response.send_message(embed=embed)
