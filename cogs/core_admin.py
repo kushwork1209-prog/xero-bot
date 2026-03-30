@@ -296,19 +296,20 @@ class CoreAdmin(commands.GroupCog, name="core"):
         )
 
     # ── 16. Set Avatar ────────────────────────────────────────────────────────
-    @app_commands.command(name="set-avatar", description="Change the bot's avatar.")
-    @app_commands.describe(url="Direct image URL")
+    @app_commands.command(name="set-avatar", description="Change the bot's avatar — upload an image file.")
+    @app_commands.describe(image="PNG or JPG image to use as bot avatar")
     @is_management()
-    async def set_avatar(self, interaction: discord.Interaction, url: str):
+    async def set_avatar(self, interaction: discord.Interaction, image: discord.Attachment):
+        if not image.content_type or not image.content_type.startswith("image/"):
+            return await interaction.response.send_message(embed=error_embed("Invalid File", "Please upload a PNG or JPG image."), ephemeral=True)
         try:
-            import aiohttp
-            async with aiohttp.ClientSession() as s:
-                async with s.get(url) as r:
-                    data = await r.read()
+            data = await image.read()
             await self.bot.user.edit(avatar=data)
-            await interaction.response.send_message(embed=success_embed("Avatar Updated", "Bot avatar changed."), ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(embed=error_embed("Failed", str(e)[:200]), ephemeral=True)
+            e = success_embed("Avatar Updated", "Bot avatar changed successfully.")
+            e.set_thumbnail(url=image.url)
+            await interaction.response.send_message(embed=e, ephemeral=True)
+        except Exception as ex:
+            await interaction.response.send_message(embed=error_embed("Failed", str(ex)[:200]), ephemeral=True)
 
     # ── 17. Bot Info ──────────────────────────────────────────────────────────
     @app_commands.command(name="bot-info", description="Technical info about this XERO instance.")

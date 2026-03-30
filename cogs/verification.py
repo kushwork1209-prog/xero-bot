@@ -266,7 +266,7 @@ class Verification(commands.GroupCog, name="verify"):
         log_channel="Channel to log verification events (optional)"
     )
     @app_commands.checks.has_permissions(administrator=True)
-    async def setup(self, interaction: discord.Interaction, role: discord.Role, log_channel: discord.TextChannel = None):
+    async def setup(self, interaction: discord.Interaction, role: discord.Role, log_channel: discord.TextChannel = None, panel_image: discord.Attachment = None):
         await interaction.response.defer(ephemeral=True)
         await self.bot.db.update_guild_setting(interaction.guild.id, "verify_role_id", role.id)
         if log_channel:

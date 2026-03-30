@@ -253,16 +253,38 @@ async def _build_staff_brief(bot, guild, member: discord.Member, ticket_id: int)
     return e
 
 class TicketCategorySelect(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label=v["label"], value=k, emoji=v["emoji"], description=v["description"])
-            for k, v in TICKET_CATEGORIES.items()
-        ]
+    def __init__(self, options_data: list = None):
+        # options_data: list of dicts with keys: label, value, emoji, description
+        if options_data:
+            options = [
+                discord.SelectOption(label=o["label"], value=o["value"], emoji=o.get("emoji","📌"), description=o.get("description",""))
+                for o in options_data[:25]
+            ]
+        else:
+            options = [
+                discord.SelectOption(label=v["label"], value=k, emoji=v["emoji"], description=v["description"])
+                for k, v in TICKET_CATEGORIES.items()
+            ]
         super().__init__(placeholder="Choose a support category...", min_values=1, max_values=1, options=options, custom_id="xero_t_select")
 
     async def callback(self, interaction: discord.Interaction):
         category_key = self.values[0]
-        category_info = TICKET_CATEGORIES[category_key]
+        # Try custom DB categories first, then fall back to defaults
+        category_info = None
+        try:
+            async with interaction.client.db._db_context() as db:
+                db.row_factory = aiosqlite.Row
+                async with db.execute(
+                    "SELECT * FROM ticket_custom_categories WHERE guild_id=? AND key=?",
+                    (interaction.guild.id, category_key)
+                ) as cur:
+                    row = await cur.fetchone()
+                if row:
+                    category_info = {"label": row["label"], "emoji": row["emoji"], "description": row["description"]}
+        except Exception:
+            pass
+        if not category_info:
+            category_info = TICKET_CATEGORIES.get(category_key, {"label": category_key.title(), "emoji": "📌", "description": ""})
         
         bot      = interaction.client
         guild    = interaction.guild
@@ -336,10 +358,28 @@ class TicketCategorySelect(discord.ui.Select):
 
         await interaction.response.send_message(f"✅ Ticket opened: {ch.mention}", ephemeral=True)
 
+async def _build_ticket_open_view(bot, guild_id: int) -> "TicketOpenView":
+    """Build TicketOpenView with custom or default categories from DB."""
+    options_data = None
+    try:
+        async with bot.db._db_context() as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT key, label, emoji, description FROM ticket_custom_categories WHERE guild_id=? ORDER BY rowid",
+                (guild_id,)
+            ) as cur:
+                rows = await cur.fetchall()
+            if rows:
+                options_data = [{"value": r["key"], "label": r["label"], "emoji": r["emoji"], "description": r["description"]} for r in rows]
+    except Exception:
+        pass
+    view = TicketOpenView(options_data)
+    return view
+
 class TicketOpenView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, options_data: list = None):
         super().__init__(timeout=None)
-        self.add_item(TicketCategorySelect())
+        self.add_item(TicketCategorySelect(options_data))
 
 class TicketActionView(discord.ui.View):
     def __init__(self, bot=None): super().__init__(timeout=None); self.bot = bot
@@ -460,14 +500,13 @@ class Tickets(commands.GroupCog, name="ticket"):
         category="Category for ticket channels", 
         log_channel="Where case logs are posted on close", 
         message="Custom panel message",
-        use_brand_image="Whether to use the Unified Brand Image (True) or a custom image (False)",
-        custom_image="Custom image URL to use for this panel (if use_brand_image is False)"
+        panel_image="Optional image to show on the ticket panel (upload a file)"
     )
     @app_commands.checks.has_permissions(administrator=True)
     async def setup(self, interaction: discord.Interaction, channel: discord.TextChannel,
                     support_role: discord.Role=None, category: discord.CategoryChannel=None,
                     log_channel: discord.TextChannel=None, message: str=None,
-                    use_brand_image: bool=True, custom_image: str=None):
+                    panel_image: discord.Attachment=None):
         if support_role: await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_support_role_id", support_role.id)
         if category:     await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_category_id", category.id)
         if log_channel:  await self.bot.db.update_guild_setting(interaction.guild.id, "ticket_log_channel_id", log_channel.id)
@@ -486,23 +525,29 @@ class Tickets(commands.GroupCog, name="ticket"):
             "**Other**\nAnything else not listed above"
         )
         
-        embed = comprehensive_embed(
-            title="XERO™ BOT SUPPORT — ELITE SUPPORT",
-            description=f"**SERVER ASSISTANCE CENTRE**\n\n{message or desc}",
-            color=XERO.PRIMARY,
-            author_name=f"{interaction.guild.name.upper()} — TICKET SYSTEM",
-            author_icon=interaction.guild.icon.url if interaction.guild.icon else None
+        embed = discord.Embed(
+            title=f"🎫  {interaction.guild.name} — Support",
+            description=message or "Need help? Select a category below to open a ticket.\nOur team will assist you as soon as possible.",
+            color=0x2B2D31,
+            timestamp=discord.utils.utcnow()
         )
-        embed.set_footer(text=f"XERO ELITE • xero.gg | XERO™ BOT SUPPORT | {datetime.datetime.now().strftime('%m/%d/%Y %I:%M %p')}")
-        
-        file = None
-        if use_brand_image:
-            embed, file = await brand_embed(embed, interaction.guild, self.bot)
-        elif custom_image:
-            embed.set_image(url=custom_image)
-            
-        await channel.send(embed=embed, file=file, view=TicketOpenView())
-        await interaction.response.send_message(embed=success_embed("Ticket System Deployed", f"Panel posted in {channel.mention}."), ephemeral=True)
+        if interaction.guild.icon:
+            embed.set_thumbnail(url=interaction.guild.icon.url)
+        if support_role:
+            embed.add_field(name="Support Team", value=support_role.mention, inline=True)
+        embed.set_footer(text=f"{interaction.guild.name}  ·  Support System")
+
+        # Handle uploaded image
+        send_file = None
+        if panel_image:
+            if not panel_image.content_type or not panel_image.content_type.startswith("image/"):
+                return await interaction.response.send_message(embed=error_embed("Invalid File", "Please upload a valid image file (PNG, JPG, etc.)."), ephemeral=True)
+            embed.set_image(url=panel_image.url)
+
+        # Build view with custom categories from DB
+        view = await _build_ticket_open_view(self.bot, interaction.guild.id)
+        await channel.send(embed=embed, view=view)
+        await interaction.response.send_message(embed=success_embed("Ticket System Ready", f"Panel posted in {channel.mention}."), ephemeral=True)
 
     @app_commands.command(name="close", description="Close the current ticket and archive the transcript.")
     @app_commands.describe(reason="Reason for closing")

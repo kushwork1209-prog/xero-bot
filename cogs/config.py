@@ -165,8 +165,8 @@ class WelcomeDMModal(discord.ui.Modal, title="Configure Welcome DM"):
         max_length=800, required=True,
     )
     image_url = discord.ui.TextInput(
-        label="DM Image URL (optional)",
-        placeholder="https://i.imgur.com/image.png — leave blank to use channel image",
+        label="DM Image URL (optional — use /config welcome-image to upload)",
+        placeholder="Leave blank. Use /config welcome-image to upload an image file.",
         required=False, max_length=500,
     )
     def __init__(self, bot, guild):
@@ -1579,6 +1579,29 @@ class Config(commands.GroupCog, name="config"):
             "Channel and message settings are still active.\n"
             "Re-run `/config welcome` with an image attached to add a new one."
         ))
+
+
+    @app_commands.command(name="welcome-image", description="Upload an image to show on welcome cards and DMs.")
+    @app_commands.describe(image="PNG or JPG image file to use for welcome messages")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def welcome_image(self, interaction: discord.Interaction, image: discord.Attachment):
+        if not image.content_type or not image.content_type.startswith("image/"):
+            return await interaction.response.send_message(embed=error_embed("Invalid File", "Please upload a PNG or JPG image."), ephemeral=True)
+        await _set(self.bot, interaction.guild.id, "welcome_dm_image_url", image.url)
+        e = success_embed("Welcome Image Set", f"Image saved! It will appear on welcome cards and DMs.")
+        e.set_image(url=image.url)
+        await interaction.response.send_message(embed=e, ephemeral=True)
+
+    @app_commands.command(name="farewell-image", description="Upload an image to show on farewell messages.")
+    @app_commands.describe(image="PNG or JPG image file")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def farewell_image(self, interaction: discord.Interaction, image: discord.Attachment):
+        if not image.content_type or not image.content_type.startswith("image/"):
+            return await interaction.response.send_message(embed=error_embed("Invalid File", "Please upload a PNG or JPG image."), ephemeral=True)
+        await _set(self.bot, interaction.guild.id, "farewell_image_url", image.url)
+        e = success_embed("Farewell Image Set", "Image saved for farewell messages.")
+        e.set_image(url=image.url)
+        await interaction.response.send_message(embed=e, ephemeral=True)
 
 
 async def setup(bot):
