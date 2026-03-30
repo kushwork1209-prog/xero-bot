@@ -280,5 +280,35 @@ class ChannelListView(discord.ui.View):
         await interaction.response.send_message(embed=view.build_embed(), view=view)
 
 
+    @app_commands.command(name="list-roles", description="Browse every role with ID, member count, color — 10 per page.")
+    async def list_roles(self, interaction: discord.Interaction):
+        roles = sorted([r for r in interaction.guild.roles if r.name != "@everyone"], key=lambda r: r.position, reverse=True)
+        if not roles:
+            return await interaction.response.send_message(embed=discord.Embed(description="No roles found.", color=0x2B2D31))
+        pages = [roles[i:i+10] for i in range(0, len(roles), 10)]
+        total_pages = len(pages)
+
+        def build_embed(page: int) -> discord.Embed:
+            e = discord.Embed(title=f"🏷️  {interaction.guild.name} — Roles", description=f"**{len(roles)}** roles · highest position first", color=0x2B2D31, timestamp=discord.utils.utcnow())
+            lines = []
+            for role in pages[page]:
+                mc  = len(role.members)
+                col = f"#{role.color.value:06x}" if role.color.value else "#99aab5"
+                h   = "👁️ Shown" if role.hoist else "Hidden"
+                m   = "Yes" if role.mentionable else "No"
+                lines.append(f"{role.mention}  ID:`{role.id}`  Members:**{mc}**  Color:`{col}`  Hoist:{h}  Mention:{m}")
+            e.add_field(name="\u200b", value="\n".join(lines) if lines else "None", inline=False)
+            e.set_footer(text=f"Page {page+1}/{total_pages}  ·  {len(roles)} roles total")
+            return e
+
+        class RV(discord.ui.View):
+            def __init__(self): super().__init__(timeout=120); self.p = 0
+            @discord.ui.button(label="◄", style=discord.ButtonStyle.secondary)
+            async def prev(self, i, _b): self.p = (self.p - 1) % total_pages; await i.response.edit_message(embed=build_embed(self.p), view=self)
+            @discord.ui.button(label="►", style=discord.ButtonStyle.secondary)
+            async def nxt(self, i, _b): self.p = (self.p + 1) % total_pages; await i.response.edit_message(embed=build_embed(self.p), view=self)
+
+        await interaction.response.send_message(embed=build_embed(0), view=RV())
+
 async def setup(bot):
     await bot.add_cog(Server(bot))
