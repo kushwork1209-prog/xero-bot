@@ -214,5 +214,71 @@ class Server(commands.GroupCog, name="server"):
             await interaction.response.send_message(embed=success_embed("Nuked", f"#{ch.name} has been nuked."))
 
 
+class ChannelListView(discord.ui.View):
+    def __init__(self, channels: list, guild: discord.Guild):
+        super().__init__(timeout=120)
+        self.channels = channels
+        self.guild    = guild
+        self.page     = 0
+        self.per      = 10
+        self.total    = len(channels)
+        self.pages    = max(1, (self.total + self.per - 1) // self.per)
+
+    def build_embed(self) -> discord.Embed:
+        start = self.page * self.per
+        chunk = self.channels[start:start + self.per]
+        lines = []
+        for ch in chunk:
+            type_emoji = {
+                discord.ChannelType.text:          "💬",
+                discord.ChannelType.voice:         "🔊",
+                discord.ChannelType.category:      "📁",
+                discord.ChannelType.news:           "📣",
+                discord.ChannelType.stage_voice:   "🎙️",
+                discord.ChannelType.forum:         "📋",
+                discord.ChannelType.thread:        "🧵",
+            }.get(ch.type, "📌")
+            cat = ch.category.name if hasattr(ch, "category") and ch.category else "—"
+            lines.append(f"{type_emoji} {ch.mention if hasattr(ch,'mention') else ch.name}  `{ch.id}`  _{cat}_")
+        e = discord.Embed(
+            title=f"📋  {self.guild.name} — All Channels",
+            description="\n".join(lines) or "No channels",
+            color=0x00D4FF,
+            timestamp=discord.utils.utcnow()
+        )
+        e.set_footer(text=f"Page {self.page+1}/{self.pages}  ·  {self.total} channels total")
+        return e
+
+    def update_buttons(self):
+        self.prev_btn.disabled = self.page == 0
+        self.next_btn.disabled = self.page >= self.pages - 1
+
+    @discord.ui.button(emoji="◀", style=discord.ButtonStyle.secondary, custom_id="cl_prev")
+    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page -= 1
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(emoji="▶", style=discord.ButtonStyle.secondary, custom_id="cl_next")
+    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page += 1
+        self.update_buttons()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+
+    @app_commands.command(name="list-channels", description="Browse every channel with its ID and category — 10 per page.")
+    async def list_channels(self, interaction: discord.Interaction):
+        # Sort: categories first, then their children in position order
+        all_ch = sorted(interaction.guild.channels, key=lambda c: (c.position,))
+        if not all_ch:
+            return await interaction.response.send_message(
+                embed=discord.Embed(description="No channels found.", color=0x2B2D31),
+                ephemeral=True
+            )
+        view = ChannelListView(all_ch, interaction.guild)
+        view.update_buttons()
+        await interaction.response.send_message(embed=view.build_embed(), view=view)
+
+
 async def setup(bot):
     await bot.add_cog(Server(bot))
