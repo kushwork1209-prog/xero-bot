@@ -7,6 +7,51 @@ from utils.embeds import success_embed, error_embed, info_embed, comprehensive_e
 
 logger = logging.getLogger("XERO.Utility")
 
+class Paginator(discord.ui.View):
+    def __init__(self, items, title, user_id, items_per_page=10):
+        super().__init__(timeout=60)
+        self.items = items
+        self.title = title
+        self.user_id = user_id
+        self.items_per_page = items_per_page
+        self.current_page = 0
+        self.total_pages = (len(items) - 1) // items_per_page + 1
+
+    def create_embed(self):
+        start = self.current_page * self.items_per_page
+        end = start + self.items_per_page
+        current_items = self.items[start:end]
+        
+        desc = "\n".join(current_items)
+        embed = info_embed(
+            f"{self.title} (Page {self.current_page + 1}/{self.total_pages})",
+            desc
+        )
+        embed.set_footer(text=f"Total: {len(self.items)} items")
+        return embed
+
+    @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("This menu is not for you.", ephemeral=True)
+        
+        if self.current_page > 0:
+            self.current_page -= 1
+            await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("This menu is not for you.", ephemeral=True)
+        
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            await interaction.response.edit_message(embed=self.create_embed(), view=self)
+        else:
+            await interaction.response.defer()
+
 class Utility(commands.Cog):
     def __init__(self, bot): self.bot = bot
 
@@ -65,7 +110,6 @@ class Utility(commands.Cog):
     async def help(self, interaction: discord.Interaction):
         # Dynamically calculate total commands
         total_cmds = 0
-        all_commands = []
         for cog_name, cog in self.bot.cogs.items():
             for cmd in cog.get_app_commands():
                 total_cmds += 1
@@ -109,11 +153,10 @@ class Utility(commands.Cog):
             ("🔊 Temp Voice","setup · rename · limit · lock · unlock · active"),
             ("🎨 Profile","card · achievements · compare · generate · variations · avatar-style"),
             ("🔧 Tools","calc · timestamp · weather · define · color · emojis · snipe"),
-            ("🎤 XERO Voice","xero · vibe-check · roast-server · milestone-channel · personality-toggle"),
             ("🔑 Core","/ping · /remind · /poll · /afk · /help · /admin · /purge-bots"),
+            ("🛠️ Utility","/roles · /channels"),
         ]
         
-        # Split into two fields or more to avoid field length limits if necessary
         for name, cmds in cats:
             embed.add_field(name=name, value=cmds, inline=True)
             
@@ -173,6 +216,27 @@ class Utility(commands.Cog):
         embed.set_author(name=msg['author'], icon_url=msg['avatar'])
         embed.set_footer(text=f"Sniped from #{interaction.channel.name}  •  XERO Snipe")
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="roles", description="List all roles in the server with their IDs and member counts.")
+    async def list_roles(self, interaction: discord.Interaction):
+        roles = sorted(interaction.guild.roles, key=lambda r: r.position, reverse=True)
+        items = []
+        for r in roles:
+            items.append(f"▹ **{r.name}**\n  ID: `{r.id}` | Members: `{len(r.members)}`")
+        
+        view = Paginator(items, f"Roles in {interaction.guild.name}", interaction.user.id)
+        await interaction.response.send_message(embed=view.create_embed(), view=view)
+
+    @app_commands.command(name="channels", description="List all channels in the server with their IDs.")
+    async def list_channels(self, interaction: discord.Interaction):
+        channels = sorted(interaction.guild.channels, key=lambda c: (str(c.type), c.position))
+        items = []
+        for c in channels:
+            type_icon = "💬" if isinstance(c, discord.TextChannel) else "🔊" if isinstance(c, discord.VoiceChannel) else "📁" if isinstance(c, discord.CategoryChannel) else "📝"
+            items.append(f"{type_icon} **{c.name}**\n  ID: `{c.id}` | Type: `{str(c.type).replace('Channel', '')}`")
+        
+        view = Paginator(items, f"Channels in {interaction.guild.name}", interaction.user.id)
+        await interaction.response.send_message(embed=view.create_embed(), view=view)
 
 async def setup(bot):
     await bot.add_cog(Utility(bot))
