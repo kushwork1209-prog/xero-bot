@@ -222,9 +222,15 @@ class Giveaway(commands.GroupCog, name="giveaway"):
     def __init__(self, bot):
         self.bot = bot
         self.process_giveaways.start()
+        self._restore_views.start()
 
-    async def cog_load(self):
-        await self.bot.wait_until_ready()
+    def cog_unload(self):
+        self.process_giveaways.cancel()
+        self._restore_views.cancel()
+
+    @tasks.loop(count=1)
+    async def _restore_views(self):
+        """Re-register persistent button views for all active giveaways after bot is ready."""
         try:
             async with self.bot.db._db_context() as db:
                 db.row_factory = aiosqlite.Row
@@ -246,10 +252,11 @@ class Giveaway(commands.GroupCog, name="giveaway"):
 
             logger.info(f"[Giveaway] Restored {len(rows)} persistent views.")
         except Exception as e:
-            logger.error(f"[Giveaway] cog_load error: {e}")
+            logger.error(f"[Giveaway] view restore error: {e}")
 
-    def cog_unload(self):
-        self.process_giveaways.cancel()
+    @_restore_views.before_loop
+    async def _before_restore(self):
+        await self.bot.wait_until_ready()
 
     @tasks.loop(minutes=1)
     async def process_giveaways(self):
