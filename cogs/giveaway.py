@@ -6,7 +6,7 @@ import discord
 import logging
 import datetime
 import random
-import asyncio
+import time
 import aiosqlite
 from discord.ext import commands, tasks
 from discord import app_commands
@@ -166,35 +166,34 @@ class GiveawayEntryView(discord.ui.View):
                         ephemeral=True,
                     )
 
-            # Toggle entry
+            # Check if already entered — no withdrawal, one-way entry
             async with db.execute(
-                "SELECT rowid FROM giveaway_participants WHERE giveaway_id=? AND user_id=?",
+                "SELECT COUNT(*) FROM giveaway_participants WHERE giveaway_id=? AND user_id=?",
                 (gw_id, interaction.user.id),
             ) as c:
-                existing = await c.fetchone()
+                already = (await c.fetchone())[0]
 
-            if existing:
-                await db.execute(
-                    "DELETE FROM giveaway_participants WHERE giveaway_id=? AND user_id=?",
-                    (gw_id, interaction.user.id),
+            if already:
+                return await interaction.response.send_message(
+                    f"✅ You're already entered in **{gw['prize']}**! Good luck!",
+                    ephemeral=True,
                 )
-                action = "left"
-            else:
-                bonus_id = gw.get("bonus_role_id")
-                entries  = 1
-                if bonus_id:
-                    m = interaction.guild.get_member(interaction.user.id)
-                    if m and any(r.id == bonus_id for r in m.roles):
-                        entries = 2
-                for _ in range(entries):
-                    try:
-                        await db.execute(
-                            "INSERT INTO giveaway_participants (giveaway_id, user_id) VALUES (?,?)",
-                            (gw_id, interaction.user.id),
-                        )
-                    except Exception:
-                        pass
-                action = "entered"
+
+            # Enter — bonus role gets 2× entries (2 weighted rows)
+            bonus_id = gw.get("bonus_role_id")
+            entries  = 1
+            if bonus_id:
+                m = interaction.guild.get_member(interaction.user.id)
+                if m and any(r.id == bonus_id for r in m.roles):
+                    entries = 2
+            for _ in range(entries):
+                try:
+                    await db.execute(
+                        "INSERT INTO giveaway_participants (giveaway_id, user_id) VALUES (?,?)",
+                        (gw_id, interaction.user.id),
+                    )
+                except Exception:
+                    pass
 
             await db.commit()
 
@@ -205,14 +204,30 @@ class GiveawayEntryView(discord.ui.View):
                 row = await c.fetchone()
             new_count = row[0] if row else 0
 
+        # Update button label with new count
         self._update_label(new_count)
 
-        if action == "entered":
-            reply = f"✅ You've entered the giveaway for **{gw['prize']}**!\nClick again to withdraw your entry."
-        else:
-            reply = f"↩️ You've left the **{gw['prize']}** giveaway."
+        # Update the embed's Entries field live on the panel
+        embed = None
+        if interaction.message and interaction.message.embeds:
+            embed = interaction.message.embeds[0]
+            for i, field in enumerate(embed.fields):
+                if "Entries" in field.name or "🎟" in field.name:
+                    embed.set_field_at(
+                        i,
+                        name  = field.name,
+                        value = f"**{new_count}** {'person has' if new_count == 1 else 'people have'} entered",
+                        inline= field.inline,
+                    )
+                    break
 
-        await interaction.response.edit_message(view=self)
+        bonus_note = " You have **2× entries** thanks to your role!" if entries == 2 else ""
+        reply = f"✅ You've entered **{gw['prize']}**!{bonus_note}"
+
+        if embed:
+            await interaction.response.edit_message(embed=embed, view=self)
+        else:
+            await interaction.response.edit_message(view=self)
         await interaction.followup.send(reply, ephemeral=True)
 
 
@@ -407,7 +422,7 @@ class Giveaway(commands.GroupCog, name="giveaway"):
             )
 
         ch      = channel or interaction.channel
-        end_ts  = int((discord.utils.utcnow() + datetime.timedelta(minutes=total_minutes)).timestamp())
+        end_ts  = int(time.time()) + (total_minutes * 60)
         w_count = max(1, winners)
 
         # Resolve images — uploads take priority over URLs
